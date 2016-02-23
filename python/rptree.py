@@ -14,19 +14,21 @@ class RPTree:
     This class contains the implementation of a single random projection tree. Only median splits are used for now.
     """
 
-    def __init__(self, data, indxs, n0, seed=None):
+    def __init__(self, data, n0, seed=None):
+
         if seed is None:
             seed = np.random.randint(0, 1e9)
         self.seed = seed
         self.dim = data.shape[1]
-        self.root = Node(indxs)
+        self.root = Node(range(data.shape[0]))
 
         queue = deque([self.root])
         np.random.seed(self.seed)
 
         # The following keep track on the level of the tree and are used to indicate when a new random vector is needed
-        level_size = 1
+        level_size = 0
         level_capacity = 1
+        vector = np.random.normal(size=self.dim)
 
         while len(queue) > 0:
             if level_size == level_capacity:
@@ -39,6 +41,7 @@ class RPTree:
             node = queue.popleft()
             indxs = node.get_indxs()
             size = len(indxs)
+
             # Compute and sort the projections
             projections = [np.dot(vector, obj) for obj in [data[i] for i in indxs]]
 
@@ -51,7 +54,7 @@ class RPTree:
             node.set_children(left, right, division)
 
             # Add new nodes to queue to be split if necessary
-            if len(projections)/2 > n0:
+            if size/2 > n0:
                 queue.append(left)
                 queue.append(right)
 
@@ -59,12 +62,11 @@ class RPTree:
         np.random.seed(self.seed)
         node = self.root
         while node.left is not None:
-            vector = np.random.normal(size=self.dim)
-            projection = np.dot(obj, vector)
-            if projection < node.division:
+            if np.dot(obj, np.random.normal(size=self.dim)) < node.division:
                 node = node.left
             else:
                 node = node.right
+            pass
         return node.indxs
 
 
@@ -74,10 +76,10 @@ class Node:
 
     """
     def __init__(self, indxs):
-        self.indxs = indxs # Can be removed from inner nodes
-        self.left = None # Not required for child nodes
-        self.right = None # Not required for child nodes
-        self.division = None # Not required for child nodes
+        self.indxs = indxs  # Can be removed from inner nodes for memory efficiency
+        self.left = None  # Not required for child nodes for memory efficiency
+        self.right = None  # Not required for child nodes for memory efficiency
+        self.division = None  # Not required for child nodes for memory efficiency
 
     def set_children(self, left, right, division):
         self.left = left
