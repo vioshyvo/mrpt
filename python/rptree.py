@@ -1,97 +1,89 @@
 # -*- coding: utf-8 -*-
 #
-#  Author: Teemu Henrikki Pitkänen <teemu.pitkanen@helsinki.fi>
+# Author: Teemu Henrikki Pitkänen <teemu.pitkanen@helsinki.fi>
 # University of Helsinki / Helsinki Institute for Information Technology 2016
 #
 
+import math
 import numpy as np
-import scipy.spatial.distance as ssd
+from collections import deque
 
 
-class rptree(object):
+class RPTree:
+    """
+    This class contains the implementation of a single random projection tree. Only median splits are used for now.
+    """
 
-    # Values that control random vector generation
-    a = 283
-    b = 293
+    def __init__(self, data, indxs, n0, seed=None):
+        if seed is None:
+            seed = np.random.randint(0, 1e9)
+        self.seed = seed
+        self.dim = data.shape[1]
+        self.root = Node(indxs)
 
-    # This method recursively builds the tree structure for the given data
-    def __init__(self, data, indices, n0, split_function, seed=None, root=1):
+        queue = deque([self.root])
+        np.random.seed(self.seed)
 
-        # If the node is bigger than the allowed maximum leaf size
-        if len(indices) > n0:
+        # The following keep track on the level of the tree and are used to indicate when a new random vector is needed
+        level_size = 1
+        level_capacity = 1
 
-            # Set random seed and store only if self is root
-            if root == 1:
-                seed = np.random.randint(0, 1e9)
-                self.seed = seed
-            np.random.seed(seed)
+        while len(queue) > 0:
+            if level_size == level_capacity:
+                level_size = 0
+                level_capacity *= 2
+                vector = np.random.normal(size=self.dim)
+            level_size += 1
 
-            # Generate the random vector and compute projections
-            randomvector = np.random.normal(size=(1,len(data[0])))
-            projections = np.dot(randomvector, np.array([data[index] for index in indices]).T)[0]
+            # Pop next node from the queue
+            node = queue.popleft()
+            indxs = node.get_indxs()
+            size = len(indxs)
+            # Compute and sort the projections
+            projections = [np.dot(vector, obj) for obj in [data[i] for i in indxs]]
 
-            # Decide the split point
-            self.splitPoint = split_function(projections)
+            order = np.argsort(projections)
 
-            # Find out the number of objects that go into each subtree
-            sizeofleft = 0
-            for i in range(len(projections)):
-                if projections[i]<self.splitPoint:
-                    sizeofleft += 1
+            # Create node objects for children
+            left = Node([indxs[i] for i in order[:size/2]])
+            right = Node([indxs[i] for i in order[size/2:]])
+            division = (projections[order[size/2]] + projections[order[int(math.ceil(size/2.0) - 1)]])/2.0
+            node.set_children(left, right, division)
 
-            # Build two lists containing the division of data indices into two subsets, one for each subtree
-            leftIndices = np.array([0]*sizeofleft)
-            rightIndices = np.array([0]*(len(projections)-sizeofleft))
-            l=0
-            r=0
-            for i in range(len(projections)):
-                if projections[i] < self.splitPoint:
-                    leftIndices[l] = indices[i]
-                    l += 1
-                else:
-                    rightIndices[r]=indices[i]
-                    r += 1
+            # Add new nodes to queue to be split if necessary
+            if len(projections)/2 > n0:
+                queue.append(left)
+                queue.append(right)
 
-            # Recursively build the subtrees
-            self.left = rptree(data, leftIndices, n0, split_function, seed+self.a, 0)
-            self.right = rptree(data, rightIndices, n0, split_function, seed+self.b, 0)
-
-        # This node becomes a leaf
-        else:
-            self.members = indices
-
-    # This method places the query object in a leaf and returns the leaf members
-    def query(self, queryobject):
-
-        # Moving down the tree to a leaf
-        tree = self
-        seed = tree.seed
-
-        while not hasattr(tree, 'members'):
-
-            # restore rng settings, generate vector, compute projection
-            np.random.seed(seed)
-            randomvector = np.random.normal(size=(1, len(queryobject)))
-            projection = np.dot(randomvector, queryobject)
-
-            # Decide into which branch the query object belongs
-            if projection < tree.splitPoint:
-                tree = tree.left
-                seed += self.a
+    def query(self, obj):
+        np.random.seed(self.seed)
+        node = self.root
+        while node.left is not None:
+            vector = np.random.normal(size=self.dim)
+            projection = np.dot(obj, vector)
+            if projection < node.division:
+                node = node.left
             else:
-                tree = tree.right
-                seed += self.b
-
-        # Return the indices of the objects in the leaf
-        return tree.members
+                node = node.right
+        return node.indxs
 
 
-def approximate_knn(trees, queryObject, data, k):
-    searchset = np.array([])
-    for tree in trees:
-        searchset = np.concatenate((searchset,tree.query(queryObject)), axis=1)
-    searchset = list(set(searchset))
-    print np.array([data[index] for index in searchset])
-    indices = np.argsort(ssd.cdist(np.array([queryObject]), np.array([data[index] for index in searchset])))[0,:k]
-    print indices
-    return [searchset[index] for index in indices]
+class Node:
+    """
+    This class describes a single node of the rp-tree.
+
+    """
+    def __init__(self, indxs):
+        self.indxs = indxs # Can be removed from inner nodes
+        self.left = None # Not required for child nodes
+        self.right = None # Not required for child nodes
+        self.division = None # Not required for child nodes
+
+    def set_children(self, left, right, division):
+        self.left = left
+        self.right = right
+        self.division = division
+
+    def get_indxs(self):
+        return self.indxs
+
