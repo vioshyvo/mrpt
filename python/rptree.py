@@ -11,7 +11,8 @@ from collections import deque
 
 class RPTree:
     """
-    This class contains the implementation of a single random projection tree. Only median splits are used for now.
+    This class implements the random projection tree data structure used for indexing a data set for quick approximate
+    nearest neighbor queries.
     """
 
     def __init__(self, data, n0, seed=None):
@@ -21,52 +22,57 @@ class RPTree:
         self.seed = seed
         self.dim = data.shape[1]
         self.root = Node(range(data.shape[0]))
+        self.tree_depth = 1
 
-        queue = deque([self.root])
+        self.build_tree(data, n0)
+
+    def build_tree(self, data, n0):
         np.random.seed(self.seed)
-
-        # The following keep track on the level of the tree and are used to indicate when a new random vector is needed
+        self.tree_depth = int(np.log2(len(data)/float(n0))+1)
+        vectors = np.random.normal(size=(self.tree_depth, self.dim))
+        all_projections = np.dot(vectors, data.T)
+        queue = deque([self.root])
         level_size = 0
         level_capacity = 1
-        vector = np.random.normal(size=self.dim)
-
+        curr_level = 0
         while len(queue) > 0:
-            if level_size == level_capacity:
-                level_size = 0
-                level_capacity *= 2
-                vector = np.random.normal(size=self.dim)
-            level_size += 1
-
-            # Pop next node from the queue
             node = queue.popleft()
             indxs = node.get_indxs()
-            size = len(indxs)
+            node_size = len(indxs)
 
-            # Compute and sort the projections
-            projections = [np.dot(vector, obj) for obj in [data[i] for i in indxs]]
-
+            projections = [all_projections[curr_level, i] for i in indxs]
             order = np.argsort(projections)
 
             # Create node objects for children
-            left = Node([indxs[i] for i in order[:size/2]])
-            right = Node([indxs[i] for i in order[size/2:]])
-            division = (projections[order[size/2]] + projections[order[int(math.ceil(size/2.0) - 1)]])/2.0
+            left = Node([indxs[i] for i in order[:node_size / 2]])
+            right = Node([indxs[i] for i in order[node_size / 2:]])
+            division = (projections[order[node_size / 2]] + projections[
+                order[int(math.ceil(node_size / 2.0) - 1)]]) / 2.0
             node.set_children(left, right, division)
 
             # Add new nodes to queue to be split if necessary
-            if size/2 > n0:
+            if node_size / 2 > n0:
                 queue.append(left)
                 queue.append(right)
 
-    def query(self, obj):
+            level_size += 1
+            if level_size == level_capacity:
+                level_size = 0
+                level_capacity *= 2
+                curr_level += 1
+
+    def find_leaf(self, obj):
         np.random.seed(self.seed)
+        projections = np.dot(np.random.normal(size=(self.tree_depth, self.dim)), obj)
+
         node = self.root
+        i = 0
         while node.left is not None:
-            if np.dot(obj, np.random.normal(size=self.dim)) < node.division:
+            if projections[i] < node.division:
                 node = node.left
             else:
                 node = node.right
-            pass
+            i += 1
         return node.indxs
 
 
