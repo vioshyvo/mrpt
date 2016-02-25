@@ -3,3 +3,4 @@
 *test.py
 *.pyc
 datasets
+*read_mnist.py
