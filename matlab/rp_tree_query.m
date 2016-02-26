@@ -1,3 +1,7 @@
+% Author Teemy Henrikki Pitk?nen <teemu.pitkanen@helsinki.fi>
+% University of Helsinki
+% Helsinki Institute for Information Technology 2016
+
 % Find the correct leaf of the query point in the rp-tree and return the
 % indices of the other points in the leaf. The leaf is found using the
 % information on the splits saved in the tree structure, ie. fields 'seed'

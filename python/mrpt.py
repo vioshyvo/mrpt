@@ -11,7 +11,7 @@ import cPickle
 
 class MRPTIndex:
 
-    def __init__(self, data, n0=10, n_trees=50):
+    def __init__(self, data, n0=32, n_trees=32):
         self.trees = [RPTree(data, n0) for t in range(n_trees)]
         self.data = data
 

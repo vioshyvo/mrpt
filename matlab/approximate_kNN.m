@@ -1,3 +1,7 @@
+% Author Teemu Henrikki Pitk?nen <teemu.pitkanen@helsinki.fi>
+% University of Helsinki
+% Helsinki Institute for Infomation Technology 2016
+
 % Finds the approximate nearest neighbours of the query point using the
 % pre-built tree structures.
 

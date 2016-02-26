@@ -1,3 +1,7 @@
+% Author Teemu Henrikki Pitk?nen <teemu.pitkanen@helsinki.fi>
+% University of Helsinki
+% Helsinki Institute for Infromation Technology 2016
+
 % The function builds a random projection tree of the data. Leaf size is
 % used as the stopping criterion.
 

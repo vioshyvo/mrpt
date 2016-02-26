@@ -1,3 +1,7 @@
+% Author Teemu Henrikki Pitk?nen <teemu.pitkanen@helsinki.fi>
+% University of Helsinki
+% Helsinki Institute for Information Technology 2016
+
 % The function performs a query in each of the rp trees and returns the
 % union of the results of each separate query.
 
