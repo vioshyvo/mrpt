@@ -1,5 +1,5 @@
 #include <iostream>
-#include <armadillo>
+#include "armadillo"
 #include <ctime>
 
 using namespace arma;
@@ -32,16 +32,20 @@ arma::mat combine_matrix(std::string filename, int n_chunks) {
 int main() {
 
     // set file paths and names
-    std::string id = "release_mnist128_to_4096";
-    std::string tree_path = "../results/trees/";
-    std::string result_path = "../results/cpp/Results_";
-    std::string data_path = "../../MRPT/data/mnist/";
+    std::string id = "test_yet_again_mnist128_to_1024";
+    // std::string tree_path = "../results/trees/";
+    std::string tree_path = "/home/hyvi/HYVI/git/mrpt/results/trees/";
+    // std::string result_path = "../results/cpp/Results_";
+    std::string result_path = "/home/hyvi/HYVI/git/mrpt/results/cpp/Results_";
+    // std::string data_path = "../../MRPT/data/mnist/";
+    std::string data_path = "/home/hyvi/HYVI/git/MRPT/data/mnist/";
+
 
     // set parameters
     int min_S = 7;
-    int max_S = 12;
+    int max_S = 10;
     int min_leaf = 3;
-    std::vector<int> k = {10, 50, 100};
+    std::vector<int> k = {10};
 
     // load news data set
     //mat X_double = combine_matrix(data_path + "t_news_", 10);

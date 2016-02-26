@@ -12,8 +12,14 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
+					<Add option="-std=c++11" />
 					<Add option="-g" />
+					<Add directory="../../../armadillo-6.400.3/include" />
 				</Compiler>
+				<Linker>
+					<Add library="blas" />
+					<Add library="lapack" />
+				</Linker>
 			</Target>
 			<Target title="Release">
 				<Option output="bin/Release/cpp" prefix_auto="1" extension_auto="1" />
@@ -22,15 +28,30 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O2" />
+					<Add option="-std=c++11" />
+					<Add directory="../../../armadillo-6.400.3/include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
+					<Add library="blas" />
+					<Add library="lapack" />
 				</Linker>
 			</Target>
 		</Build>
 		<Compiler>
 			<Add option="-Wall" />
 		</Compiler>
+		<Unit filename="src/Contour.cpp" />
+		<Unit filename="src/Contour.h" />
+		<Unit filename="src/Contours.cpp" />
+		<Unit filename="src/Contours.h" />
+		<Unit filename="src/Mrpt.cpp" />
+		<Unit filename="src/Mrpt.h" />
+		<Unit filename="src/Result.cpp" />
+		<Unit filename="src/Result.h" />
+		<Unit filename="src/knn.cpp" />
+		<Unit filename="src/knn.h" />
+		<Unit filename="src/main.cpp" />
 		<Extensions>
 			<envvars />
 			<code_completion />

@@ -1,5 +1,5 @@
 #include <iostream>
-#include <armadillo>
+#include "armadillo"
 #include <ctime>
 
 using namespace arma;
@@ -32,7 +32,7 @@ std::vector<double> Mrpt::grow() {
     std::vector<double> times(2);
     uvec indices = linspace<uvec>(0, n_rows - 1, n_rows);
 
-    // generate the random matrix and project the data set onto it 
+    // generate the random matrix and project the data set onto it
     clock_t begin = clock();
     random_matrix = conv_to<fmat>::from(randn(n_pool, dim));
     projected_data = random_matrix * X;
@@ -50,7 +50,7 @@ std::vector<double> Mrpt::grow() {
     }
     end = clock();
     times[1] = (end - begin) / static_cast<double> (CLOCKS_PER_SEC);
-    
+
     trees.save(id + "_trees.mat");
     random_matrix.save(id + "_random_matrix.mat");
     leaf_labels.save(id + "_leaf_labels.mat");
@@ -97,7 +97,7 @@ uvec Mrpt::query_canditates(const fvec& q, int k) {
 
     // std::cout << "projected_query.size(): " << projected_query.size() << ", idx_canditates.size(): " << idx_canditates.size() << std::endl;
     for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        // std::cout << "n_tree: " << n_tree << ", n_trees: " << n_trees << ", j: " << j << std::endl; 
+        // std::cout << "n_tree: " << n_tree << ", n_trees: " << n_trees << ", j: " << j << std::endl;
 
         const uvec& col_leaf_labels = leaf_labels.unsafe_col(n_tree);
         const fvec& tree = trees.unsafe_col(n_tree);
@@ -115,7 +115,7 @@ uvec Mrpt::query_canditates(const fvec& q, int k) {
             split_point = tree[idx_tree];
             // std::cout << "idx_left: " << idx_left << ", idx_right: " << idx_right << ", split_point: " << split_point << std::endl;
             // bool temp = split_point == 0;
-            // std::cout << "split_point == 0: " <<  temp << std::endl; 
+            // std::cout << "split_point == 0: " <<  temp << std::endl;
         }
 
         uvec idx_one_tree = find(col_leaf_labels == idx_tree);

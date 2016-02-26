@@ -1,4 +1,4 @@
-#include <armadillo>
+#include "armadillo"
 #include <ctime>
 #include <fstream>
 
@@ -88,10 +88,10 @@ void Contours::write_results(std::vector<Result> results, std::string filename) 
         return;
     }
 
-    int n_fields = 13; // # of fields in on Result struct    
+    int n_fields = 13; // # of fields in on Result struct
     outfile << results.size() << "\n";
     outfile << n_fields << "\n";
-       
+
     for (auto r = results.begin(); r < end_results; ++r) {
         outfile << "nn_found " << r->nn_found.t() << "\n";
         outfile << "k " << r->k << "\n\n";
@@ -125,8 +125,8 @@ void Contours::write_results(std::vector<Result> results, std::string filename) 
 //      Rcpp::_["times_total"] = times_total,
 //      Rcpp::_["times_multi"] = times_multi
 //    );
-//    
-//    ret.attr("class") = "contour"; 
-//    
+//
+//    ret.attr("class") = "contour";
+//
 //    return ret;
 //  }

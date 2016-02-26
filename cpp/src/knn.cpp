@@ -1,4 +1,4 @@
-#include <armadillo>
+#include "armadillo"
 
 using namespace arma;
 
@@ -15,7 +15,7 @@ uvec knnCpp_indices(const fmat& X, const frowvec& q, uword k, uvec indices) {
     fvec distances = fvec(n_rows);
     for (int i = 0; i < n_rows; i++)
         distances[i] = sum(pow((X.row(indices(i)) - q), 2));
-    
+
     if(k == 1) {
         uvec ret(1);
         distances.min(ret[0]);
@@ -23,7 +23,7 @@ uvec knnCpp_indices(const fmat& X, const frowvec& q, uword k, uvec indices) {
     }
 
     uvec sorted_indices = indices(sort_index(distances));
-    // std::cout << "sorted_indices:\n" << sorted_indices; 
+    // std::cout << "sorted_indices:\n" << sorted_indices;
     return sorted_indices.size() > k ? sorted_indices.head(k) : sorted_indices;
 }
 
@@ -39,13 +39,13 @@ uvec knnCpp_T_indices(const fmat& X, const fvec& q, uword k, uvec indices) {
     fvec distances = fvec(n_cols);
     for (int i = 0; i < n_cols; i++)
         distances[i] = sum(pow((X.col(indices(i)) - q), 2));
-    
+
     if(k == 1) {
         uvec ret(1);
         distances.min(ret[0]);
         return ret;
     }
-    
+
     uvec sorted_indices = indices(sort_index(distances));
     return sorted_indices.size() > k ? sorted_indices.head(k): sorted_indices;
 }
@@ -63,13 +63,13 @@ uvec knnCpp(const fmat& X, const frowvec& q, int k) {
     fvec distances = fvec(n_rows);
     for (int i = 0; i < n_rows; i++)
         distances[i] = sum(pow((X.row(i) - q), 2));
-    
+
     if(k == 1) {
         uvec ret(1);
         distances.min(ret[0]);
         return ret + 1;
     }
-    
+
     uvec sorted_indices = sort_index(distances);
     return sorted_indices.head(k) + 1;
 }
@@ -86,13 +86,13 @@ uvec knnCppT(const fmat& X, const fvec& q, int k) {
     fvec distances = fvec(n_cols);
     for (int i = 0; i < n_cols; i++)
         distances[i] = sum(pow((X.col(i) - q), 2));
-    
+
     if(k == 1) {
         uvec ret(1);
         distances.min(ret[0]);
         return ret;
     }
-    
+
     uvec sorted_indices = sort_index(distances);
     return sorted_indices.subvec(0, k - 1);
 }

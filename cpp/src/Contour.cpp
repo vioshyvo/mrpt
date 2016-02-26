@@ -1,4 +1,4 @@
-#include <armadillo>
+#include "armadillo"
 #include <ctime>
 
 using namespace arma;
@@ -58,7 +58,7 @@ void Contour::query(const fmat& Q, int k_, umat true_knn) {
     for (int i = 0; i < n_mrpts; i++) {
         mrpts = new Mrpt(X, n_trees[i], n_0[i], id + std::to_string(i));
         mrpts->read_trees();
-        
+
         clock_t begin = clock();
         for (int j = 0; j < n_points; j++)
             idx_canditates[j] = mrpts->query_canditates(Q.unsafe_col(j), k);
@@ -121,8 +121,8 @@ Result Contour::results(double time_exact) {
 //      Rcpp::_["times_total"] = times_total,
 //      Rcpp::_["times_multi"] = times_multi
 //    );
-//    
-//    ret.attr("class") = "contour"; 
-//    
+//
+//    ret.attr("class") = "contour";
+//
 //    return ret;
 //  }
