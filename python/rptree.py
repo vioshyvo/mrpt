@@ -89,10 +89,10 @@ class Node:
 
     """
     def __init__(self, indexes):
-        self.indexes = indexes  # Can be removed from inner nodes for memory efficiency
-        self.left = None  # Not required for child nodes for memory efficiency
-        self.right = None  # Not required for child nodes for memory efficiency
-        self.division = None  # Not required for child nodes for memory efficiency
+        self.indexes = indexes
+        self.left = None
+        self.right = None
+        self.division = None
 
     def set_children(self, left, right, division):
         self.left = left
