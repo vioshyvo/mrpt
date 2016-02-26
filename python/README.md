@@ -15,7 +15,8 @@ A k-nn query can then be made by
 The query returns the indices of the approximate nearest neighbors in the original data set.
 
 Dependencies
-—————
+------------
+
 Numpy, scipy
 
 Advanced
