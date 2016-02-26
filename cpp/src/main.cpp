@@ -32,13 +32,13 @@ arma::mat combine_matrix(std::string filename, int n_chunks) {
 int main() {
 
     // set file paths and names
-    std::string id = "test_yet_again_mnist128_to_1024";
-    // std::string tree_path = "../results/trees/";
-    std::string tree_path = "/home/hyvi/HYVI/git/mrpt/results/trees/";
-    // std::string result_path = "../results/cpp/Results_";
-    std::string result_path = "/home/hyvi/HYVI/git/mrpt/results/cpp/Results_";
-    // std::string data_path = "../../MRPT/data/mnist/";
-    std::string data_path = "/home/hyvi/HYVI/git/MRPT/data/mnist/";
+    std::string id = "make_mnist128_to_1024";
+    std::string tree_path = "../trees/";
+    // std::string tree_path = "/home/hyvi/HYVI/git/mrpt/results/trees/";
+    std::string result_path = "../../results/cpp/Results_";
+    // std::string result_path = "/home/hyvi/HYVI/git/mrpt/results/cpp/Results_";
+    std::string data_path = "../../datasets/";
+    // std::string data_path = "/home/hyvi/HYVI/git/MRPT/data/mnist/";
 
 
     // set parameters
@@ -53,7 +53,7 @@ int main() {
 
     // load mnist data set
     mat X_double;
-    X_double.load(data_path + "mnist_arma_t.mat");
+    X_double.load(data_path + "mnist/mnist_arma_t.mat");
 
     // convert into float matrix
     fmat X_mnist = conv_to<fmat>::from(X_double);
