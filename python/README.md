@@ -1,23 +1,23 @@
 # Python implementation for the MRPT algorithm
 
+Dependencies
+============
+
+Numpy, Scipy
+
 Get started
 ===========
 
-To create a MRPT index instance from a matrix of row vectors, simply call 
+To create a MRPT index instance from a matrix of row vectors, simply call: 
 	
 	from mrpt import *
 	index = MRPTIndex(data)
 
-A k-nn query can then be made by
+And that's it! Sit back and enjoy lightning-fast approximate nearest neighbor queries by calling:
 
 	neighbors = index.ann(query_object, k)
 
-The query returns the indices of the approximate nearest neighbors in the original data set.
-
-Dependencies
-------------
-
-Numpy, scipy
+The query returns the indexes of the approximate nearest neighbors in the original data set.
 
 Advanced
 ========
