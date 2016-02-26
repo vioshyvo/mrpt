@@ -1,6 +1,6 @@
 *.idea
 *.DS_Store
 *test.py
+*test.m
 *.pyc
-datasets
 *read_mnist.py
