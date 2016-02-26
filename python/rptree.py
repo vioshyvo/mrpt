@@ -11,7 +11,8 @@ from collections import deque
 
 class RPTree:
     """
-    This class contains the implementation of a single random projection tree. Only median splits are used for now.
+    This class implements the random projection tree data structure used for indexing a data set for quick approximate
+    nearest neighbor queries.
     """
 
     def __init__(self, data, n0, seed=None):
@@ -21,62 +22,74 @@ class RPTree:
         self.seed = seed
         self.dim = data.shape[1]
         self.root = Node(range(data.shape[0]))
+        self.tree_depth = int(np.log2(len(data)/float(n0))+1)
+        self.build_tree(data, n0)
 
-        queue = deque([self.root])
+    def build_tree(self, data, n0):
+        """
+        This method builds the random projection tree using projections on random vectors.
+        """
+        # Restore rng settings for reproducibility and compute projections to random basis
         np.random.seed(self.seed)
+        all_projections = np.dot(np.random.normal(size=(self.tree_depth, self.dim)), data.T)
 
-        # The following keep track on the level of the tree and are used to indicate when a new random vector is needed
+        # Main while loop that builds the tree one level at a time
         level_size = 0
         level_capacity = 1
-        vector = np.random.normal(size=self.dim)
-
+        curr_level = 0
+        queue = deque([self.root])
         while len(queue) > 0:
-            if level_size == level_capacity:
-                level_size = 0
-                level_capacity *= 2
-                vector = np.random.normal(size=self.dim)
-            level_size += 1
-
-            # Pop next node from the queue
+            # Pop next node to be processed
             node = queue.popleft()
-            indxs = node.get_indxs()
-            size = len(indxs)
+            indexes = node.get_indexes()
+            node_size = len(indexes)
 
-            # Compute and sort the projections
-            projections = [np.dot(vector, obj) for obj in [data[i] for i in indxs]]
-
+            # Sort the projections and define the split
+            projections = [all_projections[curr_level, i] for i in indexes]
             order = np.argsort(projections)
+            division = (projections[order[node_size / 2]] + projections[
+                order[int(math.ceil(node_size / 2.0) - 1)]]) / 2.0
 
-            # Create node objects for children
-            left = Node([indxs[i] for i in order[:size/2]])
-            right = Node([indxs[i] for i in order[size/2:]])
-            division = (projections[order[size/2]] + projections[order[int(math.ceil(size/2.0) - 1)]])/2.0
+            # Create new nodes, add to queue if their size requires a split
+            left = Node([indexes[i] for i in order[:node_size / 2]])
+            right = Node([indexes[i] for i in order[node_size / 2:]])
             node.set_children(left, right, division)
-
-            # Add new nodes to queue to be split if necessary
-            if size/2 > n0:
+            if node_size / 2 > n0:
                 queue.append(left)
                 queue.append(right)
 
-    def query(self, obj):
+            # For keeping track on which tree level the loop operates
+            level_size += 1
+            if level_size == level_capacity:
+                level_size = 0
+                level_capacity *= 2
+                curr_level += 1
+
+    def find_leaf(self, obj):
+        """
+        This function routes the query data object to a leaf and returns the index object indices of that leaf
+        """
+        # Restore rng settings, compute projections to random basis
         np.random.seed(self.seed)
+        projections = deque(np.dot(np.random.normal(size=(self.tree_depth, self.dim)), obj))
+
+        # Move down the tree according to the projections and split values stored in the tree
         node = self.root
         while node.left is not None:
-            if np.dot(obj, np.random.normal(size=self.dim)) < node.division:
+            if projections.popleft() < node.division:
                 node = node.left
             else:
                 node = node.right
-            pass
-        return node.indxs
+        return node.get_indexes()
 
 
 class Node:
     """
-    This class describes a single node of the rp-tree.
+    This class defines the structure of the rp-tree nodes
 
     """
-    def __init__(self, indxs):
-        self.indxs = indxs  # Can be removed from inner nodes for memory efficiency
+    def __init__(self, indexes):
+        self.indexes = indexes  # Can be removed from inner nodes for memory efficiency
         self.left = None  # Not required for child nodes for memory efficiency
         self.right = None  # Not required for child nodes for memory efficiency
         self.division = None  # Not required for child nodes for memory efficiency
@@ -86,6 +99,6 @@ class Node:
         self.right = right
         self.division = division
 
-    def get_indxs(self):
-        return self.indxs
+    def get_indexes(self):
+        return self.indexes
 
