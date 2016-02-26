@@ -4,7 +4,7 @@ LDLIBS= -lblas -llapack
 OBJS= Contour.o Contours.o knn.o main.o Mrpt.o Result.o 
 
 mrpt: $(OBJS)
-	g++ -o mrpt $(OBJS) $(LDLIBS)
+	g++ -o ../bin/mrpt $(OBJS) $(LDLIBS)
 
 Contour.o: Result.h Mrpt.h Contour.h knn.h
 Contours.o: Result.h knn.h Contour.h Contours.h 
