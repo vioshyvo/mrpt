@@ -31,7 +31,7 @@ class RPTree:
         """
         # Restore rng settings for reproducibility and compute projections to random basis
         np.random.seed(self.seed)
-        all_projections = np.dot(np.random.normal(size=(self.tree_depth, self.dim)), data.T)
+        all_projections = np.dot(np.random.normal(size=(self.tree_depth, self.dim)), data.T) # Possible to do without transpose
 
         # Main while loop that builds the tree one level at a time
         level_size = 0

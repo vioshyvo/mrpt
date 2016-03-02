@@ -5,3 +5,4 @@
 *.pyc
 *read_mnist.py
 *2015.py
+*.class
