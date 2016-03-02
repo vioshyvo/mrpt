@@ -10,7 +10,8 @@ function [ tree ] = rptree( data, n0, seed )
 
 % Use a random seed only if the user does not specify one.
 if nargin < 3
-   seed = rand; 
+   rng('shuffle'); % Ensure randomness (after queries)
+   seed = rand*1e9;
 end
 
 % Java LinkedList used as a queue
@@ -22,7 +23,7 @@ rng(seed);
 % Something something
 dim = size(data, 2);
 tree_depth = ceil(log2(size(data,1)/n0) + 1); % TSEK TSEK
-all_projections = data * normrnd(1, 0, dim, tree_depth);
+all_projections = data * normrnd(0, 1, dim, tree_depth);
 
 % The main while-loop that builds the tree one level at a time.
 root = RPTNode(1:size(data,1));

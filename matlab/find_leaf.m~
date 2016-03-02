@@ -1,0 +1,27 @@
+function [ indexes ] = find_leaf( tree, query )
+%Places the queried data point to a leaf and returns the corresponding
+%indexes
+%   Detailed explanation goes here
+
+% Restore rng settings
+rng(tree.seed)
+
+projections = query * normrnd(1, 0, tree.dim, tree_depth)
+end
+
+    def find_leaf(self, obj):
+        """
+        This function routes the query data object to a leaf and returns the index object indices of that leaf
+        """
+        # Restore rng settings, compute projections to random basis
+        np.random.seed(self.seed)
+        projections = deque(np.dot(np.random.normal(size=(self.tree_depth, self.dim)), obj))
+
+        # Move down the tree according to the projections and split values stored in the tree
+        node = self.root
+        while node.left is not None:
+            if projections.popleft() < node.division:
+                node = node.left
+            else:
+                node = node.right
+        return node.get_indexes()
