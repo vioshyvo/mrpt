@@ -1,3 +1,7 @@
+% Author Teemu Henrikki Pitk?nen <teemu.pitkanen@helsinki.fi>
+% University of Helsinki
+% Helsinki Institute for Information Technology 2016
+
 function [ index ] = mrpt( data, n0, n_trees )
 %The function builds the mrpt index for the given data set.
 %   The MRPT index is a vital structure for performing fast nearest
