@@ -6,7 +6,7 @@ function [ indexes ] = find_leaf( tree, query )
 % Restore rng settings
 rng(tree.seed);
 
-projections = query * normrnd(0, 1, tree.dim, tree.tree_depth)
+projections = query * normrnd(0, 1, tree.dim, tree.tree_depth);
 
 % Move down the tree with respect to the projections and splits
 node = tree.root;
