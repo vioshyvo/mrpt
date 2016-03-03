@@ -2,7 +2,7 @@
 % parameter is the image data as a matrix, one image per row. The other
 % parameter is the indices of the digits to be visualized.
 
-function [] = visualize(data, indices)
+function [] = mnist_show_images(data, indices)
 
 s = ceil(sqrt(size(indices,2)));
 

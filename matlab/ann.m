@@ -3,8 +3,8 @@ function [ neighbors ] = ann( data, index, obj, k )
 %'index'
 %   Detailed explanation goes here
 neighborhood = [];
-for t = 1:size(index,2)
+for t = 1:size(index,1)
     neighborhood = union(neighborhood, find_leaf(index{t}, obj));
 end
-[dist, ind] = sort(pdist2(obj, data(neighborhood,:)));
+[~, ind] = sort(pdist2(obj, data(neighborhood,:)));
 neighbors = neighborhood(ind(1:k))';
