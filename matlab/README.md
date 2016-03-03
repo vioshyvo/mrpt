@@ -11,7 +11,7 @@ a terminal window
 
     javac -source <version> -target <version> java/RPTNode.java,
 
-where <version> is the java version supported by your MATLAB installation 
+where \<version\> is the java version supported by your MATLAB installation 
 (1.7 for MATLAB R2014b)
 
 Next, you need to include this class to your Java path. This happens by 
@@ -30,4 +30,4 @@ index is built with command
 Simple as that! Now you can find the approximate `k` nearest neighbors of 
 object `obj` by 
 
-    neighbors = ann(data, index, object)
+    neighbors = ann(data, index, obj)
