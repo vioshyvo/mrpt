@@ -35,7 +35,7 @@ rng(seed);
 
 % Compute some basic characteristics of the tree.
 dim = size(data, 2);
-tree_depth = ceil(log2(size(data,1)/n0) + 1); % TSEK TSEK
+tree_depth = ceil(log2(size(data,1)/n0) + 1); % May be too high! Check!
 
 % Compute the projections.
 all_projections = data * normrnd(0, 1, dim, tree_depth);
