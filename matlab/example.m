@@ -7,10 +7,13 @@
 k=10;
 n_queries = 100;
 n0 = 32;
-n_trees = 32;
+n_trees = 16;
 
 [trainimgs, trainlbls] = read_mnist('train');
 [testimgs, testlbls] = read_mnist('test');
+trainimgs=trainimgs(1:32769,:);
+trainlbls=trainlbls(1:32769,:);
+
 query_indexes = randperm(size(testimgs, 1));
 queries = testimgs(query_indexes(1:n_queries),:);
 
@@ -37,4 +40,4 @@ n_correct = zeros(n_queries, 1);
 for ii = 1:n_queries
    n_correct(ii) = size(intersect(aneighbors(ii,:),tneighbors(ii,:)),2); 
 end
-fprintf('Accuracy: %f\n', sum(n_correct)/n_queries);
+fprintf('Accuracy: %f\n', sum(n_correct)/(k*n_queries));

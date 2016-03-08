@@ -24,7 +24,7 @@ elif len(sys.argv) == 2:
     k = 10
 else:
     n0 = 32
-    n_trees = 32
+    n_trees = 1
     n_queries = 100
     k = 10
 

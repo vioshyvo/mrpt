@@ -35,7 +35,7 @@ rng(seed);
 
 % Compute some basic characteristics of the tree.
 dim = size(data, 2);
-tree_depth = ceil(log2(size(data,1)/n0) + 1); % May be too high! Check!
+tree_depth = floor(log2(size(data,1)/n0) + 1); % Check!
 
 % Compute the projections.
 all_projections = data * normrnd(0, 1, dim, tree_depth);
@@ -44,8 +44,8 @@ all_projections = data * normrnd(0, 1, dim, tree_depth);
 root = RPTNode(1:size(data,1));
 queue = LinkedList();
 queue.add(root);
-curr_level = 2;
-curr_level_size = 2;
+curr_level = 1;
+curr_level_size = 1;
 curr_level_occupancy = 0;
 while queue.size() > 0
     
@@ -55,16 +55,21 @@ while queue.size() > 0
     % Find out the indices in this node and the ordering of their
     % projections.
     indexes = node.get_indexes();
+    node_size = size(indexes, 1);
     [sorted_projs, order] = sort(all_projections(indexes, curr_level));
     
     % Create children, add to queue if necessary.
-    split = median(all_projections(indexes, curr_level)); % MAKE FASTER!
-    left = RPTNode(indexes(order(1:floor(size(order,1)/2))));
-    right = RPTNode(indexes(order(floor(size(order,1)/2)+1: size(order,1))));
+    % In case the split is not equal the extra index goes to the left
+    % branch
+    split = (sorted_projs(floor(node_size/2 + 1))+sorted_projs(ceil(node_size/2)))/2;
+    left = RPTNode(indexes(order(1:ceil(node_size/2))));
+    right = RPTNode(indexes(order(ceil(node_size/2)+1:node_size)));
     node.set_children(left, right, split);
-    if size(indexes, 1)/2 > n0
+    if node_size > 2*n0+1
         queue.add(left);
         queue.add(right);
+    elseif node_size == 2*n0 + 1
+        queue.add(left);
     end
     
     % Keep track of the tree level.

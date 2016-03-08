@@ -1,4 +1,4 @@
-# Python implementation for the MRPT algorithm
+# Python implementation of the MRPT algorithm
 
 Dependencies
 ============
