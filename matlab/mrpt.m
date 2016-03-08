@@ -22,6 +22,8 @@ function [ index ] = mrpt( data, n0, n_trees )
 if nargin == 1
     n0 = 32;
     n_trees = 32;
+    % Maybe write a function to choose reasonable params depending on the
+    % data matrix shape
 end
 
 % Construct the cell array as described.

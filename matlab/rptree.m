@@ -2,14 +2,12 @@
 % University of Helsinki
 % Helsinki Institute for Information Technology 2016
 
-function [ tree ] = rptree( data, n0, seed )
+function [ tree ] = rptree( data, n0 )
 %The function iteratively builds a random projection tree data structure 
 %for the given data.
 %   INPUTS:
 %   data - The data for which th user wants to build the index
 %   n0 - The maximum number of elements in a leaf of the tree
-%   seed - Optional: A user-specified seed for controlling the tree
-%   building
 %
 %   OUTPUTS:
 %   tree - The random projection tree as a cell array with 4 fields:
@@ -20,25 +18,21 @@ function [ tree ] = rptree( data, n0, seed )
 %   {3} dim - Dimensionality of the data set.
 %   {4} tree_depth - The maximum depth of the tree.
 
-% Use a random seed only if the user does not specify one.
-if nargin < 3
-   rng('shuffle'); % Ensure randomness (after queries)
-   seed = rand*1e9;
-end
+
+% Generate and store a random seed for rng
+rng('shuffle');
+seed = rand*1e9;
+rng(seed);
 
 % Java LinkedList used as a queue
 import java.util.LinkedList;
 
-% Set random seed to ensure that the same random vectors can be generated
-% when querying the tree.
-rng(seed);
-
 % Compute some basic characteristics of the tree.
 dim = size(data, 2);
-tree_depth = floor(log2(size(data,1)/n0) + 1); % Check!
+n_random_vectors = ceil(log2(size(data,1)/n0))
 
 % Compute the projections.
-all_projections = data * normrnd(0, 1, dim, tree_depth);
+all_projections = data * normrnd(0, 1, dim, n_random_vectors);
 
 % The main while-loop that builds the tree one level at a time.
 root = RPTNode(1:size(data,1));
@@ -82,5 +76,5 @@ while queue.size() > 0
 end
 
 % Create the struct as specified in the OUTPUTS section.
-tree = struct('root', root, 'seed', seed, 'dim', dim, 'tree_depth', tree_depth);
+tree = struct('root', root, 'seed', seed, 'dim', dim, 'n_rvs', n_random_vectors);
 end

@@ -18,7 +18,7 @@ function [ indexes ] = find_leaf( tree, query )
 rng(tree.seed);
 
 % Compute the projections.
-projections = query * normrnd(0, 1, tree.dim, tree.tree_depth);
+projections = query * normrnd(0, 1, tree.dim, tree.n_rvs);
 
 % Move down the tree with respect to the projections and splits.
 node = tree.root;

@@ -11,8 +11,8 @@ n_trees = 16;
 
 [trainimgs, trainlbls] = read_mnist('train');
 [testimgs, testlbls] = read_mnist('test');
-trainimgs=trainimgs(1:32769,:);
-trainlbls=trainlbls(1:32769,:);
+trainimgs=trainimgs(1:32768,:);
+trainlbls=trainlbls(1:32768,:);
 
 query_indexes = randperm(size(testimgs, 1));
 queries = testimgs(query_indexes(1:n_queries),:);
