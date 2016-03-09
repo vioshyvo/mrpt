@@ -83,6 +83,7 @@ uvec Mrpt::query(const fvec& q, int k) {
         idx_canditates.insert(idx_canditates.begin(), idx_one_tree.begin(), idx_one_tree.end());
     }
 
+    std::sort(idx_canditates.begin(), idx_canditates.end());
     auto last = std::unique(idx_canditates.begin(), idx_canditates.end());
     idx_canditates.erase(last, idx_canditates.end());
 
@@ -122,6 +123,7 @@ uvec Mrpt::query_canditates(const fvec& q, int k) {
         idx_canditates.insert(idx_canditates.begin(), idx_one_tree.begin(), idx_one_tree.end());
     }
 
+    std::sort(idx_canditates.begin(), idx_canditates.end());
     auto last = std::unique(idx_canditates.begin(), idx_canditates.end());
     idx_canditates.erase(last, idx_canditates.end());
     return conv_to<uvec>::from(idx_canditates);

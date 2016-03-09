@@ -6,6 +6,9 @@ using namespace arma;
 
 #include "Contours.h"
 #include "Result.h"
+#include "Mrpt.h"
+#include "knn.h"
+
 
 
 /*******************************************************
@@ -32,7 +35,7 @@ arma::mat combine_matrix(std::string filename, int n_chunks) {
 int main() {
 
     // set file paths and names
-    std::string id = "make_mnist128_to_1024";
+    std::string id = "mnist128_to_2048";
     std::string tree_path = "../trees/";
     // std::string tree_path = "/home/hyvi/HYVI/git/mrpt/results/trees/";
     std::string result_path = "../../results/cpp/Results_";
@@ -43,13 +46,13 @@ int main() {
 
     // set parameters
     int min_S = 7;
-    int max_S = 10;
+    int max_S = 11;
     int min_leaf = 3;
-    std::vector<int> k = {10};
+    std::vector<int> k = {10, 50, 100};
 
     // load news data set
-    //mat X_double = combine_matrix(data_path + "t_news_", 10);
-    //std::cout << "X_double.n_cols: " << X_double.n_cols << ", X_double.n_rows: " << X_double.n_rows  << std::endl;
+//     mat X_double = combine_matrix(data_path + "t_news_", 10);
+//     std::cout << "X_double.n_cols: " << X_double.n_cols << ", X_double.n_rows: " << X_double.n_rows  << std::endl;
 
     // load mnist data set
     mat X_double;
@@ -76,7 +79,70 @@ int main() {
     fmat X_train = X_mnist.cols(n_test, n_train + n_test - 1);
     X_mnist.reset();
 
+//    umat true_knn(k[0], n_test);
+//    std::vector<uvec> approximate_knn(n_test);
+//    // std::vector<uvec> index_canditates(n_test);
+//    double nn_found = 0;
+
     std::cout << "X_train.n_cols: " << X_train.n_cols << ", X_test.n_cols: " << X_test.n_cols << ", X_mnist.n_cols: " << X_mnist.n_cols << std::endl;
+
+//    int n_trees = 64;
+//    int n_0 = 32;
+//    std::string id0 = "single_mnist_64_32";
+//
+//    std::cout << "X_test.col(0).n_elem: " << X_test.col(0).n_elem <<  ", X_train.n_rows: " << X_train.n_rows << "\n";
+//    std::cout << "nearest neighbors of X_test.col(0: ) \n" << knnCppT(X_train, X_test.col(0), k[0]) << std::endl;
+//
+//    clock_t begin = clock();
+//    for (int i = 0; i < n_test; i++) true_knn.col(i) = knnCppT(X_train, X_test.col(i), k[0]);
+//    clock_t end = clock();
+//    double time_exact = (end - begin) / static_cast<double> (CLOCKS_PER_SEC);
+//
+//    std::cout << "Exact k-NN time / point: " << 1000 * time_exact / n_test << " ms\n";
+//
+//    begin = clock();
+//    Mrpt* mrpts = nullptr;
+//    mrpts = new Mrpt(X_train, n_trees, n_0, id0);
+//    mrpts->grow();
+//    end = clock();
+//    double growing_time = (end - begin) / static_cast<double> (CLOCKS_PER_SEC);
+//
+//    std::cout << "Growing time: " << growing_time << " s.\n";
+//
+////    begin = clock();
+////        for (int j = 0; j < n_points; j++)
+////            approximate_knn[j] = knnCpp_T_indices(X, Q.unsafe_col(j), k, idx_canditates[j]);
+////        end = clock();
+////        times_knn[i] = (end - begin) / static_cast<double> (CLOCKS_PER_SEC);
+//
+//    begin = clock();
+//    for (int j = 0; j < n_test; j++) approximate_knn[j] = mrpts->query(X_test.unsafe_col(j), k[0]);
+//    end = clock();
+//    double query_time = (end - begin) / static_cast<double> (CLOCKS_PER_SEC);
+//
+//    std::cout << "Query time / point: " << 1000 * query_time / n_test << " ms\n";
+//
+//    uvec test = {1,2,3,4,5};
+//    std::cout << "Any: " << any(test == 6) << "\n";
+//
+//    for (int j = 0; j < n_test; j++) {
+//        int n_knn = approximate_knn[j].size();
+//        for (int l = 0; l < n_knn; l++)
+//            if (any(true_knn.col(j) == approximate_knn[j][l]))
+//                nn_found++;
+//    }
+//
+//
+//    std::cout << "Approximate k-NN:\n";
+//    for(int j = 0; j < 20; j++) std::cout << approximate_knn[j] << "\n";
+//
+//
+//    std::cout << "Recall: " << nn_found / (n_test * k[0]) << "\n";
+//
+//    delete mrpts;
+//    mrpts = nullptr;
+//
+//    return 0;
 
     // Grow and save trees
     std::cout << "Nyt mennaan!" << std::endl;

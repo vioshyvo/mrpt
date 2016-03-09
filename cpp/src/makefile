@@ -9,7 +9,7 @@ mrpt: $(OBJS)
 Contour.o: Result.h Mrpt.h Contour.h knn.h
 Contours.o: Result.h knn.h Contour.h Contours.h 
 knn.o: knn.h 
-main.o: Contours.h Result.h
+main.o: Contours.h Result.h Mrpt.h knn.h
 Mrpt.o: knn.h Mrpt.h
 Result.o: Result.h 
  
