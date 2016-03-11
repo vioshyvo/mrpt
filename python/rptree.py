@@ -22,7 +22,7 @@ class RPTree:
         self.seed = seed
         self.dim = data.shape[1]
         self.root = Node(range(data.shape[0]))
-        self.tree_depth = int(np.log2(len(data)/float(n0))+1)
+        self.n_random_vectors = math.ceil(np.log2(len(data)/float(n0)))
         self.build_tree(data, n0)
 
     def build_tree(self, data, n0):
@@ -31,7 +31,7 @@ class RPTree:
         """
         # Restore rng settings for reproducibility and compute projections to random basis
         np.random.seed(self.seed)
-        all_projections = np.dot(np.random.normal(size=(self.tree_depth, self.dim)), data.T) # Possible to do without transpose
+        all_projections = np.dot(data, np.random.normal(size=(self.dim, self.n_random_vectors)))
 
         # Main while loop that builds the tree one level at a time
         level_size = 0
@@ -45,7 +45,7 @@ class RPTree:
             node_size = len(indexes)
 
             # Sort the projections and define the split
-            projections = [all_projections[curr_level, i] for i in indexes]
+            projections = [all_projections[i, curr_level] for i in indexes]
             order = np.argsort(projections)
             division = (projections[order[node_size / 2]] + projections[
                 order[int(math.ceil(node_size / 2.0) - 1)]]) / 2.0
@@ -71,7 +71,7 @@ class RPTree:
         """
         # Restore rng settings, compute projections to random basis
         np.random.seed(self.seed)
-        projections = deque(np.dot(np.random.normal(size=(self.tree_depth, self.dim)), obj))
+        projections = deque(np.dot(obj, np.random.normal(size=(self.dim, self.n_random_vectors))))
 
         # Move down the tree according to the projections and split values stored in the tree
         node = self.root
