@@ -9,7 +9,7 @@ import scipy.spatial.distance as ssd
 import cPickle
 
 
-class MRPTIndex:
+class MRPTIndex(object):
 
     def __init__(self, data, n0=32, n_trees=32):
         self.trees = [RPTree(data, n0) for t in range(n_trees)]
