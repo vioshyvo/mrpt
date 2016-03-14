@@ -4,12 +4,15 @@
 # University of Helsinki / Helsinki Institute for Information Technology 2016
 #
 
-from mnist_utils import *
-from mrpt import *
-import scipy.spatial.distance as ssd
 import time
-import numpy as np
 import sys
+
+import scipy.spatial.distance as ssd
+import numpy as np
+
+from utils.mnist_utils import *
+from mrpt import *
+
 
 
 ########################################################################################################################

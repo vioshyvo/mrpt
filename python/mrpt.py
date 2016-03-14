@@ -21,17 +21,3 @@ class MRPTIndex(object):
             neighborhood = neighborhood.union(tree.find_leaf(obj))
         neighborhood = list(neighborhood)
         return [neighborhood[i] for i in np.argsort(ssd.cdist([obj], [self.data[i] for i in neighborhood])[0])[:k]]
-
-'''
-# Need a method to save without the data!!! --update: still saving in single trees---
-def save(index, filename='mrpt.idx'):
-    with open(filename, 'w') as f:
-        cPickle.dump(index.trees, f)
-
-
-def load(data, filename='mrpt.idx'):
-    with open(filename, 'r') as f:
-        index = MRPTIndex(data, n0=0, n_trees=0)
-        index.trees = cPickle.load(f)  # Bad convention. Create method set_trees for mrptindex...
-        return index
-'''

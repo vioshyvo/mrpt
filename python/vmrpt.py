@@ -7,21 +7,19 @@
 from mrpt import *
 
 
-class VotingMRPTIndex(MRPTIndex):
+class VMRPTIndex(MRPTIndex):
 
     def __init__(self, data, n0=1000, n_trees=32, tuning=350):
-        super(VotingMRPTIndex, self).__init__(data, n0, n_trees)
+        super(VMRPTIndex, self).__init__(data, n0, n_trees)
         self.tuning = tuning
 
     def ann(self, obj, k):
         neighborhood = []
-        for tree in self.trees:
-            neighborhood = np.append(neighborhood, tree.find_leaf(obj))
         votes = np.zeros(len(self.data))
-        for neighbor in neighborhood:
-            votes[neighbor] += 1
+        for tree in self.trees:
+            for vote in tree.find_leaf(obj):
+                votes[vote] += 1
 
-        elected = np.argsort(votes)[::-1]
-        elected = elected[:self.tuning]
+        elected = np.argsort(votes)[len(votes)-1:len(votes)-1-self.tuning:-1]
 
         return [elected[i] for i in np.argsort(ssd.cdist([obj], [self.data[i] for i in elected])[0])[:k]]
