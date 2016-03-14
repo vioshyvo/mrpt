@@ -11,102 +11,115 @@ from collections import deque
 
 class RPTree(object):
     """
-    This class implements the random projection tree data structure used for indexing a data set for quick approximate
-    nearest neighbor queries.
+    A Random Projection Tree is a spatial index data structure used in specific data mining and indexing tasks. Our
+    implementation has been built with approximate nearest neighbor search (ANN) problems in mind. A tree is built by
+    dividing the data space by random hyperplanes into small cells. In ANN-problems we usually achieve substantial
+    improvements by quickly choosing just a subset of the data located in a single cell where the actual brute-force NN
+    search is then performed.
     """
 
-    def __init__(self, data, n0):
-        self.dim = data.shape[1]
+    def __init__(self, data, n0=100):
         self.seed = np.random.randint(0, int(1e9))
-        self.n0 = n0
-        self.n_random_vectors = math.ceil(np.log2(len(data)/float(n0)))
-
-        self.root = Node()
+        self.tree_height = math.ceil(np.log2(len(data)/float(n0)))
+        self.root = InnerNode()
         self.build_tree(data, n0)
 
     def build_tree(self, data, n0):
         """
-        This method builds the random projection tree using projections on random vectors.
+        An iterative method for building the random projection tree structure. The tree is built level-by-level by
+        using a queue to handle the order in which the nodes are processed. The method is significantly faster to
+        recursive building. This implementation uses same random vectors in each tree branch for running
+        time efficiency. Note that although all projections are computed in a single matrix multiplication, the
+        projection vector is different on each level.
         """
         # Restore rng settings for reproducibility and compute projections to random basis
         np.random.seed(self.seed)
-        all_projections = np.dot(data, np.random.normal(size=(self.dim, self.n_random_vectors)))
+        all_projections = np.dot(data, np.random.normal(size=(data.shape[1], self.tree_height)))
 
         # Main while loop that builds the tree one level at a time
-        level_size = 0
-        level_capacity = 1
-        curr_level = 0
         queue = deque([(self.root, range(len(data)))])
+        tracker = FullBinaryTreeLevelTracker()
         while len(queue) > 0:
             # Pop next node to be processed
             node, indexes = queue.popleft()
             node_size = len(indexes)
 
             # Sort the projections and define the split
-            projections = [all_projections[i, curr_level] for i in indexes]
+            projections = [all_projections[i, tracker.get_level()] for i in indexes]
             order = np.argsort(projections)
             node.set_split((projections[order[node_size / 2]] + projections[
                 order[int(math.ceil(node_size / 2.0) - 1)]]) / 2.0)
 
-            # Create new nodes, add to queue if their size requires a split
+            # Split the indexes to child nodes. In case of uneven division the extra object goes to the left branch
             l_indexes = [indexes[i] for i in order[:math.ceil(node_size/2.0)]]
             r_indexes = [indexes[i] for i in order[math.ceil(node_size/2.0):]]
 
-            if node_size >= 2*n0 + 1:
-                left = Node()
+            # Set references to children, add child nodes to queue if further splits are required (node size > n0)
+            if len(l_indexes) > n0:
+                left = InnerNode()
                 node.set_left(left)
                 queue.append((left, l_indexes))
-                if node_size > 2*n0 + 1:
-                    right = Node()
-                    node.set_right(right)
-                    queue.append((right, r_indexes))
-                else:
-                    node.set_right(Leaf(r_indexes))
             else:
-                node.set_left(Leaf(l_indexes))
-                node.set_right(Leaf(r_indexes))
+                node.set_left(LeafNode(l_indexes))
 
-            # For keeping track on which tree level the loop operates
-            level_size += 1
-            if level_size == level_capacity:
-                level_size = 0
-                level_capacity *= 2
-                curr_level += 1
+            if len(r_indexes) > n0:
+                right = InnerNode()
+                node.set_right(right)
+                queue.append((right, r_indexes))
+            else:
+                node.set_right(LeafNode(r_indexes))
+
+            tracker.object_added()  # Corresponds to adding _node_, not its children, thus called only once
 
     def find_leaf(self, obj):
         """
-        This function routes the query data object to a leaf and returns the index object indices of that leaf
+        The function re-creates the same random vectors that were used in tree construction, computes the projections of
+        the query vector and using the split information stored in the nodes places the query vector into a single leaf.
+        The query vector has to be given as a 1-dimensional array.
         """
         # Restore rng settings, compute projections to random basis
         np.random.seed(self.seed)
-        projections = deque(np.dot(obj, np.random.normal(size=(self.dim, self.n_random_vectors))))
+        projections = deque(np.dot(obj, np.random.normal(size=(len(obj), self.tree_height))))
 
         # Move down the tree according to the projections and split values stored in the tree
         node = self.root
-        while node.left is not None:
+        while not hasattr(node, 'get_indexes'):
             if projections.popleft() < node.split_threshold:
                 node = node.left
             else:
                 node = node.right
         return node.get_indexes()
 
-    def get_n0(self):
-        return self.n0
 
-
-class Node(object):
+class FullBinaryTreeLevelTracker(object):
     """
-    This class defines the structure of the rp-tree nodes
+    This class keeps track on the height of an almost full binary tree while adding objects. Useful in construction.
+    """
+    def __init__(self):
+        self.level = 0
+        self.level_capacity = 1
+        self.level_occupancy = 0
+
+    def object_added(self):
+        self.level_occupancy += 1
+        if self.level_occupancy == self.level_capacity:
+            self.level_occupancy = 0
+            self.level_capacity *= 2
+            self.level += 1
+
+    def get_level(self):
+        return self.level
+
+
+class InnerNode(object):
+    """
+    This class defines the structure of the inner rp-tree nodes.
 
     """
     def __init__(self):
         self.left = None
         self.right = None
         self.split_threshold = None
-        self.indexes = None
-
-    def set_indexes(self, indexes):
-        self.indexes = indexes
 
     def set_left(self, left):
         self.left = left
@@ -118,9 +131,11 @@ class Node(object):
         self.split_threshold = split
 
 
-class Leaf(Node):
+class LeafNode(object):
+    """
+    This class describes a leaf-node of the rp-tree.
+    """
     def __init__(self, indexes):
-        super(Leaf, self).__init__()
         self.indexes = indexes
 
     def get_indexes(self):

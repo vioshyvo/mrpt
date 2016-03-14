@@ -7,4 +7,4 @@
 *2015.py
 *.class
 *m~
-*saved_trees/*
+python/saved_trees/*

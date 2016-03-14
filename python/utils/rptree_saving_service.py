@@ -18,14 +18,19 @@ def new_filename(filename):
 
 # Checks that the directories needed exist and creates them if not
 def create_dirs(datasetname, n0):
-    if not os.path.exists('saved_trees/' + datasetname+'/' + str(n0)):
-        os.makedirs('saved_trees' + '/' + datasetname + '/' + str(n0))
+    if not os.path.exists('saved_trees/' + datasetname + '/' + n0):
+        os.makedirs('saved_trees' + '/' + datasetname + '/' + n0)
 
 
 # Saves a single tree
-def save(tree, datasetname):
-    create_dirs(datasetname, tree.get_n0())
-    filename = new_filename('saved_trees/' + datasetname + '/' + str(tree.get_n0()) + '/' + 't')
+def save(tree, datasetname, n0):
+    """
+    The main function in this file, used to store single rp-trees to disk.
+    :param tree: The tree to be saved
+    :param datasetname: Name of the data set the tree is built for
+    """
+    create_dirs(datasetname, str(n0))
+    filename = new_filename('saved_trees/' + datasetname + '/' + str(n0) + '/' + 't')
     with open(filename, 'w') as f:
         cPickle.dump(tree, f)
 
