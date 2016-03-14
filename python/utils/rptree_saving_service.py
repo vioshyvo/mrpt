@@ -35,6 +35,13 @@ def save(tree, datasetname, n0):
         cPickle.dump(tree, f)
 
 
-# Loads number rp-trees with the desired n0.
-def load(n0, number):
-    raise NotImplementedError('Method not yet implemented!')
+# Loads number rp-trees with the desired n0. NOTE! THE DIRECTORY MUST NOT CONTAIN ANY OTHER FILES!!!
+def load(datasetname, n0, n_trees):
+    dirname = 'saved_trees/'+datasetname+'/'+str(n0)+'/'
+    filenames = os.listdir(dirname)
+    trees = []
+    ordinal = 0
+    for i in range(min(n_trees, len(filenames))):
+        with open(dirname+filenames[ordinal], 'r') as f:
+            trees.append(cPickle.load(f))
+    return trees
