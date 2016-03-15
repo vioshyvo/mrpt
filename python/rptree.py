@@ -7,6 +7,8 @@
 import math
 import numpy as np
 from collections import deque
+import os
+import cPickle
 
 
 class RPTree(object):
@@ -18,7 +20,7 @@ class RPTree(object):
     search is then performed.
     """
 
-    def __init__(self, data, n0=100):
+    def __init__(self, data, n0):
         self.seed = np.random.randint(0, int(1e9))
         self.tree_height = math.ceil(np.log2(len(data)/float(n0)))
         self.root = InnerNode()
@@ -91,6 +93,38 @@ class RPTree(object):
         return node.get_indexes()
 
 
+def save_tree(tree, path):
+    """
+    The other main function in this file, used to store single rp-trees to disk.
+    :param tree: The tree to be saved
+    :param datasetname: Name of the data set the tree is built for
+    """
+    if not os.path.exists(path):
+        os.makedirs(path)
+    ordinal = 0
+    while os.path.isfile(path + '/t' + str(ordinal) + '.idx'):
+        ordinal += 1
+    filename = path + '/t' + str(ordinal) + '.idx'
+    with open(filename, 'w') as f:
+        cPickle.dump(tree, f)
+
+
+def load_trees(path, n_trees):
+    """
+    The other main function in this file. Loads trees from disk.
+    :param path: The path where the trees are loaded
+    :param n_trees: The number of trees loaded
+    :return: A list containing the trees. Empty if no such directory.
+    """
+    trees = []
+    if os.path.exists(path):
+        files = os.listdir(path)
+        for i in range(min(n_trees, len(files))):
+            with open(path+'/'+files[i], 'r') as f:
+                trees.append(cPickle.load(f))
+    return trees
+
+
 class FullBinaryTreeLevelTracker(object):
     """
     This class keeps track on the height of an almost full binary tree while adding objects. Useful in construction.
@@ -113,7 +147,8 @@ class FullBinaryTreeLevelTracker(object):
 
 class InnerNode(object):
     """
-    This class defines the structure of the inner rp-tree nodes.
+    This class defines the structure of the inner rp-tree nodes. The only information stored here are pointers to the
+    child nodes and the split value used in this node to divide the data objects to the children.
 
     """
     def __init__(self):
@@ -133,7 +168,8 @@ class InnerNode(object):
 
 class LeafNode(object):
     """
-    This class describes a leaf-node of the rp-tree.
+    This class describes a leaf-node of the rp-tree. The only values stored are the indexes of the data objects that
+    belong to the leaf. All information on tree structure is stored in inner nodes.
     """
     def __init__(self, indexes):
         self.indexes = indexes

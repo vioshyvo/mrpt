@@ -6,7 +6,6 @@
 
 from rptree import *
 import scipy.spatial.distance as ssd
-import utils.saving_service as ss
 import hashlib as hl
 
 
@@ -24,15 +23,15 @@ class MRPTIndex(object):
         if use_saved:
             self.trees = []
             save_path = 'saved_trees/'+hl.sha1(data.view(np.uint8)).hexdigest()[:8]+'/'+str(n0)
-            self.trees = ss.load(save_path, n_trees)
+            self.trees = load_trees(save_path, n_trees)
             for t in range(len(self.trees), n_trees):
                 t = RPTree(data, n0)
                 self.trees.append(t)
-                ss.save(t, save_path)
+                save_tree(t, save_path)
         else:
             self.trees = [RPTree(data, n0) for t in range(n_trees)]
 
-    def ann(self, obj, k):
+    def ann(self, obj, k=10):
         """
         The classic-style MRPT query which is performed in each of the trees, and the results are combined to find the
         best k approximate neighbors.
@@ -46,7 +45,7 @@ class MRPTIndex(object):
         neighborhood = list(neighborhood)
         return [neighborhood[i] for i in np.argsort(ssd.cdist([obj], [self.data[i] for i in neighborhood])[0])[:k]]
 
-    def vann(self, obj, k, n_elected):
+    def vann(self, obj, k=10, n_elected=500):
         """
         The voting-enhanced MRPT query. In queries each potential approximate neighbor suggested by a tree counts as
         a vote. Only the objects with the highest number votes are actually compared at the end of the search.
