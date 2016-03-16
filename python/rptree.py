@@ -93,38 +93,6 @@ class RPTree(object):
         return node.get_indexes()
 
 
-def save_tree(tree, path):
-    """
-    The other main function in this file, used to store single rp-trees to disk.
-    :param tree: The tree to be saved
-    :param datasetname: Name of the data set the tree is built for
-    """
-    if not os.path.exists(path):
-        os.makedirs(path)
-    ordinal = 0
-    while os.path.isfile(path + '/t' + str(ordinal) + '.idx'):
-        ordinal += 1
-    filename = path + '/t' + str(ordinal) + '.idx'
-    with open(filename, 'w') as f:
-        cPickle.dump(tree, f)
-
-
-def load_trees(path, n_trees):
-    """
-    The other main function in this file. Loads trees from disk.
-    :param path: The path where the trees are loaded
-    :param n_trees: The number of trees loaded
-    :return: A list containing the trees. Empty if no such directory.
-    """
-    trees = []
-    if os.path.exists(path):
-        files = os.listdir(path)
-        for i in range(min(n_trees, len(files))):
-            with open(path+'/'+files[i], 'r') as f:
-                trees.append(cPickle.load(f))
-    return trees
-
-
 class FullBinaryTreeLevelTracker(object):
     """
     This class keeps track on the height of an almost full binary tree while adding objects. Useful in construction.
@@ -176,3 +144,35 @@ class LeafNode(object):
 
     def get_indexes(self):
         return self.indexes
+
+
+def save_tree(tree, path):
+    """
+    The other main function in this file, used to store single rp-trees to disk.
+    :param tree: The tree to be saved
+    :param datasetname: Name of the data set the tree is built for
+    """
+    if not os.path.exists(path):
+        os.makedirs(path)
+    ordinal = 0
+    while os.path.isfile(path + '/t' + str(ordinal) + '.idx'):
+        ordinal += 1
+    filename = path + '/t' + str(ordinal) + '.idx'
+    with open(filename, 'w') as f:
+        cPickle.dump(tree, f)
+
+
+def load_trees(path, n_trees):
+    """
+    The other main function in this file. Loads trees from disk.
+    :param path: The path where the trees are loaded
+    :param n_trees: The number of trees loaded
+    :return: A list containing the trees. Empty if no such directory.
+    """
+    trees = []
+    if os.path.exists(path):
+        files = os.listdir(path)
+        for i in range(min(n_trees, len(files))):
+            with open(path+'/'+files[i], 'r') as f:
+                trees.append(cPickle.load(f))
+    return trees
