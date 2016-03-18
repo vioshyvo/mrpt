@@ -77,13 +77,18 @@ class RPTree(object):
         :param n0: The maximum leaf size
         :return: The chunks as a list of lists, the projection values that separate these chunks
         """
-        ordering = np.argsort(projections)
-        n_chunks = min(int(math.ceil(len(indexes)/float(n0))), self.degree)
-        chunk_sizes = np.repeat([int(math.floor(len(indexes)/n_chunks))], n_chunks)
-        chunk_sizes[range(len(indexes) - int(math.floor(len(indexes)/n_chunks))*n_chunks)] += 1
+        indexes = indexes[np.argsort(projections)]
+        projections = np.sort(projections)
+        n = len(indexes)
+
+        n_chunks = min(int(math.ceil(n/float(n0))), self.degree)
+        min_chunk_size = int(math.floor(n/n_chunks))
+        chunk_sizes = np.repeat([min_chunk_size], n_chunks)
+        chunk_sizes[range(n - min_chunk_size*n_chunks)] += 1
         chunk_bounds = np.cumsum([0] + chunk_sizes)
-        return ([indexes[ordering[chunk_bounds[i]:chunk_bounds[i+1]]] for i in range(len(chunk_bounds)-1)],
-                [(projections[ordering[i-1]] + projections[ordering[i]])/2 for i in chunk_bounds[1:-1]])
+
+        return ([indexes[chunk_bounds[i]:chunk_bounds[i+1]] for i in range(n_chunks)],
+                [(projections[i-1] + projections[i])/2 for i in chunk_bounds[1:-1]])
 
     def find_leaf(self, obj):
         """
