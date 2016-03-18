@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# encoding: utf-8
 #
 # Author: Teemu Henrikki Pitkänen <teemu.pitkanen@helsinki.fi>
 # University of Helsinki / Helsinki Institute for Information Technology 2016
@@ -7,6 +7,8 @@
 from rptree import *
 import scipy.spatial.distance as ssd
 import hashlib as hl
+import os
+import cPickle
 
 
 class MRPTIndex(object):
@@ -18,16 +20,16 @@ class MRPTIndex(object):
     exists in the pre-built collection, as many new trees will be built as needed. The new trees are also added to the
     collection.
     """
-    def __init__(self, data, n0=10, n_trees=32, use_saved=False):
+    def __init__(self, data, n0=10, n_trees=32, degree=2, use_saved=False):
         self.data = data
         if use_saved:
             self.trees = []
-            save_path = 'saved_trees/'+hl.sha1(data.view(np.uint8)).hexdigest()[:8]+'/'+str(n0)
+            save_path = 'saved_trees/'+hl.sha1(data.view(np.uint8)).hexdigest()[:8]+'/'+str(n0)+'/'+str(degree)
             self.trees = load_trees(save_path, n_trees)
             for t in range(len(self.trees), n_trees):
-                t = RPTree(data, n0)
+                t = RPTree(data, n0, degree=degree)
                 self.trees.append(t)
-                save_tree(t, save_path)
+                save_trees([t], save_path)
         else:
             self.trees = [RPTree(data, n0) for t in range(n_trees)]
 
@@ -62,3 +64,35 @@ class MRPTIndex(object):
         elected = np.argsort(votes)[len(votes)-1:len(votes)-1-n_elected:-1]
         return [elected[i] for i in np.argsort(ssd.cdist([obj], [self.data[i] for i in elected])[0])[:k]]
 
+
+def save_trees(trees, path):
+    """
+    The other main function in this file, used to store single rp-trees to disk.
+    :param trees: The trees to be saved
+    :param datasetname: Name of the data set the trees are built for
+    """
+    if not os.path.exists(path):
+        os.makedirs(path)
+    ordinal = 0
+    for tree in trees:
+        while os.path.isfile(path + '/t' + str(ordinal) + '.idx'):
+            ordinal += 1
+        filename = path + '/t' + str(ordinal) + '.idx'
+        with open(filename, 'w') as f:
+            cPickle.dump(tree, f)
+
+
+def load_trees(path, n_trees):
+    """
+    The other main function in this file. Loads trees from disk.
+    :param path: The path where the trees are loaded
+    :param n_trees: The number of trees loaded
+    :return: A list containing the trees. Empty if no such directory.
+    """
+    trees = []
+    if os.path.exists(path):
+        files = os.listdir(path)
+        for i in range(min(n_trees, len(files))):
+            with open(path+'/'+files[i], 'r') as f:
+                trees.append(cPickle.load(f))
+    return trees

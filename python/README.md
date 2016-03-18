@@ -32,12 +32,12 @@ The index construction now supports saving and loading trees. When calling the `
 
 ###Speed up queries by employing a voting trick
 
-When employing the voting trick, the index is built exactly in the same manner as in typical MRPT. To understand the method we need to go a bit deeper to the normal query first. When answering a query, each of the `n_trees` trees in the index returns all the objects in a single leaf, resulting in at most `n_trees*n0` objects. We compute the nearest neighbors wthin these objects in a brute-force manner. 
+When employing the voting trick, the index is built exactly in the same manner as in typical MRPT. To understand the method we need to go a bit deeper to the normal query first. When answering a query, each of the `n_trees` trees in the index returns all the objects in a single leaf, resulting in at most `n_trees*n0` objects. We compute the nearest neighbors within these objects in a brute-force manner. 
 
 The voting-scheme is based on the intuitive idea of the actually nearest neighbors likely being returned by several trees. In a voting approximate nearest neighbor query (function `vann`) we take the objects returned by the trees as votes, and only compute the distances to the objects with the most votes. The number of these objects is determined by an extra parameter `n_elected` of the `vann` function. Notice that this trick allows us to use a lot bigger values of `n0`.
 
 	voting_index = MRPTIndex(data, n0=1000, n_trees=64, use_saved=True)
-    neighbors = index.vann(query_object, k=10, n_elected=100)
+    neighbors = voting_index.vann(query_object, k=10, n_elected=100)
 
 ##Extras
 The file `mnist_utils.py` contains python functions to read and visualize the popular mnist data set.
