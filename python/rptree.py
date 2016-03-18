@@ -15,7 +15,7 @@ class RPTree(object):
     implementation has been built with approximate nearest neighbor search (ANN) problems in mind. A tree is built by
     dividing the data space by random hyperplanes into small cells. In ANN-problems we usually achieve substantial
     improvements by quickly choosing just a subset of the data located in a single cell where the actual brute-force NN
-    search is then performed.
+    search is then performed, instead of using the whole data set.
     """
 
     def __init__(self, data, n0, degree=2):
@@ -50,18 +50,8 @@ class RPTree(object):
             # Pop next node to be processed
             node, indexes = queue.popleft()
 
-            # Sort the projections
-            projections = all_projections[indexes, tracker.level]
-            order = np.argsort(projections)
-
-            # CLEAN THIS BLOCK LATER!!!
-            n_children = min(int(math.ceil(len(indexes)/float(n0))), self.degree)
-            child_sizes = [int(math.floor(len(indexes)/n_children))]*n_children
-            for i in range(len(indexes) - int(math.floor(len(indexes)/n_children))*n_children):
-                child_sizes[i] += 1
-            split_is = np.cumsum([0] + child_sizes)
-            indexes_divided = [indexes[order[split_is[i]:split_is[i+1]]] for i in range(len(split_is)-1)]
-            node.splits = [(projections[order[i-1]] + projections[order[i]])/2 for i in split_is[1:-1]]
+            # Divide the indexes into equal sized chunks (one for each child) and compute the split boundaries
+            indexes_divided, node.splits = self._chunkify(indexes, all_projections[indexes, tracker.level], n0)
 
             # Set references to children, add child nodes to queue if further splits are required (node size > n0)
             for node_indexes in indexes_divided:
@@ -73,6 +63,27 @@ class RPTree(object):
                     node.children.append(node_indexes)
 
             tracker.object_added()  # Corresponds to adding _node_, not its children, thus called only once
+
+    def _chunkify(self, indexes, projections, n0):
+        """
+        Divides the list 'indexes' into 'self.degree' equal-sized chunks. If the split is not even, the extra elements
+        are added to the list entries on the left. The function aims at building as full leaf nodes as possible, so in
+        case each child is not of size at least n0, the method may result in less than 'self.degree' chunks. Think of
+        the case n0=10, self.degree=5, len(indexes)=12. Instead of splitting into 5 chunks of sizes 2-3, the function
+        returns two chunks with sizes 6 and 5. Thus the leaf sizes are generally closer to n0 and the running time and
+        performance stay more predictable.
+        :param indexes: The list of indexes to be chunkified
+        :param projections: The projections corresponding to the indexes
+        :param n0: The maximum leaf size
+        :return: The chunks as a list of lists, the projection values that separate these chunks
+        """
+        ordering = np.argsort(projections)
+        n_chunks = min(int(math.ceil(len(indexes)/float(n0))), self.degree)
+        chunk_sizes = np.repeat([int(math.floor(len(indexes)/n_chunks))], n_chunks)
+        chunk_sizes[range(len(indexes) - int(math.floor(len(indexes)/n_chunks))*n_chunks)] += 1
+        chunk_bounds = np.cumsum([0] + chunk_sizes)
+        return ([indexes[ordering[chunk_bounds[i]:chunk_bounds[i+1]]] for i in range(len(chunk_bounds)-1)],
+                [(projections[ordering[i-1]] + projections[ordering[i]])/2 for i in chunk_bounds[1:-1]])
 
     def find_leaf(self, obj):
         """
