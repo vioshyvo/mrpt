@@ -28,7 +28,7 @@ class RPTree(object):
         self.seed = np.random.randint(0, int(1e9))
         self.degree = degree
         self.tree_height = math.ceil(math.log(len(data)/float(n0), degree))
-        self.root = _Node()
+        self.root = _Node()  # ([], [])
         self._build_tree(data, n0)
 
     def _build_tree(self, data, n0):
@@ -52,15 +52,16 @@ class RPTree(object):
 
             # Divide the indexes into equal sized chunks (one for each child) and compute the split boundaries
             indexes_divided, node.splits = self._chunkify(indexes, all_projections[indexes, tracker.level], n0)
+            # node[0].append(splits)
 
             # Set references to children, add child nodes to queue if further splits are required (node size > n0)
             for node_indexes in indexes_divided:
                 if len(node_indexes) > n0:
-                    child = _Node()
-                    node.children.append(child)
+                    child = _Node()  # ([], [])
+                    node.children.append(child)  # [1].append(child)
                     queue.append((child, node_indexes))
                 else:
-                    node.children.append(node_indexes)
+                    node.children.append(node_indexes)  # [1].append(node_indexes)
 
             tracker.object_added()  # Corresponds to adding _node_, not its children, thus called only once
 
@@ -85,8 +86,7 @@ class RPTree(object):
         min_chunk_size = int(math.floor(n/n_chunks))
         chunk_sizes = np.repeat([min_chunk_size], n_chunks)
         chunk_sizes[range(n - min_chunk_size*n_chunks)] += 1
-        chunk_bounds = np.cumsum([0] + chunk_sizes)
-
+        chunk_bounds = np.cumsum(np.concatenate(([0], chunk_sizes)))
         return ([indexes[chunk_bounds[i]:chunk_bounds[i+1]] for i in range(n_chunks)],
                 [(projections[i-1] + projections[i])/2 for i in chunk_bounds[1:-1]])
 
@@ -115,7 +115,9 @@ class RPTree(object):
 
 class _FullTreeLevelTracker(object):
     """
-    To be documented ...
+    A _FullTreeLevelTracker object keeps track on the height of a tree with a fixed degree in internal nodes. Every time
+    an object is added to the tree the object_added -method need to be called. The height can be read from the 'level'
+    attribute.
     """
     def __init__(self, degree=2):
         self.level = 0
@@ -136,13 +138,10 @@ class _FullTreeLevelTracker(object):
 
 class _Node(object):
     """
-    This class defines the structure of the inner rp-tree nodes. The only information stored here are pointers to the
-    child nodes and the split value used in this node to divide the data objects to the children.
-
+    The class describes the structure of a single internal node. Only the split values used at this node and the links
+    to the child nodes need to be stored. (The random vector can be generated without explicitly storing it.). Notice
+    also that leaf nodes are not _Node-objects but just simple lists of data object indices.
     """
     def __init__(self):
-        """
-        A node is initially just a place holder so no values ...
-        """
         self.children = []
         self.splits = []
