@@ -6,10 +6,12 @@
 
 from rptree import *
 import scipy.spatial.distance as ssd
-import hashlib as hl
+from Queue import PriorityQueue
+
+# The following imports used only for saving/loading trees
 import os
 import cPickle
-from Queue import PriorityQueue
+import hashlib as hl
 
 
 class MRPTIndex(object):
@@ -21,7 +23,7 @@ class MRPTIndex(object):
     exists in the pre-built collection, as many new trees will be built as needed. The new trees are also added to the
     collection.
     """
-    def __init__(self, data, n0=10, n_trees=32, degree=2, use_saved=False):
+    def __init__(self, data, n0, n_trees, degree=2, use_saved=False):
         self.data = data
         if use_saved:
             self.trees = []
@@ -34,96 +36,47 @@ class MRPTIndex(object):
         else:
             self.trees = [RPTree(data, n0) for t in range(n_trees)]
 
-    def ann(self, obj, k=10, p=0):
+    def ann(self, obj, k, extra_branches=0, n_elected=None):
         """
-        Ann with backtrack. Will replace ann?
-        :param obj:
-        :param k:
-        :param p:
-        :return:
+        The mrpt approximate nearest neighbor query. By default the function implements a basic query - the query object
+        is routed to one leaf in each tree, and the nearest neighbors are searched in the union of these leaves. The
+        extra parameters allow some performance-improving tricks. The parameter extra_brances allows the query to
+        explore extra branches where the projection value was close to the split. The n_elected parameter causes the
+        query to use the voting trick - not all objects in the union of leaves are searched, but only those that were
+        returned by several trees.
+        :param obj: The object whose neighbors are being searched
+        :param k: The number of neighbors being searched
+        :param extra_branches: The number of extra branches allowed in the index
+        :param n_elected: The number of elected objects in the voting trick
+        :return: The approximate neighbors. In extreme situations not strictly k, but slightly less (eg. 1 tree case)
         """
-        p_queue = PriorityQueue()
-        all_projections = []
-        neighborhood = set()
-
-        for i in range(len(self.trees)):
-            ((indexes, gaps), projections) = self.trees[i].find_leaf(obj)
-            neighborhood = neighborhood.union(indexes)
-            all_projections.append(projections)
-            for gap in gaps:
-                p_queue.put((gap[0], gap[1], gap[2], i))
-
-        for i in range(p):
-            gap, node, level, tree = p_queue.get()
-            indexes, gaps = RPTree.move_down_from_node(node, all_projections[tree][level:], level)
-            neighborhood = neighborhood.union(indexes)
-            for gap in gaps:
-                p_queue.put((gap[0], gap[1], gap[2], tree))
-
-        neighborhood = list(neighborhood)
-        return [neighborhood[i] for i in np.argsort(ssd.cdist([obj], [self.data[i] for i in neighborhood])[0])[:k]]
-
-    def vann(self, obj, k=10, n_elected=200, p=0):
-        """
-        Ann with backtrack. Will replace ann?
-        :param obj:
-        :param k:
-        :param p:
-        :return:
-        """
-        p_queue = PriorityQueue()
+        priority_queue = PriorityQueue()
         all_projections = []
         votes = np.zeros(len(self.data))
 
+        # First traverse each tree from root to leaf
         for i in range(len(self.trees)):
-            ((indexes, gaps), projections) = self.trees[i].find_leaf(obj)
-            for vote in indexes:
-                votes[vote] += 1
+            ((indexes, gaps), projections) = self.trees[i].full_tree_traversal(obj)
+            votes[indexes] += 1
             all_projections.append(projections)
             for gap in gaps:
-                p_queue.put((gap[0], gap[1], gap[2], i))
+                priority_queue.put((gap[0], gap[1], gap[2], i))  # gap_size, link_to_node, level_in_tree, tree_id
 
-        for i in range(p):
-            gap, node, level, tree = p_queue.get()
-            indexes, gaps = RPTree.move_down_from_node(node, all_projections[tree][level:], level)
-            for vote in indexes:
-                votes[vote] += 1
+        # Optional branching trick: traverse down from #extra_branches nodes with the smallest d(projection, split)
+        for i in range(extra_branches):
+            gap, node, level, tree = priority_queue.get()
+            indexes, gaps = RPTree.partial_tree_traversal(node, all_projections[tree][level:], level)
+            votes[indexes] += 1
             for gap in gaps:
-                p_queue.put((gap[0], gap[1], gap[2], tree))
+                priority_queue.put((gap[0], gap[1], gap[2], tree))
 
-        elected = np.argsort(votes)[len(votes)-1:len(votes)-1-n_elected:-1]
-        return [elected[i] for i in np.argsort(ssd.cdist([obj], [self.data[i] for i in elected])[0])[:k]]
+        # Decide which nodes to include in the brute force search
+        if n_elected is not None:   # Optional voting trick
+            elected = np.argsort(votes)[len(votes)-1:len(votes)-1-n_elected:-1]
+        else:  # Basic mrpt
+            elected = np.nonzero(votes)[0]
 
-    def ann_old(self, obj, k=10):
-        """
-        The classic-style MRPT query which is performed in each of the trees, and the results are combined to find the
-        best k approximate neighbors.
-        :param obj: The vector whose neighbors are being searched for
-        :param k: The number of neighbors
-        :return: The indices of the approximate neighbors in the data set
-        """
-        neighborhood = set()
-        for tree in self.trees:
-            neighborhood = neighborhood.union(tree.find_leaf(obj))
-        neighborhood = list(neighborhood)
-        return [neighborhood[i] for i in np.argsort(ssd.cdist([obj], [self.data[i] for i in neighborhood])[0])[:k]]
-
-    def vann_old(self, obj, k=10, n_elected=500):
-        """
-        The voting-enhanced MRPT query. In queries each potential approximate neighbor suggested by a tree counts as
-        a vote. Only the objects with the highest number votes are actually compared at the end of the search.
-        Has the potential to provide big improvements in query time.
-        :param obj: The vector whose neighbors are being searched for
-        :param k: The number of neighbors
-        :param n_elected: The number of data objects whose distances to the query are really computed
-        :return: The indices of the approximate neighbors in the data set
-        """
-        votes = np.zeros(len(self.data))
-        for tree in self.trees:
-            ((indexes, gaps), projections) = tree.find_leaf(obj)
-            for vote in indexes:
-                votes[vote] += 1
-        elected = np.argsort(votes)[len(votes)-1:len(votes)-1-n_elected:-1]
+        # Find the nearest neighbors in the subset of objects
         return [elected[i] for i in np.argsort(ssd.cdist([obj], [self.data[i] for i in elected])[0])[:k]]
 
     @staticmethod
@@ -131,7 +84,7 @@ class MRPTIndex(object):
         """
         The other main function in this file, used to store single rp-trees to disk.
         :param trees: The trees to be saved
-        :param datasetname: Name of the data set the trees are built for
+        :param path: The path where the trees are saved
         """
         if not os.path.exists(path):
             os.makedirs(path)
@@ -147,7 +100,7 @@ class MRPTIndex(object):
     def load_trees(path, n_trees):
         """
         The other main function in this file. Loads trees from disk.
-        :param path: The path where the trees are loaded
+        :param path: The path from where the trees are loaded
         :param n_trees: The number of trees loaded
         :return: A list containing the trees. Empty if no such directory.
         """

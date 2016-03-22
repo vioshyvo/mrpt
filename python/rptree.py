@@ -90,7 +90,7 @@ class RPTree(object):
         return ([indexes[chunk_bounds[i]:chunk_bounds[i+1]] for i in range(n_chunks)],
                 [(projections[i-1] + projections[i])/2 for i in chunk_bounds[1:-1]])
 
-    def find_leaf(self, obj):
+    def full_tree_traversal(self, obj):
         """
         The function re-creates the same random vectors that were used in tree construction, computes the projections of
         the query vector and using the split information stored in the nodes places the query vector into a single leaf.
@@ -101,10 +101,10 @@ class RPTree(object):
         projections = np.dot(obj, np.random.normal(size=(len(obj), self.tree_height)))
 
         # Move down the tree according to the projections and split values stored in the tree
-        return self.move_down_from_node(self.root, projections, 0), projections
+        return self.partial_tree_traversal(self.root, projections, 0), projections
 
     @staticmethod
-    def move_down_from_node(node, projections, tree_level):
+    def partial_tree_traversal(node, projections, tree_level):
         """
         Moves down to a leaf starting from the specified node.
         """
