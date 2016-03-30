@@ -20,7 +20,7 @@ class RPTree(object):
 
     def __init__(self, data, n0, degree=2):
         """
-        Sets the main attributes and calls the routine which actually creates the nodes and builds the tree.
+        Sets the main attributes and calls the build_tree routine which actually creates the nodes and builds the tree.
         :param data: The data for which the index is built
         :param n0: The maximum leaf size of the tree
         :param degree: The maximum number of children that each internal node of the tree has
@@ -101,7 +101,8 @@ class RPTree(object):
         projections = np.dot(obj, np.random.normal(size=(len(obj), self.tree_height)))
 
         # Move down the tree according to the projections and split values stored in the tree
-        return self.partial_tree_traversal(self.root, projections, 0), projections
+        indexes, gaps = self.partial_tree_traversal(self.root, projections, 0)
+        return indexes, gaps, projections
 
     @staticmethod
     def partial_tree_traversal(node, projections, tree_level):
@@ -110,12 +111,15 @@ class RPTree(object):
         """
         gaps = []
         for projection in projections:
+
+            # Find the child where the query object belongs.
             child_index = len(node.splits)
             for i in range(len(node.splits)):
                 if projection < node.splits[i]:
                     child_index = i
                     break
 
+            # Store the distances to splits for the priority queue trick.
             for i in range(len(node.splits)):
                 gap = abs(projection - node.splits[i])
                 if i < child_index:
@@ -123,6 +127,7 @@ class RPTree(object):
                 elif i >= child_index:
                     gaps.append((gap, node.children[i+1], tree_level + 1))
 
+            # Move down the tree for next iteration round
             node = node.children[child_index]
             tree_level += 1
             if not hasattr(node, 'splits'):

@@ -16,14 +16,22 @@ import hashlib as hl
 
 class MRPTIndex(object):
     """
-    The MRPT index is basically just a collection of RP trees. Query results are formed by combining the results of
-    single trees. The constructor builds a user-specified number of trees with a user-specified maximum leaf-size. The
-    current version can use pre-built saved trees to speed up -- if there are trees built for the same data set with the
-    same leaf size those will be used. If the use_saved option is allowed but the index needs more trees than there
-    exists in the pre-built collection, as many new trees will be built as needed. The new trees are also added to the
-    collection.
+    The MRPT index is a data structure that allows us to answer approximate nearest neighbor queries quickly. The index
+    is basically just a collection of random projection trees. This class implements the basic MRPT index as well as a
+    number of small tricks to improve performance.
     """
     def __init__(self, data, n0, n_trees, degree=2, use_saved=False):
+        """
+        The initializer builds the MRPT index. It has to be called before ANN-queries can be made.
+        :param data: The data fro which the index is built. At the moment this has to be done at once, no objects can be
+        added later.
+        :param n0: The maximum leaf size used in all of the trees of the index.
+        :param n_trees: The number of trees used in the index.
+        :param degree: Defines the degree of inner random projection tree nodes (the number of children). Use the
+        default value unless you really know what you are doing.
+        :param use_saved: Saves and loads trees for reuse instead of building new ones every time an index is created.
+        :return: The index object.
+        """
         self.data = data
         if use_saved:
             self.trees = []
@@ -40,10 +48,11 @@ class MRPTIndex(object):
         """
         The mrpt approximate nearest neighbor query. By default the function implements a basic query - the query object
         is routed to one leaf in each tree, and the nearest neighbors are searched in the union of these leaves. The
-        extra parameters allow some performance-improving tricks. The parameter extra_brances allows the query to
+        extra parameters allow some tricks to improve performance. The parameter extra_brances allows the query to
         explore extra branches where the projection value was close to the split. The n_elected parameter causes the
-        query to use the voting trick - not all objects in the union of leaves are searched, but only those that were
-        returned by several trees.
+        query to use the voting trick - not all objects in the union of leaves are searched, but the appearance counts
+        as a vote and only the most voted objects get 'elected' to be searched. Thus an object must be returned by
+        several trees to be included in the linear search.
         :param obj: The object whose neighbors are being searched
         :param k: The number of neighbors being searched
         :param extra_branches: The number of extra branches allowed in the index
@@ -55,20 +64,20 @@ class MRPTIndex(object):
         votes = np.zeros(len(self.data))
 
         # First traverse each tree from root to leaf
-        for i in range(len(self.trees)):
-            ((indexes, gaps), projections) = self.trees[i].full_tree_traversal(obj)
+        for tree_id in range(len(self.trees)):
+            indexes, gaps, projections = self.trees[tree_id].full_tree_traversal(obj)
             votes[indexes] += 1
             all_projections.append(projections)
-            for gap in gaps:
-                priority_queue.put((gap[0], gap[1], gap[2], i))  # gap_size, link_to_node, level_in_tree, tree_id
+            for (gap_width, node, level) in gaps:
+                priority_queue.put((gap_width, node, level, tree_id))  # gap_size, link_to_node, level_in_tree, tree_id
 
         # Optional branching trick: traverse down from #extra_branches nodes with the smallest d(projection, split)
         for i in range(extra_branches):
-            gap, node, level, tree = priority_queue.get()
+            gap_width, node, level, tree = priority_queue.get()
             indexes, gaps = RPTree.partial_tree_traversal(node, all_projections[tree][level:], level)
             votes[indexes] += 1
-            for gap in gaps:
-                priority_queue.put((gap[0], gap[1], gap[2], tree))
+            for gap_width in gaps:
+                priority_queue.put((gap_width[0], gap_width[1], gap_width[2], tree))
 
         # Decide which nodes to include in the brute force search
         if n_elected is not None:   # Optional voting trick
@@ -82,7 +91,7 @@ class MRPTIndex(object):
     @staticmethod
     def save_trees(trees, path):
         """
-        The other main function in this file, used to store single rp-trees to disk.
+        A function for saving the trees to disk.
         :param trees: The trees to be saved
         :param path: The path where the trees are saved
         """
@@ -99,10 +108,11 @@ class MRPTIndex(object):
     @staticmethod
     def load_trees(path, n_trees):
         """
-        The other main function in this file. Loads trees from disk.
+        A function for reading saved trees from the disk.
         :param path: The path from where the trees are loaded
-        :param n_trees: The number of trees loaded
-        :return: A list containing the trees. Empty if no such directory.
+        :param n_trees: The number of trees the user wants loaded
+        :return: A list containing the trees. Empty if no such directory exists. If not enough trees exist the function
+        will return as many as it finds.
         """
         trees = []
         if os.path.exists(path):
