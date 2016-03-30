@@ -8,4 +8,5 @@
 *.class
 *m~
 python/saved_trees/*
-*results.txr
+*results.txt
+
