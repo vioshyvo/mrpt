@@ -6,7 +6,7 @@
 
 from rptree import *
 import scipy.spatial.distance as ssd
-from Queue import PriorityQueue
+import Queue
 
 # The following imports used only for saving/loading trees
 import os
@@ -59,7 +59,7 @@ class MRPTIndex(object):
         :param n_elected: The number of elected objects in the voting trick
         :return: The approximate neighbors. In extreme situations not strictly k, but slightly less (eg. 1 tree case)
         """
-        priority_queue = PriorityQueue()
+        priority_queue = Queue.PriorityQueue()
         all_projections = []
         votes = np.zeros(len(self.data))
 
@@ -73,11 +73,14 @@ class MRPTIndex(object):
 
         # Optional branching trick: traverse down from #extra_branches nodes with the smallest d(projection, split)
         for i in range(extra_branches):
-            gap_width, node, level, tree = priority_queue.get()
-            indexes, gaps = RPTree.partial_tree_traversal(node, all_projections[tree][level:], level)
-            votes[indexes] += 1
-            for gap_width in gaps:
-                priority_queue.put((gap_width[0], gap_width[1], gap_width[2], tree))
+            try:
+                gap_width, node, level, tree = priority_queue.get(block=False)
+                indexes, gaps = RPTree.partial_tree_traversal(node, all_projections[tree][level:], level)
+                votes[indexes] += 1
+                for gap_width in gaps:
+                    priority_queue.put((gap_width[0], gap_width[1], gap_width[2], tree))
+            except Queue.Empty:
+                print 'More branches than leaves. Will skip the extras. Should yield 100% accuracy...'
 
         # Decide which nodes to include in the brute force search
         if n_elected is not None:   # Optional voting trick
