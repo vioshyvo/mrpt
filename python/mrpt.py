@@ -80,7 +80,7 @@ class MRPTIndex(object):
                 for gap_width in gaps:
                     priority_queue.put((gap_width[0], gap_width[1], gap_width[2], tree))
             except Queue.Empty:
-                print 'More branches than leaves. Will skip the extras. Should yield 100% accuracy...'
+                print 'More branches than leaves. Will skip the extras.'
 
         # Decide which nodes to include in the brute force search
         if n_elected is not None:   # Optional voting trick

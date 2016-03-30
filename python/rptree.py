@@ -111,7 +111,7 @@ class RPTree(object):
         """
         gaps = []
         for projection in projections:
-            
+
             if not hasattr(node, 'splits'):
                 break
 
