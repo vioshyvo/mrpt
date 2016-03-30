@@ -111,6 +111,9 @@ class RPTree(object):
         """
         gaps = []
         for projection in projections:
+            
+            if not hasattr(node, 'splits'):
+                break
 
             # Find the child where the query object belongs.
             child_index = len(node.splits)
@@ -130,8 +133,6 @@ class RPTree(object):
             # Move down the tree for next iteration round
             node = node.children[child_index]
             tree_level += 1
-            if not hasattr(node, 'splits'):
-                break
 
         return node, gaps
 
