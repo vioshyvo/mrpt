@@ -4,6 +4,8 @@
 # University of Helsinki / Helsinki Institute for Information Technology 2016
 #
 
+import sys
+sys.path.append('/cs/work/home/teempitk/mrpt/python')
 from mrpt import *
 import numpy as np
 from utils.mnist_utils import *
@@ -51,5 +53,3 @@ def choose_params(data, k):
     n_extra_branches = int(np.random.beta(2, 5)*500)
     n_elected = k + int(np.random.beta(2, 5)*1000)
     return n0, n_trees, degree, n_extra_branches, n_elected
-
-explore_mnist(3)
