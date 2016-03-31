@@ -50,6 +50,12 @@ def choose_params(data, k):
     n0 = pow(2, np.random.randint(0, 12))
     n_trees = int(np.random.beta(2, 5)*min(300, len(data)/n0))
     degree = 2
-    n_extra_branches = int(np.random.beta(2, 5)*500)
-    n_elected = k + int(np.random.beta(2, 5)*1000)
+    n_extra_branches = 0
+    n_elected = None
+    # voting + pq
+    #n0 = pow(2, np.random.randint(0, 12))
+    #n_trees = int(np.random.beta(2, 5)*min(300, len(data)/n0))
+    #degree = 2
+    #n_extra_branches = int(np.random.beta(2, 5)*500)
+    #n_elected = k + int(np.random.beta(2, 5)*1000)
     return n0, n_trees, degree, n_extra_branches, n_elected
