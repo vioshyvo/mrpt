@@ -34,7 +34,7 @@ def explore_mnist(iters=1):
         correct_approximates = [len(np.intersect1d(a_neighbors[i], e_neighbors[i])) for i in range(len(a_neighbors))]
         accuracy = sum(correct_approximates)/1000.0
 
-        with open('results.txt', "a") as f:
+        with open('votingResults.txt', "a") as f:
             f.write(str(n0)+' '+str(n_trees)+' '+str(degree)+' '+str(n_extra_branches)+' '+str(n_elected)+' ' +
                     str(accuracy)+' '+str(avg_query_time)+'\n')
 
