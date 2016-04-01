@@ -47,11 +47,20 @@ def load_exact_results():
 
 
 def choose_params(data, k):
-    n0 = pow(2, np.random.randint(0, 12))
-    n_trees = int(np.random.beta(2, 5)*min(300, len(data)/n0))
+    # Just voting
+    n0 = pow(2, np.random.randint(0, 14))
+    n_trees = int(np.random.beta(2, 5)*500)
     degree = 2
     n_extra_branches = 0
-    n_elected = None
+    n_elected = k + int(np.random.beta(2, 5)*1000)
+
+    # Normal mrpt
+    #n0 = pow(2, np.random.randint(0, 12))
+    #n_trees = int(np.random.beta(2, 5)*min(300, len(data)/n0))
+    #degree = 2
+    #n_extra_branches = 0
+    #n_elected = None
+
     # voting + pq
     #n0 = pow(2, np.random.randint(0, 12))
     #n_trees = int(np.random.beta(2, 5)*min(300, len(data)/n0))
