@@ -34,7 +34,7 @@ def explore_mnist(iters=1):
         correct_approximates = [len(np.intersect1d(a_neighbors[i], e_neighbors[i])) for i in range(len(a_neighbors))]
         accuracy = sum(correct_approximates)/1000.0
 
-        with open('votingResults.txt', "a") as f:
+        with open('rptResults.txt', "a") as f:
             f.write(str(n0)+' '+str(n_trees)+' '+str(degree)+' '+str(n_extra_branches)+' '+str(n_elected)+' ' +
                     str(accuracy)+' '+str(avg_query_time)+'\n')
 
@@ -47,12 +47,19 @@ def load_exact_results():
 
 
 def choose_params(data, k):
-    # Just voting
-    n0 = pow(2, np.random.randint(0, 14))
-    n_trees = int(np.random.beta(2, 5)*500)
+    # SINGLE RPT
+    n0 = pow(2, np.random.randint(0, 16))
+    n_trees = 1
     degree = 2
     n_extra_branches = 0
-    n_elected = k + int(np.random.beta(2, 5)*1000)
+    n_elected = None
+
+    # Just voting
+    #n0 = pow(2, np.random.randint(0, 14))
+    #n_trees = int(np.random.beta(2, 5)*300)
+    #degree = 2
+    #n_extra_branches = 0
+    #n_elected = k + int(np.random.beta(2, 5)*1000)
 
     # Normal mrpt
     #n0 = pow(2, np.random.randint(0, 12))
