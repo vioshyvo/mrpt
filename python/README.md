@@ -50,15 +50,15 @@ This trick maintains a priority queue of the difference between the projection v
 ## MNIST handwritten digits example
 The file `mnist_utils.py` contains python functions to read and visualize the popular [mnist data](http://yann.lecun.com/exdb/mnist/) set. You may need to fix the paths to data sets etc. 
 
-Once you have the data, you can try the following examples for 10-NN search. For reference, finding the neighbors with bruteforce with the following command takes approximately 300-400ms on my system:
+Once you have the data, you can try the following examples for 10-NN search. For reference, finding the neighbors with bruteforce with the following command takes approximately 300-400ms on my system (a 2013 Macbook Air 2*1.3GHz Core i5):
 
-    neighbors = numpy.argsort(scipy.spatial.distance.cdist([query_img], mnist_train_imgs)[-1])[:10]
+    neighbors = numpy.argsort(scipy.spatial.distance.cdist([query_img], mnist_train_imgs)[0])[:10]
 
 ### Basic MRPT
 
-The following parameters for the basic MRPT should get 7-8 out of 10 neighbors right on average. On my system the query time is less than 100ms.
+The following parameters for the basic MRPT should get 9 out of 10 neighbors right on average. On my system the query time is about 200ms.
     
-    index = MRPTIndex(data, n0=16, n_trees=50)
+    index = MRPTIndex(data, n0=32, n_trees=75)
     neighbors = index.ann(query_obj, 10)
 
 ### MRPT with voting and extra branches
@@ -67,6 +67,9 @@ We can do better using the additional tricks described above. The following para
 
     index = MRPTIndex(data, n0=512, n_trees=30)
     neighbors = index.ann(query_obj, 10, extra_branches=140, n_elected=200)
+
+The code in `example.py` executes the above commands and prints some basic stats.
+
 
 # Questions?
 teemu.pitkanen'at'cs.helsinki.fi

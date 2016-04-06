@@ -44,7 +44,7 @@ class MRPTIndex(object):
         else:
             self.trees = [RPTree(data, n0) for t in range(n_trees)]
 
-    def ann(self, obj, k, extra_branches=0, n_elected=None):
+    def ann(self, obj, k, extra_branches=0, n_elected=0):
         """
         The mrpt approximate nearest neighbor query. By default the function implements a basic query - the query object
         is routed to one leaf in each tree, and the nearest neighbors are searched in the union of these leaves. The
@@ -83,7 +83,7 @@ class MRPTIndex(object):
                 print 'More branches than leaves. Will skip the extras.'
 
         # Decide which nodes to include in the brute force search
-        if n_elected is not None:   # Optional voting trick
+        if n_elected > 0:   # Optional voting trick
             elected = np.argsort(votes)[len(votes)-1:len(votes)-1-n_elected:-1]
         else:  # Basic mrpt
             elected = np.nonzero(votes)[0]
