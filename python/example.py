@@ -51,7 +51,7 @@ def mrpt_example(n0, n_trees, n_extra_branches, n_elected):
     plt.ylabel('Number of test queries')
     plt.show()
 
-    print '%.1f ' % (1.0*sum(correct_neighbors)/n_queries) + 'neighbors correct on average (out of 10)'
+    print '%.1f ' % (1.0*sum(correct_neighbors)/n_queries) + 'neighbors (out of 10) correct on average'
 
 
 # An OK choice of parameters with no bells and whistles employed. Should get ~90% performance.

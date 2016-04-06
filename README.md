@@ -1,5 +1,7 @@
 # Implementations of MRPT approximate nearest neighbour search in various programming languages
 
+![Six trees](2dExample.png "Sample trees built on a 2-d data set")
+
 ## What?
 This repository contains a number of implementations for the approximate nearest neighbour method of multiple random projection trees (MRPT). The method is a result of research conducted at Helsinki Institute for Information Technology (HIIT).
 
