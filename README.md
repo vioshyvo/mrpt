@@ -1,14 +1,12 @@
-# Implementations of MRPT approximate nearest neighbour search in various programming languages
+# MRPT approximate nearest neighbor search
 
-![Six trees](2dExample.png "Sample trees built on a 2-d data set")
+![Tree](2dExample.png "An example rp-tree built on a 2-d data set")
 
-## What?
-This repository contains a number of implementations for the approximate nearest neighbour method of multiple random projection trees (MRPT). The method is a result of research conducted at Helsinki Institute for Information Technology (HIIT).
-
-MRPT is a spatial method where the data space is divided by randomly chosen hyperplanes. The method is particularly effective in use cases that involve high dimensional and high sample size data sets.
+## What is MRPT
+MRPT is an algorithm for approximate nearest neighbor search. The method is based on an index data structure that consists of Multiple Random Projection Trees. Building a new index for a data set may take quite some time, but after that initial costs queries can be performed at superior speeds compared to the trivial linear-time approach. MRPT is a result of research conducted at Helsinki Institute for Information Technology (HIIT).
 
 ## Languages
-As of now we support MATLAB, Python and C++.
+We provide implementations of the method in two programming languages, C++ and Python 2.7. The C++ version is naturally faster, but new ideas are usually brought to the Python version first and it serves an important role in prototyping.
 
 ## More information
-See our paper : http://arxiv.org/pdf/1509.06957v1
+See our paper: http://arxiv.org/pdf/1509.06957v1
