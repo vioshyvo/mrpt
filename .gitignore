@@ -12,3 +12,6 @@ python/saved_trees/*
 python/test/*
 matlab
 *rptree2.py
+cpp2
+cpp/nbproject
+*.o
