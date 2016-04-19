@@ -69,7 +69,7 @@ class MRPTIndex(object):
             votes[indexes] += 1
             all_projections.append(projections)
             for (gap_width, node, level) in gaps:
-                priority_queue.put((gap_width, node, level, tree_id))  # gap_size, link_to_node, level_in_tree, tree_id
+                priority_queue.put((gap_width, node, level, tree_id))
 
         # Optional branching trick: traverse down from #extra_branches nodes with the smallest d(projection, split)
         for i in range(extra_branches):
@@ -84,12 +84,12 @@ class MRPTIndex(object):
 
         # Decide which nodes to include in the brute force search
         if n_elected > 0:   # Optional voting trick
-            elected = np.argsort(votes)[len(votes)-1:len(votes)-1-n_elected:-1]
+            elected = np.argsort(votes)[::-1][:n_elected]
         else:  # Basic mrpt
             elected = np.nonzero(votes)[0]
 
         # Find the nearest neighbors in the subset of objects
-        return [elected[i] for i in np.argsort(ssd.cdist([obj], [self.data[i] for i in elected])[0])[:k]]
+        return elected[np.argsort(ssd.cdist([obj], self.data[elected])[0])[:k]]
 
     @staticmethod
     def save_trees(trees, path):

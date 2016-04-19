@@ -92,9 +92,12 @@ class RPTree(object):
 
     def full_tree_traversal(self, obj):
         """
-        The function re-creates the same random vectors that were used in tree construction, computes the projections of
-        the query vector and using the split information stored in the nodes places the query vector into a single leaf.
-        The query vector has to be given as a 1-dimensional array.
+        The function places the query object 'obj' to a leaf. The function re-creates the same random vectors that were
+        used in tree construction, computes the projections of the query vector and using the split information stored
+        in the nodes places the query vector into a single leaf.
+        :param obj: The query object, has to be given as a row vector
+        :return: The indexes of the leaf, gap information and projection values from the path to leaf (for the extra
+        branches trick)
         """
         # Restore rng settings, compute projections to random basis
         np.random.seed(self.seed)
@@ -111,7 +114,7 @@ class RPTree(object):
         """
         gaps = []
         for projection in projections:
-
+            # Leaves as
             if not hasattr(node, 'splits'):
                 break
 

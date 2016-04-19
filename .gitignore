@@ -11,3 +11,4 @@ python/saved_trees/*
 *results.txt
 python/test/*
 matlab
+*rptree2.py
