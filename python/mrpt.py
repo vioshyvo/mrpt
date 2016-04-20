@@ -4,16 +4,16 @@
 # University of Helsinki / Helsinki Institute for Information Technology 2016
 #
 
-from scipy.spatial.distance import cdist
-import Queue
-import math
 import numpy as np
+from scipy.spatial.distance import cdist
+from Queue import PriorityQueue, Empty
 from collections import deque
+from math import log, ceil, floor
 
 # The following imports used only for saving/loading trees
 import os
 import cPickle
-import hashlib as hl
+from hashlib import sha1
 
 
 class MRPTIndex(object):
@@ -37,7 +37,8 @@ class MRPTIndex(object):
         self.data = data
         if use_saved:
             self.trees = []
-            save_path = 'saved_trees/'+hl.sha1(data.view(np.uint8)).hexdigest()[:8]+'/'+str(n0)+'/'+str(degree)
+            # The directory name is a hash of the data set contents to avoid using trees built for wrong data
+            save_path = 'saved_trees/'+sha1(data.view(np.uint8)).hexdigest()[:8]+'/'+str(n0)+'/'+str(degree)
             self.trees = MRPTIndex.load_trees(save_path, n_trees)
             for t in range(len(self.trees), n_trees):
                 t = RPTree(data, n0, degree=degree)
@@ -61,7 +62,7 @@ class MRPTIndex(object):
         :param n_elected: The number of elected objects in the voting trick
         :return: The approximate neighbors. In extreme situations not strictly k, but slightly less (eg. 1 tree case)
         """
-        priority_queue = Queue.PriorityQueue()
+        priority_queue = PriorityQueue()
         all_projections = []
         votes = np.zeros(len(self.data))
 
@@ -81,7 +82,7 @@ class MRPTIndex(object):
                 votes[indexes] += 1
                 for gap_width in gaps:
                     priority_queue.put((gap_width[0], gap_width[1], gap_width[2], tree))
-            except Queue.Empty:
+            except Empty:
                 print 'More branches than leaves. Will skip the extras.'
 
         # Decide which nodes to include in the brute force search
@@ -146,7 +147,7 @@ class RPTree(object):
         """
         self.seed = np.random.randint(0, int(1e9))
         self.degree = degree
-        self.tree_height = math.ceil(math.log(len(data)/float(n0), degree))
+        self.tree_height = ceil(log(len(data)/float(n0), degree))
         self.root = _Node()
         self._build_tree(data, n0)
 
@@ -200,8 +201,8 @@ class RPTree(object):
         projections = np.sort(projections)
         n = len(indexes)
 
-        n_chunks = min(int(math.ceil(n/float(n0))), self.degree)
-        min_chunk_size = int(math.floor(n/n_chunks))
+        n_chunks = min(int(ceil(n/float(n0))), self.degree)
+        min_chunk_size = int(floor(n/n_chunks))
         chunk_sizes = np.repeat([min_chunk_size], n_chunks)
         chunk_sizes[range(n - min_chunk_size*n_chunks)] += 1
         chunk_bounds = np.cumsum(np.concatenate(([0], chunk_sizes)))
