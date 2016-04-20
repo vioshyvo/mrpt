@@ -16,3 +16,5 @@ cpp2
 cpp/nbproject
 *.o
 python/rptree2*
+*.cpp~
+
