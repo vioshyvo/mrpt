@@ -18,3 +18,4 @@ cpp/nbproject
 python/rptree2*
 *.cpp~
 
+/cpp/build/

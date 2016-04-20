@@ -7,7 +7,9 @@
 from distutils.core import setup, Extension
 
 module1 = Extension('mrpt',
-                    sources = ['src/mrptmodule.cpp', 'src/mrpt.cpp', 'src/knn.cpp'])
+                    sources = ['src/mrptmodule.cpp', 'src/mrpt.cpp', 'src/knn.cpp'],
+                    extra_compile_args = ['-std=c++11'],
+                    extra_link_args = ['-lblas', '-llapack'])
 
 setup (name = 'mrpt',
        versiown = '1.0',

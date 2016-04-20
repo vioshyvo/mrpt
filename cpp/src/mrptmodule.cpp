@@ -8,6 +8,7 @@
 
 #include "Python/Python.h"
 #include "Python/structmember.h"
+//#include "numpy/arrayobject.h"
 #include <cstdlib>
 #include <armadillo>
 #include "mrpt.h"
@@ -25,7 +26,6 @@ Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
     mrptIndex* self;
     self = (mrptIndex*) type->tp_alloc(type, 0);
     if (self != NULL) {
-        //self->f = 0;
         self->ptr = NULL;
     }
     return (PyObject *) self;
@@ -38,10 +38,24 @@ Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
     int n0, n_trees, n, dim;
     if (!PyArg_ParseTuple(args, "Oii", &data, &n0, &n_trees))
         return -1;
+    
+    // Convert the python data matrix to armadillo fmat
     n = PyList_Size(data);
     dim = PyList_Size(PyList_GetItem(data, 0));
-    arma::fmat X();
+    
+    
+    std::cout << n << std::endl;
+    std::cout << dim << std::endl;
+    
+    arma::fmat X(dim, n);
+
+    for (int i = 0; i < dim; i++){
+        for (int j = 0; j < n; j++){
+            X(i, j) = PyFloat_AsDouble(PyList_GetItem(PyList_GetItem(data, j), i));
+        }
+    }
     self->ptr = new Mrpt(X, n_trees, n0, "genericTreeID");
+    std::vector<double> times = self->ptr->grow();
     return 0;
 }
 
@@ -55,21 +69,21 @@ mrpt_dealloc(mrptIndex* self) {
 }
 
 // Copy-paste from the dummy implementation. Guaranteed to NOT work for now!!!
-static PyObject* ann(PyObject* self, PyObject* args) { 
+static PyObject* ann(mrptIndex* self, PyObject* args) { 
     PyObject* v;
-    int k;
+    int k, dim;
     if (!PyArg_ParseTuple(args, "Oi", &v, &k))
         return NULL;
-    arma::fvec w(5);
-    for (int i = 0; i < 5; i++){
+    dim = PyList_Size(v);
+    arma::fvec w(dim);
+    for (int i = 0; i < dim; i++){
         PyObject* elem = PyList_GetItem(v, i);
-        
         w[i] = PyFloat_AsDouble(elem);
     }
-    arma::uvec neighbors = query(w, 10); // <----- Fix the rest from here on
+    arma::uvec neighbors = self->ptr->query(w, k);
     
-    PyObject* l = PyList_New(10);
-    for (size_t i = 0; i < 10; i++)
+    PyObject* l = PyList_New(k);
+    for (size_t i = 0; i < k; i++)
         PyList_SetItem(l, i, PyInt_FromLong(neighbors[i]));
     return l;
 }
@@ -127,5 +141,13 @@ static PyTypeObject MrptIndexType = {
 PyMODINIT_FUNC
 initmrpt(void) {
     PyObject* m;
-    (void) Py_InitModule("mrpt", MrptMethods);
+    if (PyType_Ready(&MrptIndexType) < 0)
+        return;
+    m = Py_InitModule("mrpt", MrptMethods);
+    
+    if (m == NULL)
+        return;
+    
+    Py_INCREF(&MrptIndexType);
+    PyModule_AddObject(m, "MrptIndex", (PyObject*)&MrptIndexType);
 }

@@ -1,3 +1,6 @@
+#include <armadillo>
+using namespace arma;
+
 #ifndef MRPT_H
 #define	MRPT_H
 

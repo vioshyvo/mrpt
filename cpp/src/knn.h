@@ -1,3 +1,6 @@
+#include <armadillo>
+using namespace arma;
+
 #ifndef KNN_H
 #define	KNN_H
 
