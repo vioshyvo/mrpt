@@ -1,5 +1,5 @@
 CXX= g++
-CPPFLAGS= -Wall -O2 -std=c++11 -g -I/usr/local/include
+CPPFLAGS= -Wall -O2 -std=c++11 -g -I /usr/local/include
 LDLIBS= -lblas -llapack
 OBJS= Contour.o Contours.o knn.o main.o Mrpt.o Result.o 
 
