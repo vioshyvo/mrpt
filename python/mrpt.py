@@ -147,7 +147,7 @@ class RPTree(object):
         """
         self.seed = np.random.randint(0, int(1e9))
         self.degree = degree
-        self.tree_height = ceil(log(len(data)/float(n0), degree))
+        self.tree_height = int(ceil(log(len(data)/float(n0), degree)))
         self.root = _Node()
         self._build_tree(data, n0)
 
