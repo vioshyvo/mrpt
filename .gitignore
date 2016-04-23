@@ -17,5 +17,6 @@ cpp/nbproject
 *.o
 python/rptree2*
 *.cpp~
-
 /cpp/build/
+*.so
+*.mat

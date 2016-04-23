@@ -7,8 +7,8 @@
 
 
 #include "Python/Python.h"
-#include "Python/structmember.h"
-//#include "numpy/arrayobject.h"
+//#include "Python/structmember.h"
+#include "numpy/arrayobject.h"
 #include <cstdlib>
 #include <armadillo>
 #include "mrpt.h"
@@ -38,14 +38,14 @@ Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
     int n0, n_trees, n, dim;
     if (!PyArg_ParseTuple(args, "Oii", &data, &n0, &n_trees))
         return -1;
-    
+
     // Convert the python data matrix to armadillo fmat
     n = PyList_Size(data);
     dim = PyList_Size(PyList_GetItem(data, 0));
     
     
-    std::cout << n << std::endl;
-    std::cout << dim << std::endl;
+    //std::cout << n << std::endl;
+    //std::cout << dim << std::endl;
     
     arma::fmat X(dim, n);
 
@@ -53,7 +53,10 @@ Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
         for (int j = 0; j < n; j++){
             X(i, j) = PyFloat_AsDouble(PyList_GetItem(PyList_GetItem(data, j), i));
         }
+    
     }
+    //std::cout << "Index construction begins.." << std::endl;
+    
     self->ptr = new Mrpt(X, n_trees, n0, "genericTreeID");
     std::vector<double> times = self->ptr->grow();
     return 0;
@@ -71,8 +74,8 @@ mrpt_dealloc(mrptIndex* self) {
 // Copy-paste from the dummy implementation. Guaranteed to NOT work for now!!!
 static PyObject* ann(mrptIndex* self, PyObject* args) { 
     PyObject* v;
-    int k, dim;
-    if (!PyArg_ParseTuple(args, "Oi", &v, &k))
+    int k, elect, dim;
+    if (!PyArg_ParseTuple(args, "Oii", &v, &k, &elect))
         return NULL;
     dim = PyList_Size(v);
     arma::fvec w(dim);
@@ -80,7 +83,7 @@ static PyObject* ann(mrptIndex* self, PyObject* args) {
         PyObject* elem = PyList_GetItem(v, i);
         w[i] = PyFloat_AsDouble(elem);
     }
-    arma::uvec neighbors = self->ptr->query(w, k);
+    arma::uvec neighbors = self->ptr->query(w, k, elect);
     
     PyObject* l = PyList_New(k);
     for (size_t i = 0; i < k; i++)
@@ -90,7 +93,8 @@ static PyObject* ann(mrptIndex* self, PyObject* args) {
 
 
 static PyMethodDef MrptMethods[] = {
-    {"ann", (PyCFunction) ann, METH_VARARGS, "Return approximate nearest neighbors"},
+    {"ann", (PyCFunction) ann, METH_VARARGS, 
+            "Return approximate nearest neighbors"},
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 
@@ -139,11 +143,11 @@ static PyTypeObject MrptIndexType = {
 
 
 PyMODINIT_FUNC
-initmrpt(void) {
+initmrptlib(void) {
     PyObject* m;
     if (PyType_Ready(&MrptIndexType) < 0)
         return;
-    m = Py_InitModule("mrpt", MrptMethods);
+    m = Py_InitModule("mrptlib", MrptMethods);
     
     if (m == NULL)
         return;

@@ -23,7 +23,7 @@ public:
     
     void read_trees();
 
-    uvec query(const fvec& q, int k);
+    uvec query(const fvec& q, int k, int elect);
 
     uvec query_canditates(const fvec& q, int k);
 
