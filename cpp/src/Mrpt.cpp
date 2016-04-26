@@ -2,6 +2,7 @@
 #include "armadillo"
 #include <ctime>
 #include <cstdlib>
+#include <queue>
 
 using namespace arma;
 
@@ -59,10 +60,12 @@ std::vector<double> Mrpt::grow() {
 }
 
 
-uvec Mrpt::query(const fvec& q, int k, int elect) {
+uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
+    
     fvec projected_query = random_matrix * q; // query vector q is passed as a reference to a col vector
     std::vector<int> votes(n_rows, 0);
- //   std::vector<int> idx_canditates(n_trees * n_0);
+    std::priority_queue<Gap> pq;
+    
     int j = 0;
 
     for (int n_tree = 0; n_tree < n_trees; n_tree++) {
@@ -76,28 +79,39 @@ uvec Mrpt::query(const fvec& q, int k, int elect) {
         while (split_point) {
             idx_left = 2 * idx_tree + 1;
             idx_right = idx_left + 1;
-            idx_tree = projected_query(j++) <= split_point ? idx_left : idx_right;
+            if (projected_query(j++) <= split_point) {
+                idx_tree = idx_left;
+                pq.push(Gap(n_tree, idx_right, j, split_point-projected_query(j-1)));
+            } else {
+                idx_tree = idx_right;
+                pq.push(Gap(n_tree, idx_left, j, projected_query(j-1)-split_point));
+            }
             split_point = tree[idx_tree];
         }
 
-        uvec idx_one_tree = find(col_leaf_labels == idx_tree);
+        uvec idx_one_tree = find(col_leaf_labels == idx_tree); // <-- What!? Way slower than necessary.. O(n) vs O(n0) 
         for (int i = 0; i < idx_one_tree.size(); i++){
             votes[idx_one_tree[i]]++;
         }
-      //  idx_canditates.insert(idx_canditates.begin(), idx_one_tree.begin(), idx_one_tree.end());
+        
+    for (int i = 0; i < branches; i++){
+        if (pq.empty()) break;
+        //Gap gap = pq.pop();
+        std::cout << pq.top().gap_width << std::endl;
+        // EXTRA BRANCHES LOOP 
+        pq.pop();
+    } 
+       
     }
-    std::vector<size_t> idx(votes.size());
-    for (size_t i = 0; i != idx.size(); ++i) idx[i] = i;
-    sort(idx.begin(), idx.end(), [&votes](size_t a, size_t b) {return votes[a] > votes[b];});
+    std::vector<size_t> elected(votes.size());
+    for (size_t i = 0; i != elected.size(); ++i) elected[i] = i;
+    sort(elected.begin(), elected.end(), [&votes](size_t a, size_t b) {return votes[a] > votes[b];});
+    //elected.erase(elect, elected.end());
     
+    uvec idxs(elect); // should check that v.begin()+elected is not too big)
+    for (int i=0; i<elect; i++) idxs(i) = elected[i];
     
-    uvec elected(elect); // should check that v.begin()+elected is not too big)
-    for (int i=0; i<elect; i++) elected(i) = idx[i];
-  //  std::sort(idx_canditates.begin(), idx_canditates.end());
- //   auto last = std::unique(idx_canditates.begin(), idx_canditates.end());
- //   idx_canditates.erase(last, idx_canditates.end());
-
-    return knnCpp_T_indices(X, q, k, elected);//conv_to<uvec>::from(elected));
+    return knnCpp_T_indices(X, q, k, idxs);//conv_to<uvec>::from(elected));
 }
 
 

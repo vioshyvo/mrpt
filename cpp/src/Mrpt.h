@@ -23,7 +23,7 @@ public:
     
     void read_trees();
 
-    uvec query(const fvec& q, int k, int elect);
+    uvec query(const fvec& q, int k, int elect, int branches);
 
     uvec query_canditates(const fvec& q, int k);
 
@@ -48,6 +48,30 @@ private:
     std::string id;
 };
 
+class Gap {
+/*
+ * Elements stored in the priority queue. gap_width is used as the priority and 
+ * the other fields are needed to find the correct node where to continue routing.
+ */
+public:    
+    int tree; // The ordinal of the tree
+    int node; // The node corresponding to the other side of the split
+    int level; // The level in the tree where node lies
+    double gap_width; // The gap between the query projection and split value at the parent of node.
+    
+    Gap(int tree_, int node_, int level_, double gap_width_)
+    : tree(tree_), node(node_), level(level_), gap_width(gap_width_) {
+    }
+    friend bool operator<(
+            const Gap& a, const Gap& b) {
+        if (a.gap_width > b.gap_width)
+            return true;
+        return false;
+    }
+//    const double get_gapwidth(){
+//        return gap_width;
+//    }
+};
 
 #endif	/* MRPT_H */
 

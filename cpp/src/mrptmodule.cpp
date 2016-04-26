@@ -7,8 +7,7 @@
 
 
 #include "Python/Python.h"
-//#include "Python/structmember.h"
-#include "numpy/arrayobject.h"
+#include "numpy/arrayobject.h" // <- unused?!?
 #include <cstdlib>
 #include <armadillo>
 #include "mrpt.h"
@@ -34,24 +33,18 @@ Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 
 static int
 Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
-    PyObject* data = NULL;
+    PyObject* py_data = NULL;
     int n0, n_trees, n, dim;
-    if (!PyArg_ParseTuple(args, "Oii", &data, &n0, &n_trees))
+    if (!PyArg_ParseTuple(args, "Oii", &py_data, &n0, &n_trees))
         return -1;
 
     // Convert the python data matrix to armadillo fmat
-    n = PyList_Size(data);
-    dim = PyList_Size(PyList_GetItem(data, 0));
-    
-    
-    //std::cout << n << std::endl;
-    //std::cout << dim << std::endl;
-    
+    n = PyList_Size(py_data);
+    dim = PyList_Size(PyList_GetItem(py_data, 0));
     arma::fmat X(dim, n);
-
     for (int i = 0; i < dim; i++){
         for (int j = 0; j < n; j++){
-            X(i, j) = PyFloat_AsDouble(PyList_GetItem(PyList_GetItem(data, j), i));
+            X(i, j) = PyFloat_AsDouble(PyList_GetItem(PyList_GetItem(py_data, j), i));
         }
     
     }
@@ -74,8 +67,8 @@ mrpt_dealloc(mrptIndex* self) {
 // Copy-paste from the dummy implementation. Guaranteed to NOT work for now!!!
 static PyObject* ann(mrptIndex* self, PyObject* args) { 
     PyObject* v;
-    int k, elect, dim;
-    if (!PyArg_ParseTuple(args, "Oii", &v, &k, &elect))
+    int k, elect, branches, dim;
+    if (!PyArg_ParseTuple(args, "Oiii", &v, &k, &elect, &branches))
         return NULL;
     dim = PyList_Size(v);
     arma::fvec w(dim);
@@ -83,7 +76,7 @@ static PyObject* ann(mrptIndex* self, PyObject* args) {
         PyObject* elem = PyList_GetItem(v, i);
         w[i] = PyFloat_AsDouble(elem);
     }
-    arma::uvec neighbors = self->ptr->query(w, k, elect);
+    arma::uvec neighbors = self->ptr->query(w, k, elect, branches);
     
     PyObject* l = PyList_New(k);
     for (size_t i = 0; i < k; i++)
