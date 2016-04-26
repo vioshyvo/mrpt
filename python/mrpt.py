@@ -80,8 +80,8 @@ class MRPTIndex(object):
                 gap_width, node, level, tree = priority_queue.get(block=False)
                 indexes, gaps = RPTree.partial_tree_traversal(node, all_projections[tree][level:], level)
                 votes[indexes] += 1
-                for gap_width in gaps:
-                    priority_queue.put((gap_width[0], gap_width[1], gap_width[2], tree))
+                for gap in gaps:
+                    priority_queue.put((gap[0], gap[1], gap[2], tree))
             except Empty:
                 print 'More branches than leaves. Will skip the extras.'
 
