@@ -64,7 +64,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
     
     fvec projected_query = random_matrix * q; // query vector q is passed as a reference to a col vector
     std::vector<int> votes(n_rows, 0);
-    std::priority_queue<Gap> pq;
+    std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq;
     
     int j = 0;
 
@@ -79,39 +79,65 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
         while (split_point) {
             idx_left = 2 * idx_tree + 1;
             idx_right = idx_left + 1;
-            if (projected_query(j++) <= split_point) {
+            if (projected_query(j) <= split_point) {
                 idx_tree = idx_left;
-                pq.push(Gap(n_tree, idx_right, j, split_point-projected_query(j-1)));
+                pq.push(Gap(n_tree, idx_right, j+1, split_point-projected_query(j)));
             } else {
                 idx_tree = idx_right;
-                pq.push(Gap(n_tree, idx_left, j, projected_query(j-1)-split_point));
+                pq.push(Gap(n_tree, idx_left, j+1, projected_query(j)-split_point));
             }
+            j++;
             split_point = tree[idx_tree];
         }
-
-        uvec idx_one_tree = find(col_leaf_labels == idx_tree); // <-- What!? Way slower than necessary.. O(n) vs O(n0) 
+        uvec idx_one_tree = find(col_leaf_labels == idx_tree); // <-- Way slower than necessary.. O(n) vs O(n0) 
         for (int i = 0; i < idx_one_tree.size(); i++){
             votes[idx_one_tree[i]]++;
         }
-        
+    }
+    
+    /*
+     * The extra branches loop starts here. Almost a copy-paste from above...
+     */
     for (int i = 0; i < branches; i++){
         if (pq.empty()) break;
-        //Gap gap = pq.pop();
-        std::cout << pq.top().gap_width << std::endl;
-        // EXTRA BRANCHES LOOP 
+        Gap gap = pq.top();
         pq.pop();
+        
+        const uvec& col_leaf_labels = leaf_labels.unsafe_col(gap.tree);
+        const fvec& tree = trees.unsafe_col(gap.tree);
+        int idx_tree = gap.node;
+        int idx_left, idx_right;
+        j = gap.level;
+        double split_point = tree[idx_tree];
+
+        while (split_point) {
+            idx_left = 2 * idx_tree + 1;
+            idx_right = idx_left + 1;
+            if (projected_query(j) <= split_point) {
+                idx_tree = idx_left;
+                pq.push(Gap(gap.tree, idx_right, j+1, split_point-projected_query(j)));
+            } else {
+                idx_tree = idx_right;
+                pq.push(Gap(gap.tree, idx_left, j+1, projected_query(j)-split_point));
+            }
+            j++;
+            split_point = tree[idx_tree];
+        }
+
+        uvec idx_one_tree = find(col_leaf_labels == idx_tree); // <-- Way slower than necessary.. O(n) vs O(n0) 
+        for (int i = 0; i < idx_one_tree.size(); i++){
+            votes[idx_one_tree[i]]++;
+        } 
     } 
-       
-    }
+    
+    // Argsort
     std::vector<size_t> elected(votes.size());
     for (size_t i = 0; i != elected.size(); ++i) elected[i] = i;
     sort(elected.begin(), elected.end(), [&votes](size_t a, size_t b) {return votes[a] > votes[b];});
-    //elected.erase(elect, elected.end());
     
-    uvec idxs(elect); // should check that v.begin()+elected is not too big)
-    for (int i=0; i<elect; i++) idxs(i) = elected[i];
-    
-    return knnCpp_T_indices(X, q, k, idxs);//conv_to<uvec>::from(elected));
+    // The 'elect' most voted objects
+    elected.resize(elect);
+    return knnCpp_T_indices(X, q, k, conv_to<uvec>::from(elected));
 }
 
 

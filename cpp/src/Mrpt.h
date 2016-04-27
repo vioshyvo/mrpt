@@ -64,13 +64,16 @@ public:
     }
     friend bool operator<(
             const Gap& a, const Gap& b) {
+        if (a.gap_width < b.gap_width)
+            return true;
+        return false;
+    }
+    friend bool operator>(
+            const Gap& a, const Gap& b) {
         if (a.gap_width > b.gap_width)
             return true;
         return false;
     }
-//    const double get_gapwidth(){
-//        return gap_width;
-//    }
 };
 
 #endif	/* MRPT_H */
