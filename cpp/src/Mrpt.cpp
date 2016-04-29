@@ -46,8 +46,7 @@ std::vector<double> Mrpt::grow() {
     // grow the trees
     begin = clock();
     for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        first_idx = n_tree * depth;
-        grow_subtree(indices, 0, 0, n_tree); // all rows of data, 0 = level of the tree, 0 = first index in the array that stores the tree, n_tree:th tree
+        grow_subtree(indices, n_tree * depth, 0, n_tree); // all rows of data, 0 = level of the tree, 0 = first index in the array that stores the tree, n_tree:th tree
 
     }
     end = clock();
@@ -196,7 +195,7 @@ void Mrpt::grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree
         return;
     }
 
-    uvec level = {first_idx + tree_level};
+    uvec level = {static_cast<unsigned long long>(tree_level)};
     frowvec projection = projected_data(level, indices);
     uvec ordered = sort_index(projection); // indices??
 

@@ -44,7 +44,6 @@ private:
     fmat trees; // all the RP-trees, col = tree, row = node
     umat leaf_labels; // leaf labels of all the data points, col = tree, row = data point
     int n_array; // length of the one RP-tree as array
-    uword first_idx; // first col index of this tree in the projected_data
     std::string id;
 };
 
