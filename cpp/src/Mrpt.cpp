@@ -30,7 +30,7 @@ void Mrpt::read_trees() {
 
 std::vector<double> Mrpt::grow() {
     trees = zeros<fmat>(n_array, n_trees);
-    leaf_labels = umat(n_rows, n_trees);
+    //leaf_labels = umat(n_rows, n_trees);
     std::vector<double> times(2);
     uvec indices = linspace<uvec>(0, n_rows - 1, n_rows);
 
@@ -46,7 +46,7 @@ std::vector<double> Mrpt::grow() {
     // grow the trees
     begin = clock();
     for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        grow_subtree(indices, n_tree * depth, 0, n_tree); // all rows of data, 0 = level of the tree, 0 = first index in the array that stores the tree, n_tree:th tree
+        leaf_labels.push_back(grow_subtree(indices, n_tree * depth, 0, n_tree)); // all rows of data, 0 = level of the tree, 0 = first index in the array that stores the tree, n_tree:th tree
 
     }
     end = clock();
@@ -184,15 +184,17 @@ void Mrpt::matrix_multiplication(const fvec& q) {
 }
 
 
-void Mrpt::grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree) {
+std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree) {
     int n = indices.size();
     int idx_left = 2 * i + 1;
     int idx_right = idx_left + 1;
 
     if (n <= n_0) {
-        uvec idx_tree = {n_tree};
-        leaf_labels(indices, idx_tree) = zeros<uvec>(n) + i;
-        return;
+        //uvec idx_tree = {n_tree};
+        //leaf_labels(indices, idx_tree) = zeros<uvec>(n) + i;
+        std::vector<uvec> v;
+        v.push_back(indices);
+        return v;
     }
 
     uvec level = {static_cast<unsigned long long>(tree_level)};
@@ -207,7 +209,11 @@ void Mrpt::grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree
     uvec left_indices = ordered.subvec(0, split_point);
     uvec right_indices = ordered.subvec(split_point + 1, n - 1);
 
-    grow_subtree(indices.elem(left_indices), tree_level + 1, idx_left, n_tree);
-    grow_subtree(indices.elem(right_indices), tree_level + 1, idx_right, n_tree);
-
+    std::vector<uvec> v = grow_subtree(indices.elem(left_indices), tree_level + 1, idx_left, n_tree);
+    std::vector<uvec> w = grow_subtree(indices.elem(right_indices), tree_level + 1, idx_right, n_tree);
+    
+    for (int i = 0; i < w.size(); i++){
+        v.push_back(w[i]);
+    }
+    return v;
 }

@@ -42,7 +42,7 @@ private:
     fmat random_matrix; // random vectors needed for all the RP-trees
     fmat projected_data; // data matrix projected onto all the random vectors
     fmat trees; // all the RP-trees, col = tree, row = node
-    umat leaf_labels; // leaf labels of all the data points, col = tree, row = data point
+    std::vector<std::vector<uvec> > leaf_labels; // leaf labels of all the data points, col = tree, row = data point
     int n_array; // length of the one RP-tree as array
     std::string id;
 };
