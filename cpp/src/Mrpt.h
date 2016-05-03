@@ -6,10 +6,11 @@ using namespace arma;
 
 /*******************************************************
  * Multiple random projection trees class
- * Ville Hyvönen
- * HIIT
+ * Ville Hyvönen & Teemu Pitkänen
+ * HIIT / University of Helsinki
  * ville.o.hyvonen<at>helsinki.fi 
- * 07.11.2015
+ * teemu.pitkanen<at>cs.helsinki.fi
+ * 2016
  ********************************************************/
 
 class Mrpt {
@@ -24,6 +25,7 @@ public:
     //void read_trees();
 
     uvec query(const fvec& q, int k, int elect, int branches);
+    uvec query(const fvec& q, int k); // the old query
 
     //uvec query_canditates(const fvec& q, int k);
 
@@ -35,14 +37,14 @@ private:
     fmat X; // data matrix, col = observation, row = dimension
     int n_trees; // number of RP-trees
     int n_0; // maximum leaf size of all the RP-trees
-    int n_rows; // sample size of data
+    int n_samples; // sample size of data
     int dim; // dimension of data
     int depth; // depth of an RP-tree with median split
     int n_pool; // amount of random vectors needed for all the RP-trees
     fmat random_matrix; // random vectors needed for all the RP-trees
     fmat projected_data; // data matrix projected onto all the random vectors
-    fmat trees; // all the RP-trees, col = tree, row = node
-    std::vector<std::vector<uvec> > leaf_labels; // leaf labels of all the data points, col = tree, row = data point
+    fmat split_points; // All split points in all trees.
+    std::vector<std::vector<uvec> > tree_leaves; // Contains all leaves of all trees. Indexed as tree_leaves[tree number][leaf number][index in leaf]
     int n_array; // length of the one RP-tree as array
     uword first_idx;
     std::string id;

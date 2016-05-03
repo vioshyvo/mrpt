@@ -15,4 +15,6 @@ class MRPTIndex(object):
         self.index = mrptlib.MrptIndex(X.tolist(), n0, n_trees)
 
     def ann(self, q, k, elect=0, branches=0):
+        if elect == 0:
+            return self.index.old_ann(q.tolist(), k)
         return self.index.ann(q.tolist(), k, elect, branches)
