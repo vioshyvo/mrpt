@@ -6,7 +6,6 @@
 
 using namespace arma;
 
-#include "knn.h"
 #include "Mrpt.h"
 
 /**
@@ -205,7 +204,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
     // Compute the actual NNs within the 'elect' objects with most votes
     uvec elected = sort_index(votes, "descend");
     elected.resize(elect);
-    return knnCpp_T_indices(X, q, k, elected);
+    return exact_knn(X, q, k, elected);
 }
 
 
@@ -248,12 +247,12 @@ uvec Mrpt::query(const fvec& q, int k) {
     auto last = std::unique(idx_canditates.begin(), idx_canditates.end());
     idx_canditates.erase(last, idx_canditates.end());
 
-    return knnCpp_T_indices(X, q, k, conv_to<uvec>::from(idx_canditates));
+    return exact_knn(X, q, k, conv_to<uvec>::from(idx_canditates));
 }
 
 
 /**
- * No idea what this is used for ...
+ * No idea what this is used for ... Deprecated anyways ... will keep here for now
  */
 //uvec Mrpt::query_canditates(const fvec& q, int k) {
 //    fvec projected_query = random_matrix * q; // query vector q is passed as a reference to a col vector
@@ -297,3 +296,27 @@ uvec Mrpt::query(const fvec& q, int k) {
 //void Mrpt::matrix_multiplication(const fvec& q) {
 //    fvec projected_query = random_matrix * q;
 //}
+
+/**
+ * find k nearest neighbors from data for the query point
+ * @param X - data matrix, row = data point, col = dimension
+ * @param q - query point as a row matrix
+ * @param k - number of neighbors searched for
+ * @param indices - indices of the points in the original matrix where search is made
+ * @return - indices of nearest neighbors in data matrix X as a column vector
+ */
+uvec exact_knn(const fmat& D, const fvec& q, uword k, uvec indices) {
+    int n_cols = indices.size();
+    fvec distances = fvec(n_cols);
+    for (int i = 0; i < n_cols; i++)
+        distances[i] = sum(pow((D.col(indices(i)) - q), 2));
+
+    if(k == 1) {
+        uvec ret(1);
+        distances.min(ret[0]);
+        return ret;
+    }
+
+    uvec sorted_indices = indices(sort_index(distances));
+    return sorted_indices.size() > k ? sorted_indices.head(k): sorted_indices;
+}

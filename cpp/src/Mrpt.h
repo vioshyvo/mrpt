@@ -50,11 +50,23 @@ private:
     std::string id;
 };
 
-class Gap {
+
+/**
+ * The exact nn query needed as the final step
+ * @param D
+ * @param q
+ * @param k
+ * @param indices
+ * @return 
+ */
+uvec exact_knn(const fmat& D, const fvec& q, uword k, uvec indices);
+    
+
 /*
  * Elements stored in the priority queue. gap_width is used as the priority and 
  * the other fields are needed to find the correct node where to continue routing.
  */
+class Gap {
 public:    
     int tree; // The ordinal of the tree
     int node; // The node corresponding to the other side of the split

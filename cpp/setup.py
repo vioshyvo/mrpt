@@ -8,7 +8,7 @@ from distutils.core import setup, Extension
 import numpy as np
 
 module1 = Extension('mrptlib',
-                    sources = ['src/mrptmodule.cpp', 'src/mrpt.cpp', 'src/knn.cpp'],
+                    sources = ['src/mrptmodule.cpp', 'src/mrpt.cpp'],
                     extra_compile_args = ['-std=c++11','-O3', '-march=native', '-ffast-math'],
                     extra_link_args = ['-lblas', '-llapack'],
                     include_dirs=[np.get_include()])

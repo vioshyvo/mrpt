@@ -1,15 +1,16 @@
 /*
- Author: Teemu Henrikki Pitkänen
- Email: teemu.pitkanen@cs.helsinki.fi
- Helsinki Institute for Information Technology (HIIT) 2016
- University of Helsinki, Finland
+ ********************************************************************
+ * Author: Teemu Henrikki Pitkänen                                  *
+ * Email: teemu.pitkanen@cs.helsinki.fi                             *
+ * Helsinki Institute for Information Technology (HIIT) 2016        *
+ * University of Helsinki, Finland                                  *
+ ********************************************************************
  */
 
 #include "Python/Python.h"
 #include <cstdlib>
 #include <armadillo>
 #include "mrpt.h"
-#include "knn.h"
 
 
 typedef struct {
@@ -46,7 +47,6 @@ Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
         }
     
     }
-    //std::cout << "Index construction begins.." << std::endl;
     
     self->ptr = new Mrpt(X, n_trees, n0, "genericTreeID");
     std::vector<double> times = self->ptr->grow();
