@@ -17,15 +17,15 @@ Mrpt::Mrpt(const fmat& X_, int n_trees_, int n_0_, std::string id_) : X(X_), n_t
     n_pool = n_trees * depth;
     n_array = pow(2, depth + 1);
     trees = fmat();
-    leaf_labels = umat();
+    //leaf_labels = umat();
     random_matrix = fmat();
 }
 
-void Mrpt::read_trees() {
-    trees.load(id + "_trees.mat");
-    random_matrix.load(id + "_random_matrix.mat");
-    leaf_labels.load(id + "_leaf_labels.mat");
-}
+//void Mrpt::read_trees() {
+//    trees.load(id + "_trees.mat");
+//    random_matrix.load(id + "_random_matrix.mat");
+//    leaf_labels.load(id + "_leaf_labels.mat");
+//}
 
 
 std::vector<double> Mrpt::grow() {
@@ -45,16 +45,19 @@ std::vector<double> Mrpt::grow() {
 
     // grow the trees
     begin = clock();
-    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        leaf_labels.push_back(grow_subtree(indices, n_tree * depth, 0, n_tree)); // all rows of data, 0 = level of the tree, 0 = first index in the array that stores the tree, n_tree:th tree
+    for (int n_tree = 0; n_tree < n_trees; n_tree++) {       
+        first_idx = n_tree * depth;
+        std::vector<uvec> t = grow_subtree(indices, 0, 0, n_tree); // all rows of data, 0 = level of the tree, 0 = first index in the array that stores the tree, n_tree:th tree
 
+        leaf_labels.push_back(t);
     }
+    std::cout << leaf_labels.size() << std::endl;
     end = clock();
     times[1] = (end - begin) / static_cast<double> (CLOCKS_PER_SEC);
 
     trees.save(id + "_trees.mat");
     random_matrix.save(id + "_random_matrix.mat");
-    leaf_labels.save(id + "_leaf_labels.mat");
+    //leaf_labels.save(id + "_leaf_labels.mat");
     return times;
 }
 
@@ -68,7 +71,8 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
     int j = 0;
 
     for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        const uvec& col_leaf_labels = leaf_labels.unsafe_col(n_tree);
+        //const uvec& col_leaf_labels = leaf_labels.unsafe_col(n_tree);
+        const std::vector<uvec> col_leaf_labels = leaf_labels[n_tree];
         const fvec& tree = trees.unsafe_col(n_tree);
 
         double split_point = tree[0];
@@ -88,7 +92,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
             j++;
             split_point = tree[idx_tree];
         }
-        uvec idx_one_tree = find(col_leaf_labels == idx_tree); // <-- Way slower than necessary.. O(n) vs O(n0) 
+        uvec idx_one_tree = col_leaf_labels[idx_tree - pow(2, depth) + 1]; // <--- the error is here!! and below in the corresponding spot.. .
         for (int i = 0; i < idx_one_tree.size(); i++){
             votes[idx_one_tree[i]]++;
         }
@@ -102,7 +106,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
         Gap gap = pq.top();
         pq.pop();
         
-        const uvec& col_leaf_labels = leaf_labels.unsafe_col(gap.tree);
+        const std::vector<uvec> col_leaf_labels = leaf_labels[gap.tree]; //.unsafe_col(n_tree);
         const fvec& tree = trees.unsafe_col(gap.tree);
         int idx_tree = gap.node;
         int idx_left, idx_right;
@@ -123,7 +127,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
             split_point = tree[idx_tree];
         }
 
-        uvec idx_one_tree = find(col_leaf_labels == idx_tree); // <-- Way slower than necessary.. O(n) vs O(n0) 
+        uvec idx_one_tree = col_leaf_labels[idx_tree - pow(2, depth) + 1];//find(col_leaf_labels == idx_tree);
         for (int i = 0; i < idx_one_tree.size(); i++){
             votes[idx_one_tree[i]]++;
         } 
@@ -140,48 +144,48 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
 }
 
 
-uvec Mrpt::query_canditates(const fvec& q, int k) {
-    fvec projected_query = random_matrix * q; // query vector q is passed as a reference to a col vector
-    std::vector<int> idx_canditates(n_trees * n_0);
-    int j = 0;
+//uvec Mrpt::query_canditates(const fvec& q, int k) {
+//    fvec projected_query = random_matrix * q; // query vector q is passed as a reference to a col vector
+//    std::vector<int> idx_canditates(n_trees * n_0);
+//    int j = 0;
+//
+//    // std::cout << "projected_query.size(): " << projected_query.size() << ", idx_canditates.size(): " << idx_canditates.size() << std::endl;
+//    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
+//        // std::cout << "n_tree: " << n_tree << ", n_trees: " << n_trees << ", j: " << j << std::endl;
+//
+//        const uvec& col_leaf_labels = leaf_labels.unsafe_col(n_tree);
+//        const fvec& tree = trees.unsafe_col(n_tree);
+//
+//        // std::cout << "tree[0]: " << tree[0] << std::endl;
+//
+//        double split_point = tree[0];
+//        int idx_left, idx_right;
+//        int idx_tree = 0;
+//
+//        while (split_point) {
+//            idx_left = 2 * idx_tree + 1;
+//            idx_right = idx_left + 1;
+//            idx_tree = projected_query(j++) <= split_point ? idx_left : idx_right;
+//            split_point = tree[idx_tree];
+//            // std::cout << "idx_left: " << idx_left << ", idx_right: " << idx_right << ", split_point: " << split_point << std::endl;
+//            // bool temp = split_point == 0;
+//            // std::cout << "split_point == 0: " <<  temp << std::endl;
+//        }
+//
+//        uvec idx_one_tree = find(col_leaf_labels == idx_tree);
+//        idx_canditates.insert(idx_canditates.begin(), idx_one_tree.begin(), idx_one_tree.end());
+//    }
+//
+//    std::sort(idx_canditates.begin(), idx_canditates.end());
+//    auto last = std::unique(idx_canditates.begin(), idx_canditates.end());
+//    idx_canditates.erase(last, idx_canditates.end());
+//    return conv_to<uvec>::from(idx_canditates);
+//}
 
-    // std::cout << "projected_query.size(): " << projected_query.size() << ", idx_canditates.size(): " << idx_canditates.size() << std::endl;
-    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        // std::cout << "n_tree: " << n_tree << ", n_trees: " << n_trees << ", j: " << j << std::endl;
 
-        const uvec& col_leaf_labels = leaf_labels.unsafe_col(n_tree);
-        const fvec& tree = trees.unsafe_col(n_tree);
-
-        // std::cout << "tree[0]: " << tree[0] << std::endl;
-
-        double split_point = tree[0];
-        int idx_left, idx_right;
-        int idx_tree = 0;
-
-        while (split_point) {
-            idx_left = 2 * idx_tree + 1;
-            idx_right = idx_left + 1;
-            idx_tree = projected_query(j++) <= split_point ? idx_left : idx_right;
-            split_point = tree[idx_tree];
-            // std::cout << "idx_left: " << idx_left << ", idx_right: " << idx_right << ", split_point: " << split_point << std::endl;
-            // bool temp = split_point == 0;
-            // std::cout << "split_point == 0: " <<  temp << std::endl;
-        }
-
-        uvec idx_one_tree = find(col_leaf_labels == idx_tree);
-        idx_canditates.insert(idx_canditates.begin(), idx_one_tree.begin(), idx_one_tree.end());
-    }
-
-    std::sort(idx_canditates.begin(), idx_canditates.end());
-    auto last = std::unique(idx_canditates.begin(), idx_canditates.end());
-    idx_canditates.erase(last, idx_canditates.end());
-    return conv_to<uvec>::from(idx_canditates);
-}
-
-
-void Mrpt::matrix_multiplication(const fvec& q) {
-    fvec projected_query = random_matrix * q;
-}
+//void Mrpt::matrix_multiplication(const fvec& q) {
+//    fvec projected_query = random_matrix * q;
+//}
 
 
 std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree) {
@@ -189,7 +193,7 @@ std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i,
     int idx_left = 2 * i + 1;
     int idx_right = idx_left + 1;
 
-    if (n <= n_0) {
+    if (tree_level == depth) {
         //uvec idx_tree = {n_tree};
         //leaf_labels(indices, idx_tree) = zeros<uvec>(n) + i;
         std::vector<uvec> v;
@@ -197,7 +201,7 @@ std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i,
         return v;
     }
 
-    uvec level = {static_cast<unsigned long long>(tree_level)};
+    uvec level = {first_idx + tree_level};
     frowvec projection = projected_data(level, indices);
     uvec ordered = sort_index(projection); // indices??
 
@@ -212,8 +216,8 @@ std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i,
     std::vector<uvec> v = grow_subtree(indices.elem(left_indices), tree_level + 1, idx_left, n_tree);
     std::vector<uvec> w = grow_subtree(indices.elem(right_indices), tree_level + 1, idx_right, n_tree);
     
-    for (int i = 0; i < w.size(); i++){
-        v.push_back(w[i]);
+    for (int j = 0; j < w.size(); j++){
+        v.push_back(w[j]);
     }
     return v;
 }

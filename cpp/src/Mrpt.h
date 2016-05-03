@@ -21,16 +21,16 @@ public:
 
     std::vector<double> grow();
     
-    void read_trees();
+    //void read_trees();
 
     uvec query(const fvec& q, int k, int elect, int branches);
 
-    uvec query_canditates(const fvec& q, int k);
+    //uvec query_canditates(const fvec& q, int k);
 
-    void matrix_multiplication(const fvec& q);
+    //void matrix_multiplication(const fvec& q);
 
 private:
-    void grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree);
+    std::vector<uvec> grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree);
 
     fmat X; // data matrix, col = observation, row = dimension
     int n_trees; // number of RP-trees
@@ -44,6 +44,7 @@ private:
     fmat trees; // all the RP-trees, col = tree, row = node
     std::vector<std::vector<uvec> > leaf_labels; // leaf labels of all the data points, col = tree, row = data point
     int n_array; // length of the one RP-tree as array
+    uword first_idx;
     std::string id;
 };
 
