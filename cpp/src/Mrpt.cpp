@@ -57,22 +57,20 @@ std::vector<double> Mrpt::grow() {
 
     trees.save(id + "_trees.mat");
     random_matrix.save(id + "_random_matrix.mat");
-    //leaf_labels.save(id + "_leaf_labels.mat");
+    //leaf_labels.save(id + "_leaf_labels.mat"); // Cannot save like this in current tree format
     return times;
 }
 
 
 uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
     
-    fvec projected_query = random_matrix * q; // query vector q is passed as a reference to a col vector
+    fvec projected_query = random_matrix * q;
     std::vector<int> votes(n_rows, 0);
     std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq;
     
     int j = 0;
 
     for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        //const uvec& col_leaf_labels = leaf_labels.unsafe_col(n_tree);
-        const std::vector<uvec> col_leaf_labels = leaf_labels[n_tree];
         const fvec& tree = trees.unsafe_col(n_tree);
 
         double split_point = tree[0];
@@ -92,7 +90,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
             j++;
             split_point = tree[idx_tree];
         }
-        uvec idx_one_tree = col_leaf_labels[idx_tree - pow(2, depth) + 1]; // <--- the error is here!! and below in the corresponding spot.. .
+        const uvec& idx_one_tree = leaf_labels[n_tree][idx_tree - pow(2, depth) + 1]; // <--- the error is here!! and below in the corresponding spot.. .
         for (int i = 0; i < idx_one_tree.size(); i++){
             votes[idx_one_tree[i]]++;
         }
@@ -106,7 +104,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
         Gap gap = pq.top();
         pq.pop();
         
-        const std::vector<uvec> col_leaf_labels = leaf_labels[gap.tree]; //.unsafe_col(n_tree);
+        //const std::vector<uvec> col_leaf_labels = leaf_labels[gap.tree]; //.unsafe_col(n_tree);
         const fvec& tree = trees.unsafe_col(gap.tree);
         int idx_tree = gap.node;
         int idx_left, idx_right;
@@ -127,7 +125,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
             split_point = tree[idx_tree];
         }
 
-        uvec idx_one_tree = col_leaf_labels[idx_tree - pow(2, depth) + 1];//find(col_leaf_labels == idx_tree);
+        const uvec& idx_one_tree = leaf_labels[gap.tree][idx_tree - pow(2, depth) + 1];//find(col_leaf_labels == idx_tree);
         for (int i = 0; i < idx_one_tree.size(); i++){
             votes[idx_one_tree[i]]++;
         } 
