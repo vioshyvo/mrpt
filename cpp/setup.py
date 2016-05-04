@@ -5,13 +5,11 @@
 #
 
 from distutils.core import setup, Extension
-import numpy as np
 
 module1 = Extension('mrptlib',
                     sources = ['mrptmodule.cpp', 'mrpt.cpp'],
                     extra_compile_args = ['-std=c++11','-O3', '-march=native', '-ffast-math'],
-                    extra_link_args = ['-lblas', '-llapack'],
-                    include_dirs=[np.get_include()])
+                    extra_link_args = ['-lblas', '-llapack'])
 
 setup (name = 'mrpt',
        version = '1.0',
