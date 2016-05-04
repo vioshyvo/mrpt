@@ -49,7 +49,7 @@ Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
     }
     
     self->ptr = new Mrpt(X, n_trees, n0, "genericTreeID");
-    std::vector<double> times = self->ptr->grow();
+    self->ptr->grow();
     return 0;
 }
 

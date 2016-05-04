@@ -1,3 +1,13 @@
+/********************************************************
+ * Multiple random projection trees class               *
+ * Ville Hyvönen & Teemu Pitkänen                       *
+ * HIIT / University of Helsinki                        *
+ * ville.o.hyvonen<at>helsinki.fi                       *
+ * teemu.pitkanen<at>cs.helsinki.fi                     *
+ * 2016                                                 *
+ ********************************************************/
+
+
 #include <iostream>
 #include "armadillo"
 #include <ctime>
@@ -9,14 +19,19 @@ using namespace arma;
 #include "Mrpt.h"
 
 /**
- * The constructor of the index
- * @param X_ - The data for which the index will be built
- * @param n_trees_ - The number of trees to be used in the index
- * @param n_0_ - The maximum leaf size to be used in the index
- * @param id_ - A name used for filenames when saving
+ * The constructor of the index. The inputs are the data for which the index 
+ * will be built and additional parameters that affect the accuracy of the NN
+ * approximation. Concisely, larger n_trees_ or n_0_ values improve accuracy but
+ * slow down the queries. A general rule for the right balance is not known. The
+ * constructor does not actually build the trees, but that is done by a separate
+ * function 'grow' that has to be called before queries can be made. 
+ * @param X_ - The data to be indexed. Samples as columns, features as rows.
+ * @param n_trees_ - The number of trees to be used in the index.
+ * @param n_0_ - The maximum leaf size to be used in the index.
+ * @param id_ - A name used for filenames when saving.
  */
 Mrpt::Mrpt(const fmat& X_, int n_trees_, int n_0_, std::string id_) : X(X_), n_trees(n_trees_), n_0(n_0_), id(id_){
-    n_samples = X.n_cols; // X is transposed
+    n_samples = X.n_cols; 
     dim = X.n_rows;
     depth = ceil(log2(n_samples / n_0));
     n_pool = n_trees * depth;
@@ -27,6 +42,7 @@ Mrpt::Mrpt(const fmat& X_, int n_trees_, int n_0_, std::string id_) : X(X_), n_t
 
 /**
  * A function for reading previously built trees from files.
+ * Does not work for for now because altered tree format
  * @return -
  */
 //void Mrpt::read_trees() {
@@ -40,33 +56,20 @@ Mrpt::Mrpt(const fmat& X_, int n_trees_, int n_0_, std::string id_) : X(X_), n_t
  * The function that actually builds the trees.
  * @return 
  */
-std::vector<double> Mrpt::grow() {
+void Mrpt::grow() {
     split_points = zeros<fmat>(n_array, n_trees);
-    std::vector<double> times(2);
     uvec indices = linspace<uvec>(0, n_samples - 1, n_samples);
 
     // generate the random matrix and project the data set onto it
-    clock_t begin = clock();
     random_matrix = conv_to<fmat>::from(randn(n_pool, dim));
     projected_data = random_matrix * X;
-    clock_t end = clock();
-    times[0] = (end - begin) / static_cast<double> (CLOCKS_PER_SEC);
     
     // Grow the trees
-    begin = clock();
     for (int n_tree = 0; n_tree < n_trees; n_tree++) {       
         first_idx = n_tree * depth;
-        std::vector<uvec> t = grow_subtree(indices, 0, 0, n_tree); // all rows of data, 0 = level of the tree, 0 = first index in the array that stores the tree, n_tree:th tree
+        std::vector<uvec> t = grow_subtree(indices, 0, 0, n_tree); 
         tree_leaves.push_back(t);
     }
-    end = clock();
-    times[1] = (end - begin) / static_cast<double> (CLOCKS_PER_SEC);
-    
-    // Save tree info
-    //split_points.save(id + "_trees.mat");
-    //random_matrix.save(id + "_random_matrix.mat");
-    //leaf_labels.save(id + "_leaf_labels.mat"); // Cannot save like this in current tree format
-    return times;
 }
 
 /**
@@ -219,7 +222,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
  * data set for which the index was built.
  */
 uvec Mrpt::query(const fvec& q, int k) {
-    fvec projected_query = random_matrix * q; // query vector q is passed as a reference to a col vector
+    fvec projected_query = random_matrix * q;
     std::vector<int> idx_canditates(n_trees * n_0);
     int j = 0;
 
@@ -239,7 +242,6 @@ uvec Mrpt::query(const fvec& q, int k) {
         }
         
         const uvec& idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
-        //uvec idx_one_tree = find(col_leaf_labels == idx_tree);
         idx_canditates.insert(idx_canditates.begin(), idx_one_tree.begin(), idx_one_tree.end());
     }
 
@@ -250,52 +252,6 @@ uvec Mrpt::query(const fvec& q, int k) {
     return exact_knn(X, q, k, conv_to<uvec>::from(idx_canditates));
 }
 
-
-/**
- * No idea what this is used for ... Deprecated anyways ... will keep here for now
- */
-//uvec Mrpt::query_canditates(const fvec& q, int k) {
-//    fvec projected_query = random_matrix * q; // query vector q is passed as a reference to a col vector
-//    std::vector<int> idx_canditates(n_trees * n_0);
-//    int j = 0;
-//
-//    // std::cout << "projected_query.size(): " << projected_query.size() << ", idx_canditates.size(): " << idx_canditates.size() << std::endl;
-//    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-//        // std::cout << "n_tree: " << n_tree << ", n_trees: " << n_trees << ", j: " << j << std::endl;
-//
-//        const uvec& col_leaf_labels = leaf_labels.unsafe_col(n_tree);
-//        const fvec& tree = trees.unsafe_col(n_tree);
-//
-//        // std::cout << "tree[0]: " << tree[0] << std::endl;
-//
-//        double split_point = tree[0];
-//        int idx_left, idx_right;
-//        int idx_tree = 0;
-//
-//        while (split_point) {
-//            idx_left = 2 * idx_tree + 1;
-//            idx_right = idx_left + 1;
-//            idx_tree = projected_query(j++) <= split_point ? idx_left : idx_right;
-//            split_point = tree[idx_tree];
-//            // std::cout << "idx_left: " << idx_left << ", idx_right: " << idx_right << ", split_point: " << split_point << std::endl;
-//            // bool temp = split_point == 0;
-//            // std::cout << "split_point == 0: " <<  temp << std::endl;
-//        }
-//
-//        uvec idx_one_tree = find(col_leaf_labels == idx_tree);
-//        idx_canditates.insert(idx_canditates.begin(), idx_one_tree.begin(), idx_one_tree.end());
-//    }
-//
-//    std::sort(idx_canditates.begin(), idx_canditates.end());
-//    auto last = std::unique(idx_canditates.begin(), idx_canditates.end());
-//    idx_canditates.erase(last, idx_canditates.end());
-//    return conv_to<uvec>::from(idx_canditates);
-//}
-
-
-//void Mrpt::matrix_multiplication(const fvec& q) {
-//    fvec projected_query = random_matrix * q;
-//}
 
 /**
  * find k nearest neighbors from data for the query point

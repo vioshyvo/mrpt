@@ -1,39 +1,30 @@
+
+/********************************************************
+ * Multiple random projection trees class               *
+ * Ville Hyvönen & Teemu Pitkänen                       *
+ * HIIT / University of Helsinki                        *
+ * ville.o.hyvonen<at>helsinki.fi                       *
+ * teemu.pitkanen<at>cs.helsinki.fi                     *
+ * 2016                                                 *
+ ********************************************************/
+
 #include <armadillo>
 using namespace arma;
 
 #ifndef MRPT_H
 #define	MRPT_H
 
-/*******************************************************
- * Multiple random projection trees class
- * Ville Hyvönen & Teemu Pitkänen
- * HIIT / University of Helsinki
- * ville.o.hyvonen<at>helsinki.fi 
- * teemu.pitkanen<at>cs.helsinki.fi
- * 2016
- ********************************************************/
-
 class Mrpt {
 public:
-
     Mrpt(const fmat& X_, int n_trees, int n_0_, std::string id_);
-
     ~Mrpt() {}
-
-    std::vector<double> grow();
-    
+    void grow();
     //void read_trees();
-
     uvec query(const fvec& q, int k, int elect, int branches);
     uvec query(const fvec& q, int k); // the old query
 
-    //uvec query_canditates(const fvec& q, int k);
-
-    //void matrix_multiplication(const fvec& q);
-
 private:
     std::vector<uvec> grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree);
-
     fmat X; // data matrix, col = observation, row = dimension
     int n_trees; // number of RP-trees
     int n_0; // maximum leaf size of all the RP-trees
@@ -52,7 +43,7 @@ private:
 
 
 /**
- * The exact nn query needed as the final step
+ * The exact nn needed as the final step of MRPT query
  * @param D
  * @param q
  * @param k
