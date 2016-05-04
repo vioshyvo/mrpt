@@ -180,8 +180,8 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
         }
 
         const uvec& idx_one_tree = tree_leaves[gap.tree][idx_tree - pow(2, depth) + 1];
-        for (int i = 0; i < idx_one_tree.size(); i++){
-            votes[idx_one_tree[i]]++;
+        for (int i : idx_one_tree){
+            votes[i]++;
         } 
     } 
     
