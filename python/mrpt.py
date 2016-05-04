@@ -47,7 +47,7 @@ class MRPTIndex(object):
         else:
             self.trees = [RPTree(data, n0) for t in range(n_trees)]
 
-    def ann(self, obj, k, extra_branches=0, n_elected=0):
+    def ann(self, obj, k, n_extra_branches=0, n_elect=0):
         """
         The mrpt approximate nearest neighbor query. By default the function implements a basic query - the query object
         is routed to one leaf in each tree, and the nearest neighbors are searched in the union of these leaves. The
@@ -58,8 +58,8 @@ class MRPTIndex(object):
         several trees to be included in the linear search.
         :param obj: The object whose neighbors are being searched
         :param k: The number of neighbors being searched
-        :param extra_branches: The number of extra branches allowed in the index
-        :param n_elected: The number of elected objects in the voting trick
+        :param n_extra_branches: The number of extra branches allowed in the index
+        :param n_elect: The number of elected objects in the voting trick
         :return: The approximate neighbors. In extreme situations not strictly k, but slightly less (eg. 1 tree case)
         """
         priority_queue = PriorityQueue()
@@ -75,7 +75,7 @@ class MRPTIndex(object):
                 priority_queue.put((gap_width, node, level, tree_id))
 
         # Optional branching trick: traverse down from #extra_branches nodes with the smallest d(projection, split)
-        for i in range(extra_branches):
+        for i in range(n_extra_branches):
             try:
                 gap_width, node, level, tree = priority_queue.get(block=False)
                 indexes, gaps = RPTree.partial_tree_traversal(node, all_projections[tree][level:], level)
@@ -86,8 +86,8 @@ class MRPTIndex(object):
                 print 'More branches than leaves. Will skip the extras.'
 
         # Decide which nodes to include in the brute force search
-        if n_elected > 0:   # Optional voting trick
-            elected = np.argsort(votes)[::-1][:n_elected]
+        if n_elect > 0:   # Optional voting trick
+            elected = np.argsort(votes)[::-1][:n_elect]
         else:  # Basic mrpt
             elected = np.nonzero(votes)[0]
 
