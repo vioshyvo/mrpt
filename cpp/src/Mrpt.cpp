@@ -154,7 +154,7 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
      * handled already once above. The extra branches are popped from the 
      * priority queue and routed down the tree just as new root-to-leaf queries.
      */
-    for (int i = 0; i < branches; i++){
+    for (int b = 0; b < branches; b++){
         if (pq.empty()) break;
         Gap gap = pq.top();
         pq.pop();
@@ -180,8 +180,8 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
         }
 
         const uvec& idx_one_tree = tree_leaves[gap.tree][idx_tree - pow(2, depth) + 1];
-        for (int i : idx_one_tree){
-            votes[i]++;
+        for (int idx : idx_one_tree){
+            votes[idx]++;
         } 
     } 
     
