@@ -1,6 +1,8 @@
-# MRPT in python 2.7
+# MRPT in pure Python 2.7
 
-This directory contains the Python implementation of our method. Although this version is usually the most up-to-date, notice that the C++ version runs way faster in real-life applications. Even this version can still provide excellent approximations way faster than an exact brute force approach using numpy.
+IMPORTANT NOTICE! WE HAVE FINALLY BROUGHT THE C++ UP TO DATE AND WRAPPED IT INTO A NICE PYTHON MODULE. IT RUNS ABOUT 10 TIMES FASTER SO THERE IS REALLY NO REASON TO USE THIS PURE PYTHON VERSION FOR ANYTHING BUT EDUCATIONAL/PROTOTYPING PURPOSES.
+
+This directory contains a pure Python implementation of our method. Although this version is usually the most up-to-date, notice that the C++ version runs way faster in real-life applications. Even this version can still provide excellent approximations way faster than an exact brute force approach using numpy.
 
 ##Dependencies
 
