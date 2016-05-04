@@ -20,3 +20,4 @@ python/rptree2*
 /cpp/build/
 *.so
 *.mat
+datasets
