@@ -1,6 +1,4 @@
-
 /********************************************************
- * Multiple random projection trees class               *
  * Ville Hyvönen & Teemu Pitkänen                       *
  * HIIT / University of Helsinki                        *
  * ville.o.hyvonen<at>helsinki.fi                       *
@@ -19,7 +17,6 @@ public:
     Mrpt(const fmat& X_, int n_trees, int n_0_, std::string id_);
     ~Mrpt() {}
     void grow();
-    //void read_trees();
     uvec query(const fvec& q, int k, int elect, int branches);
     uvec query(const fvec& q, int k); // the old query
 
@@ -44,18 +41,26 @@ private:
 
 /**
  * The exact nn needed as the final step of MRPT query
- * @param D
- * @param q
- * @param k
- * @param indices
- * @return 
+ * @param D - The data set. Samples as columns, features as rows.
+ * @param q - The object whose neighbors are searched
+ * @param k - The number of neighbors searched for
+ * @param indices - A subset of indices of range(1, n_samples), the set of 
+ * samples taken into account in the knn search. The other samples are ignored.
+ * @return The indices (col numbers) of the neighbors in D
  */
 uvec exact_knn(const fmat& D, const fvec& q, uword k, uvec indices);
     
 
-/*
- * Elements stored in the priority queue. gap_width is used as the priority and 
- * the other fields are needed to find the correct node where to continue routing.
+/**
+ * This class defines the elements that are stored in the priority queue for 
+ * the extra branch / priority queue trick. An instance of the class describes a
+ * single node in a rp-tree in a single query. The most important field 
+ * gap_width tells the difference of the split value used in this node and the 
+ * projection of the query vector in this node. This is used as a criterion to 
+ * choose extra branches -- a small distance indicates that some neighbors may
+ * easily end up on the other side of split. The rest of the fields are needed 
+ * to start a tree traversal from the node "on the other side of the split", 
+ * and the methods are needed for sorting in the priority queue.
  */
 class Gap {
 public:    

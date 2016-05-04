@@ -1,11 +1,16 @@
-/*
- ********************************************************************
+/********************************************************************
  * Author: Teemu Henrikki Pitkänen                                  *
  * Email: teemu.pitkanen@cs.helsinki.fi                             *
  * Helsinki Institute for Information Technology (HIIT) 2016        *
  * University of Helsinki, Finland                                  *
- ********************************************************************
+ ********************************************************************/
+
+/*
+ * This file wraps the C++11 Mrpt code to an extension module compatible with 
+ * Python 2.7.
  */
+
+
 
 #include "Python/Python.h"
 #include <cstdlib>
@@ -18,7 +23,6 @@ typedef struct {
     Mrpt* ptr;
 } mrptIndex;
 
-
 static PyObject *
 Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
     mrptIndex* self;
@@ -28,7 +32,6 @@ Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
     }
     return (PyObject *) self;
 }
-
 
 static int
 Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
@@ -52,7 +55,6 @@ Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
     self->ptr->grow();
     return 0;
 }
-
 
 static void
 mrpt_dealloc(mrptIndex* self) {
@@ -100,7 +102,6 @@ static PyObject* old_ann(mrptIndex* self, PyObject* args) {
     return l;
 }
 
-
 static PyMethodDef MrptMethods[] = {
     {"ann", (PyCFunction) ann, METH_VARARGS, 
             "Return approximate nearest neighbors"},
@@ -108,7 +109,6 @@ static PyMethodDef MrptMethods[] = {
             "Return approximate nearest neighbors"},
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
-
 
 static PyTypeObject MrptIndexType = {
     PyObject_HEAD_INIT(NULL)
@@ -151,7 +151,6 @@ static PyTypeObject MrptIndexType = {
     0, /* tp_alloc */
     Mrpt_new, /* tp_new */
 };
-
 
 PyMODINIT_FUNC
 initmrptlib(void) {

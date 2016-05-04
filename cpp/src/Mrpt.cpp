@@ -1,5 +1,4 @@
 /********************************************************
- * Multiple random projection trees class               *
  * Ville Hyvönen & Teemu Pitkänen                       *
  * HIIT / University of Helsinki                        *
  * ville.o.hyvonen<at>helsinki.fi                       *
@@ -7,16 +6,12 @@
  * 2016                                                 *
  ********************************************************/
 
-
-#include <iostream>
 #include "armadillo"
-#include <ctime>
 #include <cstdlib>
 #include <queue>
+#include "Mrpt.h"
 
 using namespace arma;
-
-#include "Mrpt.h"
 
 /**
  * The constructor of the index. The inputs are the data for which the index 
@@ -41,20 +36,10 @@ Mrpt::Mrpt(const fmat& X_, int n_trees_, int n_0_, std::string id_) : X(X_), n_t
 }
 
 /**
- * A function for reading previously built trees from files.
- * Does not work for for now because altered tree format
- * @return -
- */
-//void Mrpt::read_trees() {
-//    trees.load(id + "_trees.mat");
-//    random_matrix.load(id + "_random_matrix.mat");
-//    leaf_labels.load(id + "_leaf_labels.mat");
-//}
-
-
-/**
- * The function that actually builds the trees.
- * @return 
+ * The function whose call starts the actual index construction. Initializes 
+ * arrays to store the tree structures and computes all the projections needed
+ * later. Then repeatedly calls method grow_subtree that builds a single 
+ * RP-tree.
  */
 void Mrpt::grow() {
     split_points = zeros<fmat>(n_array, n_trees);
@@ -106,13 +91,9 @@ std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i,
 
     std::vector<uvec> v = grow_subtree(indices.elem(left_indices), tree_level + 1, idx_left, n_tree);
     std::vector<uvec> w = grow_subtree(indices.elem(right_indices), tree_level + 1, idx_right, n_tree);
-    
-    for (int j = 0; j < w.size(); j++){
-        v.push_back(w[j]);
-    }
+    v.insert( v.end(), w.begin(), w.end() );
     return v;
 }
-
 
 /**
  * This function finds the k approximate nearest neighbors of the query object 
@@ -169,9 +150,9 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
     }
     
     /*
-     * The following loop routes the query to extra leaves in the trees handled
-     * already once above. The extra branches are popped from the priority queue
-     * and handled just as new root-to-leaf queries.
+     * The following loop routes the query to extra leaves in the same trees 
+     * handled already once above. The extra branches are popped from the 
+     * priority queue and routed down the tree just as new root-to-leaf queries.
      */
     for (int i = 0; i < branches; i++){
         if (pq.empty()) break;
@@ -209,7 +190,6 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
     elected.resize(elect);
     return exact_knn(X, q, k, elected);
 }
-
 
 /**
  * This function implements the barebones MRPT algorithm and finds the k 
