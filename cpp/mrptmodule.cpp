@@ -12,10 +12,10 @@
 
 
 
-#include "Python/Python.h"
+#include "Python.h"
 #include <cstdlib>
 #include <armadillo>
-#include "mrpt.h"
+#include "Mrpt.h"
 
 
 typedef struct {
