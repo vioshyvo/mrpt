@@ -4,7 +4,7 @@
 # University of Helsinki / Helsinki Institute for Information Technology 2016
 #
 
-from mrpt import *
+from cppmrpt import *
 from utils.mnist_utils import *
 import numpy as np
 from numpy import random as nr
@@ -32,15 +32,15 @@ def mrpt_example(n0, n_trees, n_extra_branches, n_elected):
 
     print 'Building index...'
     t = time.time()
-    index = MRPTIndex(train_images, n0=n0, n_trees=n_trees, use_saved=False)
-    print 'Took '+str(int(time.time()-t)) + 'sec'
+    index = MRPTIndex(train_images, n0=n0, n_trees=n_trees)
+    print 'Took ' + '%.2f' % (time.time()-t) + 'sec'
 
     print 'Doing ' + '%d' % n_queries + ' queries...'
     t = time.time()
     neighbors = np.zeros((n_queries, 10))
     for i in range(n_queries):
-        neighbors[i] = index.ann(test_images[i], 10, extra_branches=n_extra_branches, n_elected=n_elected)
-    print 'Took '+str(int(time.time()-t)) + 'sec'
+        neighbors[i] = index.ann(test_images[i], 10, n_extra_branches=n_extra_branches, n_elect=n_elected)
+    print 'Took '+ '%.2f' % (time.time()-t) + 'sec'
 
     correct_neighbors = np.zeros(n_queries)
     for i in range(n_queries):
@@ -58,7 +58,7 @@ def mrpt_example(n0, n_trees, n_extra_branches, n_elected):
 print '=========================\nRun 1: Basic parameters'
 mrpt_example(n0=32, n_trees=75, n_extra_branches=0, n_elected=0)
 
-# A good choice of advanced parameters for MNIST. Should get to ~90% performance way faster.
+# A good choice of advanced parameters for MNIST. Should get to ~90% performance.
 print '=========================\nRun 2: Advanced parameters'
-mrpt_example(n0=512, n_trees=30, n_extra_branches=140, n_elected=200)
+mrpt_example(n0=512, n_trees=20, n_extra_branches=100, n_elected=200)
 
