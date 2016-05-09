@@ -147,9 +147,8 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
             split_point = tree[idx_tree];
         }
         const uvec& idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
-        for (int i = 0; i < idx_one_tree.size(); i++){
-            votes[idx_one_tree[i]]++;
-        }
+        for (int idx : idx_one_tree)
+            votes[idx]++;
     }
     
     /*
