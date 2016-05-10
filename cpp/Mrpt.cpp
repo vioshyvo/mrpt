@@ -186,18 +186,19 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
             votes[idx]++;
     } 
     
-    // Compute the actual NNs within the 'elect' objects with most votes
+    // Choose the objects with enough votes...
     uvec elected(n_samples);
-    j = 0;
-    for (int i=0; i<n_samples; i++){
-        if (votes[i] >= elect){
-            elected[j] = i;
-            j++;
+    do { 
+        j = 0;
+        for (int i=0; i<n_samples; i++){
+            if (votes[i] >= elect){
+                elected[j] = i;
+                j++;
+            }
         }
-    }
+        elect--; // If not enough objects with enough votes, decrease the requirement
+    } while(j < k);
     elected.resize(j);
-//    uvec elected = sort_index(votes, "descend");
-//    elected.resize(elect);
     return exact_knn(X, q, k, elected);
 }
 
