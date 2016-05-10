@@ -98,6 +98,7 @@ std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i,
     return v;
 }
 
+
 /**
  * This function finds the k approximate nearest neighbors of the query object 
  * q. The accuracy of the query depends on both the parameters used for index 
@@ -191,6 +192,64 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
     elected.resize(elect);
     return exact_knn(X, q, k, elected);
 }
+
+
+/**
+ * This function finds the k approximate nearest neighbors of the query object 
+ * q. The accuracy of the query depends on both the parameters used for index 
+ * construction and additional parameters given to this function. This 
+ * function implements two tricks to improve performance. The voting trick 
+ * interprets each index object in leaves returned by tree traversals as votes,
+ * and only performs the final linear search with the 'elect' most voted 
+ * objects. The priority queue trick keeps track of nodes where the split value
+ * was close to the projection so that we can split the tree traversal to both
+ * subtrees if we want.
+ * @param q - The query object whose neighbors the function finds.
+ * @param k - The number of neighbors the user wants the function to return
+ * @param elect - The number of most voted objects elected to linear search
+ * @param branches - The number of extra branches explored in priority queue trick
+ * @return The indices of the k approximate nearest neighbors in the original
+ * data set for which the index was built.
+ */
+uvec Mrpt::query(const fvec& q, int k, int elect) {
+    
+    fvec projected_query = random_matrix * q;
+    uvec votes = zeros<uvec>(n_samples);
+    
+    /*
+     * The following loops over all trees, and routes the query to exactly one 
+     * leaf in each.
+     */
+    int j = 0; // Used to find the correct projection value, increases through all trees
+    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
+        const fvec& tree = split_points.unsafe_col(n_tree);
+
+        double split_point = tree[0];
+        int idx_left, idx_right;
+        int idx_tree = 0;
+
+        while (split_point) {
+            idx_left = 2 * idx_tree + 1;
+            idx_right = idx_left + 1;
+            if (projected_query(j) <= split_point) {
+                idx_tree = idx_left;
+            } else {
+                idx_tree = idx_right;
+            }
+            j++;
+            split_point = tree[idx_tree];
+        }
+        const uvec& idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
+        for (int idx : idx_one_tree)
+            votes[idx]++;
+    }
+
+    // Compute the actual NNs within the 'elect' objects with most votes
+    uvec elected = sort_index(votes, "descend");
+    elected.resize(elect);
+    return exact_knn(X, q, k, elected);
+}
+
 
 /**
  * This function implements the barebones MRPT algorithm and finds the k 
