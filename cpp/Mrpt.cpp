@@ -98,7 +98,6 @@ std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i,
     return v;
 }
 
-
 /**
  * This function finds the k approximate nearest neighbors of the query object 
  * q. The accuracy of the query depends on both the parameters used for index 

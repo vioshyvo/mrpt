@@ -18,5 +18,5 @@ class MRPTIndex(object):
         if n_elect == 0:
             return self.index.old_ann(q.tolist(), k)
         if n_extra_branches == 0:
-            return self.index.voting_ann(q.tolist, k, n_elect)
+            return self.index.voting_ann(q.tolist(), k, n_elect)
         return self.index.ann(q.tolist(), k, n_elect, n_extra_branches)
