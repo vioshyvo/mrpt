@@ -18,7 +18,6 @@ public:
     ~Mrpt() {}
     void grow();
     uvec query(const fvec& q, int k, int elect, int branches);
-    uvec query(const fvec& q, int k, int elect); // Query without priority queue
     uvec query(const fvec& q, int k); // the old query
 
 private:
