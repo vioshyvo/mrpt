@@ -17,7 +17,7 @@ public:
     Mrpt(const fmat& X_, int n_trees, int n_0_, std::string id_);
     ~Mrpt() {}
     void grow();
-    uvec query(const fvec& q, int k, int elect, int branches);
+    uvec query(const fvec& q, int k, int votes_required, int branches);
     uvec query(const fvec& q, int k); // the old query
 
 private:

@@ -110,12 +110,12 @@ std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i,
  * subtrees if we want.
  * @param q - The query object whose neighbors the function finds.
  * @param k - The number of neighbors the user wants the function to return
- * @param elect - The number of most voted objects elected to linear search
- * @param branches - The number of extra branches explored in priority queue trick
+ * @param votes_required - The number of votes required for an object to be included in the linear search step
+ * @param branches - The number of extra branches explored in the priority queue trick
  * @return The indices of the k approximate nearest neighbors in the original
  * data set for which the index was built.
  */
-uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
+uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
     
     fvec projected_query = random_matrix * q;
     uvec votes = zeros<uvec>(n_samples);
@@ -191,12 +191,12 @@ uvec Mrpt::query(const fvec& q, int k, int elect, int branches) {
     do { 
         j = 0;
         for (int i=0; i<n_samples; i++){
-            if (votes[i] >= elect){
+            if (votes[i] >= votes_required){
                 elected[j] = i;
                 j++;
             }
         }
-        elect--; // If not enough objects with enough votes, decrease the requirement
+        votes_required--; // If not enough objects with enough votes, decrease the requirement
     } while(j < k);
     elected.resize(j);
     return exact_knn(X, q, k, elected);

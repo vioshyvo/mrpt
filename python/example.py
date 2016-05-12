@@ -39,7 +39,7 @@ def mrpt_example(n0, n_trees, n_extra_branches, n_elected):
     t = time.time()
     neighbors = np.zeros((n_queries, 10))
     for i in range(n_queries):
-        neighbors[i] = index.ann(test_images[i], 10, n_extra_branches=n_extra_branches, n_elect=n_elected)
+        neighbors[i] = index.ann(test_images[i], 10, n_extra_branches=n_extra_branches, votes_required=n_elected)
     print 'Took '+ '%.2f' % (time.time()-t) + 'sec'
 
     correct_neighbors = np.zeros(n_queries)
