@@ -21,3 +21,4 @@ python/rptree2*
 *.so
 *.mat
 datasets
+python/cppmrpt.py
