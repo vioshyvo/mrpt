@@ -1,14 +1,14 @@
 # MRPT in C++11
 
-This directory contains a highly efficient C++ implementation of the MRPT algorithm, and wrappers to use it with Python 2.7.
+This directory contains a C++ implementation of the MRPT algorithm, and wrappers to use it with Python 2.7.
 
 ## Dependencies
 
-Requires [Armadillo](http://arma.sourceforge.net/docs.html). At the time of writing, the module unfortunately only works with Python 2.7. (and C++ naturally.)
+Requires [Armadillo](http://arma.sourceforge.net/docs.html). At the time of writing, our Python support only covers Python 2.7.
 
 ## Installation
 
-1. [Download](https://github.com/teemupitkanen/mrpt/archive/master.zip) this Github repo zip and unzip it.
+1. [Download](https://github.com/teemupitkanen/mrpt/archive/master.zip) this Github repo and unzip it.
 2. Make sure to have [Armadillo](http://arma.sourceforge.net/docs.html) installed.
 3. Move to the `mrpt/cpp` directory.
 4. Build the module by issuing command `python setup.py build`.
@@ -27,7 +27,7 @@ After these steps you should be able to use MRPT in Python by the following code
     query = np.array(<give a single query object of the same dimensionality>)
 
     index = MrptIndex(data, n0=500, n_trees=30)
-    neighbors = index.ann(query, 10, n_extra_branches=150, n_elect=200)
+    neighbors = index.ann(query, 10, n_extra_branches=150, n_elect=5)
 
 ## Questions
 Feel free to contact: teemu.pitkanen'at'cs.helsinki.fi 
