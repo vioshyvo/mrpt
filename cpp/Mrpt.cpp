@@ -38,6 +38,21 @@ Mrpt::Mrpt(const fmat& X_, int n_trees_, int n_0_, std::string id_) : X(X_), n_t
     random_matrix = fmat();
 }
 
+Mrpt::Mrpt(const std::string filename, int n_trees_, int n_0_, std::string id_) : n_trees(n_trees_), n_0(n_0_), id(id_){
+    X = fmat();
+    X.load(filename);
+    n_samples = X.n_cols; 
+    dim = X.n_rows;
+    if (n_0 == 1) // n_0==1 => leaves have sizes 1 or 2 (b/c 0.5 is impossible)
+        depth = floor(log2(n_samples));
+    else
+        depth = ceil(log2(n_samples / n_0));
+    n_pool = n_trees * depth;
+    n_array = pow(2, depth + 1);
+    split_points = fmat();
+    random_matrix = fmat();
+}
+
 /**
  * The function whose call starts the actual index construction. Initializes 
  * arrays to store the tree structures and computes all the projections needed

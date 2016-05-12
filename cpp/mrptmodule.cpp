@@ -39,19 +39,22 @@ Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
     int n0, n_trees, n, dim;
     if (!PyArg_ParseTuple(args, "Oii", &py_data, &n0, &n_trees))
         return -1;
-
-    // Convert the python data matrix to armadillo fmat
-    n = PyList_Size(py_data);
-    dim = PyList_Size(PyList_GetItem(py_data, 0));
-    arma::fmat X(dim, n);
-    for (int i = 0; i < dim; i++){
-        for (int j = 0; j < n; j++){
-            X(i, j) = PyFloat_AsDouble(PyList_GetItem(PyList_GetItem(py_data, j), i));
+    
+    if (PyString_Check(py_data)){
+        // Load the data matrix from file
+        self->ptr = new Mrpt(std::string(PyString_AsString(py_data)), n_trees, n0, "genericTreeID");
+    } else {
+        // Load the data matrix from a nested python list
+        n = PyList_Size(py_data);
+        dim = PyList_Size(PyList_GetItem(py_data, 0));
+        arma::fmat X(dim, n);
+        for (int i = 0; i < dim; i++){
+            for (int j = 0; j < n; j++){
+                X(i, j) = PyFloat_AsDouble(PyList_GetItem(PyList_GetItem(py_data, j), i));
+            }
         }
-    
+        self->ptr = new Mrpt(X, n_trees, n0, "genericTreeID");
     }
-    
-    self->ptr = new Mrpt(X, n_trees, n0, "genericTreeID");
     self->ptr->grow();
     return 0;
 }
