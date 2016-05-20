@@ -6,12 +6,17 @@
  * 2016                                                 *
  ********************************************************/
 
-#include "armadillo"
-#include <cstdlib>
 #include <queue>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <random>
 #include "Mrpt.h"
 
-using namespace arma;
+#include <Eigen/Dense>
+#include <Eigen/SparseCore>
+
+using namespace Eigen;
 
 /**
  * The constructor of the index. The inputs are the data for which the index 
@@ -23,34 +28,29 @@ using namespace arma;
  * @param X_ - The data to be indexed. Samples as columns, features as rows.
  * @param n_trees_ - The number of trees to be used in the index.
  * @param n_0_ - The maximum leaf size to be used in the index.
+ * @param density - Expected ratio of non-zero components in a projection matrix.
+ * @param metric - Distance metric to use, currently euclidean or angular.
  * @param id_ - A name used for filenames when saving.
  */
-Mrpt::Mrpt(const fmat& X_, int n_trees_, int n_0_, std::string id_) : X(X_), n_trees(n_trees_), n_0(n_0_), id(id_){
-    n_samples = X.n_cols; 
-    dim = X.n_rows;
-    if (n_0 == 1) // n_0==1 => leaves have sizes 1 or 2 (b/c 0.5 is impossible)
-        depth = floor(log2(n_samples));
-    else
-        depth = ceil(log2(n_samples / n_0));
-    n_pool = n_trees * depth;
-    n_array = pow(2, depth + 1);
-    split_points = fmat();
-    random_matrix = fmat();
-}
+Mrpt::Mrpt(const MatrixXf &X_, int n_trees_, int n_0_, float density_,
+           std::string metric_, std::string id_)
+           : X(X_), n_trees(n_trees_), n_0(n_0_), density(density_), id(id_) {
+    n_samples = X.cols();
+    dim = X.rows();
 
-Mrpt::Mrpt(const std::string filename, int n_trees_, int n_0_, std::string id_) : n_trees(n_trees_), n_0(n_0_), id(id_){
-    X = fmat();
-    X.load(filename);
-    n_samples = X.n_cols; 
-    dim = X.n_rows;
     if (n_0 == 1) // n_0==1 => leaves have sizes 1 or 2 (b/c 0.5 is impossible)
         depth = floor(log2(n_samples));
     else
         depth = ceil(log2(n_samples / n_0));
+
     n_pool = n_trees * depth;
     n_array = pow(2, depth + 1);
-    split_points = fmat();
-    random_matrix = fmat();
+    X_norms = X.colwise().squaredNorm();
+
+    if (metric_ == "angular")
+        metric = ANGULAR;
+    else
+        metric = EUCLIDEAN;
 }
 
 /**
@@ -60,17 +60,25 @@ Mrpt::Mrpt(const std::string filename, int n_trees_, int n_0_, std::string id_) 
  * RP-tree.
  */
 void Mrpt::grow() {
-    split_points = zeros<fmat>(n_array, n_trees);
-    uvec indices = linspace<uvec>(0, n_samples - 1, n_samples);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    split_points = MatrixXf::Zero(n_array, n_trees);
+    VectorXi indices = VectorXi::LinSpaced(n_samples, 0, n_samples - 1);
 
     // generate the random matrix and project the data set onto it
-    random_matrix = conv_to<fmat>::from(randn(n_pool, dim));
-    projected_data = random_matrix * X;
-    
+    if (density < 1) {
+        sparse_random_matrix = buildSparseRandomMatrix(n_pool, dim, density, gen);
+        projected_data = sparse_random_matrix * X;
+    } else {
+        dense_random_matrix = buildDenseRandomMatrix(n_pool, dim, gen);
+        projected_data = dense_random_matrix * X;
+    }
+
     // Grow the trees
-    for (int n_tree = 0; n_tree < n_trees; n_tree++) {       
+    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
         first_idx = n_tree * depth;
-        std::vector<uvec> t = grow_subtree(indices, 0, 0, n_tree); 
+        std::vector<VectorXi> t = grow_subtree(indices, 0, 0, n_tree); 
         tree_leaves.push_back(t);
     }
 }
@@ -82,34 +90,48 @@ void Mrpt::grow() {
  * @param tree_level - The level in tree where the recursion is at
  * @param i - The index within the tree where we are at
  * @param n_tree - The index of the tree within the index
- * @return The leaves as a vector of arma::uvecs
+ * @return The leaves as a vector of arma::VectorXis
  */
-std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree) {
+std::vector<VectorXi> Mrpt::grow_subtree(const VectorXi &indices, int tree_level, int i, unsigned n_tree) {
     int n = indices.size();
     int idx_left = 2 * i + 1;
     int idx_right = idx_left + 1;
 
     if (tree_level == depth) {
-        std::vector<uvec> v;
+        std::vector<VectorXi> v;
         v.push_back(indices);
         return v;
     }
 
-    uvec level = {first_idx + tree_level};
-    frowvec projection = projected_data(level, indices);
-    uvec ordered = sort_index(projection);
+    VectorXf projections = VectorXf(n);
+    for (int i = 0; i < n; ++i)
+        projections(i) = projected_data(first_idx + tree_level, indices(i));
+
+    // sort indices of the projections based on their values
+    VectorXi ordered = VectorXi::LinSpaced(n, 0, n - 1);
+    std::sort(ordered.data(), ordered.data() + ordered.size(),
+              [&projections](size_t i1, size_t i2) {return projections(i1) < projections(i2);});
 
     int split_point = n % 2 ? n / 2 : n / 2 - 1; // median split
     int idx_split_point = ordered(split_point);
     int idx_split_point2 = ordered(split_point + 1);
 
-    split_points(i, n_tree) = n % 2 ? projection(idx_split_point) : (projection(idx_split_point) + projection(idx_split_point2)) / 2;
-    uvec left_indices = ordered.subvec(0, split_point);
-    uvec right_indices = ordered.subvec(split_point + 1, n - 1);
+    split_points(i, n_tree) = n % 2 ? projections(idx_split_point) :
+                              (projections(idx_split_point) + projections(idx_split_point2)) / 2;
+    VectorXi left_indices = ordered.head(split_point + 1);
+    VectorXi right_indices = ordered.tail(n - split_point - 1);
 
-    std::vector<uvec> v = grow_subtree(indices.elem(left_indices), tree_level + 1, idx_left, n_tree);
-    std::vector<uvec> w = grow_subtree(indices.elem(right_indices), tree_level + 1, idx_right, n_tree);
-    v.insert( v.end(), w.begin(), w.end() );
+    VectorXi left_elems = VectorXi(left_indices.size());
+    VectorXi right_elems = VectorXi(right_indices.size());
+
+    for (int i = 0; i < left_indices.size(); ++i)
+        left_elems(i) = indices(left_indices(i));
+    for (int i = 0; i < right_indices.size(); ++i)
+        right_elems(i) = indices(right_indices(i));
+
+    std::vector<VectorXi> v = grow_subtree(left_elems, tree_level + 1, idx_left, n_tree);
+    std::vector<VectorXi> w = grow_subtree(right_elems, tree_level + 1, idx_right, n_tree);
+    v.insert(v.end(), w.begin(), w.end());
     return v;
 }
 
@@ -130,10 +152,15 @@ std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i,
  * @return The indices of the k approximate nearest neighbors in the original
  * data set for which the index was built.
  */
-uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
-    
-    fvec projected_query = random_matrix * q;
-    uvec votes = zeros<uvec>(n_samples);
+VectorXi Mrpt::query(const VectorXf& q, int k, int votes_required, int branches) {
+    VectorXf projected_query = VectorXf(n_pool);
+
+    if (density < 1)
+        projected_query.noalias() = sparse_random_matrix * q;
+    else
+        projected_query.noalias() = dense_random_matrix * q;
+
+    VectorXi votes = VectorXi::Zero(n_samples);
     std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq;
     
     /*
@@ -141,14 +168,12 @@ uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
      * leaf in each.
      */
     int j = 0; // Used to find the correct projection value, increases through all trees
-    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        const fvec& tree = split_points.unsafe_col(n_tree);
-
-        double split_point = tree[0];
+    for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+        float split_point = split_points(0, n_tree);
         int idx_left, idx_right;
         int idx_tree = 0;
 
-        while (split_point) {
+        for (int k = 0; k < depth; ++k) {
             idx_left = 2 * idx_tree + 1;
             idx_right = idx_left + 1;
             if (projected_query(j) <= split_point) {
@@ -159,30 +184,32 @@ uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
                 pq.push(Gap(n_tree, idx_left, j+1, projected_query(j)-split_point));
             }
             j++;
-            split_point = tree[idx_tree];
+            split_point = split_points(idx_tree, n_tree);
         }
-        const uvec& idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
-        for (int idx : idx_one_tree)
-            votes[idx]++;
+
+        const VectorXi &idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
+        for (int i = 0; i < idx_one_tree.size(); ++i)
+            votes(idx_one_tree(i))++;
     }
-    
+
+
     /*
      * The following loop routes the query to extra leaves in the same trees 
      * handled already once above. The extra branches are popped from the 
      * priority queue and routed down the tree just as new root-to-leaf queries.
      */
-    for (int b = 0; b < branches; b++){
+    for (int b = 0; b < branches; ++b) {
         if (pq.empty()) break;
         Gap gap = pq.top();
         pq.pop();
         
-        const fvec& tree = split_points.unsafe_col(gap.tree);
+        const VectorXf& tree = split_points.col(gap.tree);
         int idx_tree = gap.node;
         int idx_left, idx_right;
         j = gap.level;
-        double split_point = tree[idx_tree];
+        float split_point = tree(idx_tree);
 
-        while (split_point) {
+        while (j % depth) {
             idx_left = 2 * idx_tree + 1;
             idx_right = idx_left + 1;
             if (projected_query(j) <= split_point) {
@@ -193,28 +220,29 @@ uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
                 pq.push(Gap(gap.tree, idx_left, j+1, projected_query(j)-split_point));
             }
             j++;
-            split_point = tree[idx_tree];
+            split_point = tree(idx_tree);
         }
 
-        const uvec& idx_one_tree = tree_leaves[gap.tree][idx_tree - pow(2, depth) + 1];
-        for (int idx : idx_one_tree)
-            votes[idx]++;
-    } 
-    
+        const VectorXi &idx_one_tree = tree_leaves[gap.tree][idx_tree - pow(2, depth) + 1];
+        for (int i = 0; i < idx_one_tree.size(); ++i)
+            votes(idx_one_tree(i))++;
+    }
+
     // Choose the objects with enough votes...
-    uvec elected(n_samples);
+    VectorXi elected(n_samples);
     do { 
         j = 0;
-        for (int i=0; i<n_samples; i++){
-            if (votes[i] >= votes_required){
-                elected[j] = i;
+        for (int i = 0; i < n_samples; ++i){
+            if (votes(i) >= votes_required){
+                elected(j) = i;
                 j++;
             }
         }
         votes_required--; // If not enough objects with enough votes, decrease the requirement
     } while(j < k);
-    elected.resize(j);
-    return exact_knn(X, q, k, elected);
+
+    VectorXi indices = elected.head(j);
+    return exact_knn(X, X_norms, q, k, indices, metric);
 }
 
 /**
@@ -227,37 +255,44 @@ uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
  * @return The indices of the k approximate nearest neighbors in the original
  * data set for which the index was built.
  */
-uvec Mrpt::query(const fvec& q, int k) {
-    fvec projected_query = random_matrix * q;
-    std::vector<int> idx_canditates(n_trees * n_0);
-    int j = 0;
+VectorXi Mrpt::query(const VectorXf& q, int k) {
+    VectorXf projected_query = VectorXf(n_pool);
 
+    if (density < 1)
+        projected_query.noalias() = sparse_random_matrix * q;
+    else
+        projected_query.noalias() = dense_random_matrix * q;
 
-    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        const fvec& tree = split_points.unsafe_col(n_tree);
+    VectorXi result = VectorXi(n_samples);
+    bool found[n_samples] = {false};
+    int j = 0, n_found = 0;
 
-        double split_point = tree[0];
+    for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+        const VectorXf& tree = split_points.col(n_tree);
+
+        double split_point = tree(0);
         int idx_left, idx_right;
         int idx_tree = 0;
 
-        while (split_point) {
+        for (int k = 0; k < depth; ++k) {
             idx_left = 2 * idx_tree + 1;
             idx_right = idx_left + 1;
             idx_tree = projected_query(j++) <= split_point ? idx_left : idx_right;
-            split_point = tree[idx_tree];
+            split_point = tree(idx_tree);
         }
         
-        const uvec& idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
-        idx_canditates.insert(idx_canditates.begin(), idx_one_tree.begin(), idx_one_tree.end());
+        const VectorXi& idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
+        for (int i = 0; i < idx_one_tree.size(); ++i) {
+            int sample = idx_one_tree(i);
+            if (found[sample]) continue;
+            found[sample] = true;
+            result(n_found++) = sample;
+        }
     }
 
-    std::sort(idx_canditates.begin(), idx_canditates.end());
-    auto last = std::unique(idx_canditates.begin(), idx_canditates.end());
-    idx_canditates.erase(last, idx_canditates.end());
-
-    return exact_knn(X, q, k, conv_to<uvec>::from(idx_canditates));
+    VectorXi indices = result.head(n_found);
+    return exact_knn(X, X_norms, q, k, indices, metric);
 }
-
 
 /**
  * find k nearest neighbors from data for the query point
@@ -267,18 +302,79 @@ uvec Mrpt::query(const fvec& q, int k) {
  * @param indices - indices of the points in the original matrix where search is made
  * @return - indices of nearest neighbors in data matrix X as a column vector
  */
-uvec exact_knn(const fmat& D, const fvec& q, uword k, uvec indices) {
-    int n_cols = indices.size();
-    fvec distances = fvec(n_cols);
-    for (int i = 0; i < n_cols; i++)
-        distances[i] = sum(pow((D.col(indices(i)) - q), 2));
+VectorXi exact_knn(const MatrixXf& D, const VectorXf& D_norms, const VectorXf& q, unsigned k,
+                   const VectorXi &indices, Metric metric) {
+    unsigned n_cols = indices.size();
 
-    if(k == 1) {
-        uvec ret(1);
-        distances.min(ret[0]);
+    VectorXf distances(n_cols);
+    if (metric == EUCLIDEAN) {
+        for (unsigned i = 0; i < n_cols; ++i)
+            distances(i) = D_norms(indices(i)) - 2 * q.dot(D.col(indices(i)));
+    } else {
+        for (unsigned i = 0; i < n_cols; ++i)
+            distances(i) = -D.col(indices(i)).dot(q);
+    }
+
+    if (k == 1) {
+        MatrixXf::Index index;
+        distances.minCoeff(&index);
+        VectorXi ret(1);
+        ret(0) = (int) indices(index);
         return ret;
     }
 
-    uvec sorted_indices = indices(sort_index(distances));
-    return sorted_indices.size() > k ? sorted_indices.head(k): sorted_indices;
+    VectorXi idx = VectorXi::LinSpaced(distances.size(), 0, distances.size() - 1);
+    std::nth_element(idx.data(), idx.data() + k - 1, idx.data() + idx.size(),
+              [&distances](size_t i1, size_t i2) {return distances(i1) < distances(i2);});
+    std::sort(idx.data(), idx.data() + k,
+              [&distances](size_t i1, size_t i2) {return distances(i1) < distances(i2);});
+
+    VectorXi result(k);
+    for (unsigned i = 0; i < k; ++i) result(i) = indices(idx(i));
+    return result;
+}
+
+/**
+ * Builds a random sparse matrix for use in random projection. The components of
+ * the matrix are drawn from the distribution
+ *
+ * -sqrt(s)   w.p. 1 / 2s
+ *  0         w.p. 1 - 1 / s
+ * +sqrt(s)   w.p. 1 / 2s
+ *
+ * where s = 1 / density.
+ * @param rows - The number of rows in the resulting matrix.
+ * @param cols - The number of columns in the resulting matrix.
+ * @param density - Expected ratio of non-zero components in the resulting matrix.
+ * @param gen - A random number engine.
+ */
+SparseMatrix<float> buildSparseRandomMatrix(int rows, int cols, float density, std::mt19937 gen) {
+    std::uniform_real_distribution<float> uni_dist(0, 1);
+    SparseMatrix<float> random_matrix = SparseMatrix<float>(rows, cols);
+
+    std::vector<Triplet<float> > triplets;
+    for (int j = 0; j < rows; ++j) {
+        for (int i = 0; i < cols; ++i) {
+            if (uni_dist(gen) > density) continue;
+            float value = sqrt(1. / density) * (uni_dist(gen) <= 0.5 ? -1 : 1);
+            triplets.push_back(Triplet<float>(j, i, value));
+        }
+    }
+
+    random_matrix.setFromTriplets(triplets.begin(), triplets.end());
+    random_matrix.makeCompressed();
+    return random_matrix;
+}
+
+/*
+ * Builds a random dense matrix for use in random projection. The components of
+ * the matrix are drawn from the standard normal distribution.
+ * @param rows - The number of rows in the resulting matrix.
+ * @param cols - The number of rows in the resulting matrix.
+ * @param gen - A random number engine.
+ */
+MatrixXf buildDenseRandomMatrix(int rows, int cols, std::mt19937 gen) {
+    std::normal_distribution<float> normal_dist(0, 1);
+    return MatrixXf::Zero(rows, cols).unaryExpr(
+            [&normal_dist, &gen](float _) -> float { return normal_dist(gen); });
 }

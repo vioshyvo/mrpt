@@ -14,8 +14,10 @@
 
 #include "Python.h"
 #include <cstdlib>
-#include <armadillo>
+#include <string>
 #include "Mrpt.h"
+
+#include <Eigen/Dense>
 
 
 typedef struct {
@@ -37,24 +39,26 @@ static int
 Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
     PyObject* py_data = NULL;
     int n0, n_trees, n, dim;
-    if (!PyArg_ParseTuple(args, "Oii", &py_data, &n0, &n_trees))
+    float density;
+    char *metric;
+    if (!PyArg_ParseTuple(args, "Oiifs", &py_data, &n0, &n_trees, &density, &metric))
         return -1;
     
-    if (PyString_Check(py_data)){
-        // Load the data matrix from file
-        self->ptr = new Mrpt(std::string(PyString_AsString(py_data)), n_trees, n0, "genericTreeID");
-    } else {
+    /* if (PyString_Check(py_data)){ */
+    /*     // Load the data matrix from file */
+    /*     self->ptr = new Mrpt(std::string(PyString_AsString(py_data)), n_trees, n0, "genericTreeID"); */
+    /* } else { */
         // Load the data matrix from a nested python list
         n = PyList_Size(py_data);
         dim = PyList_Size(PyList_GetItem(py_data, 0));
-        arma::fmat X(dim, n);
+        Eigen::MatrixXf X(dim, n);
         for (int i = 0; i < dim; i++){
             for (int j = 0; j < n; j++){
                 X(i, j) = PyFloat_AsDouble(PyList_GetItem(PyList_GetItem(py_data, j), i));
             }
         }
-        self->ptr = new Mrpt(X, n_trees, n0, "genericTreeID");
-    }
+        self->ptr = new Mrpt(X, n_trees, n0, density, std::string(metric), "genericTreeID");
+    /* } */
     self->ptr->grow();
     return 0;
 }
@@ -73,15 +77,15 @@ static PyObject* ann(mrptIndex* self, PyObject* args) {
     if (!PyArg_ParseTuple(args, "Oiii", &v, &k, &elect, &branches))
         return NULL;
     dim = PyList_Size(v);
-    arma::fvec w(dim);
+    Eigen::VectorXf w(dim);
     for (int i = 0; i < dim; i++){
         PyObject* elem = PyList_GetItem(v, i);
         w[i] = PyFloat_AsDouble(elem);
     }
-    arma::uvec neighbors = self->ptr->query(w, k, elect, branches);
+    Eigen::VectorXi neighbors = self->ptr->query(w, k, elect, branches);
     
     PyObject* l = PyList_New(k);
-    for (size_t i = 0; i < k; i++)
+    for (int i = 0; i < k; i++)
         PyList_SetItem(l, i, PyInt_FromLong(neighbors[i]));
     return l;
 }
@@ -92,15 +96,15 @@ static PyObject* old_ann(mrptIndex* self, PyObject* args) {
     if (!PyArg_ParseTuple(args, "Oi", &v, &k))
         return NULL;
     dim = PyList_Size(v);
-    arma::fvec w(dim);
+    Eigen::VectorXf w(dim);
     for (int i = 0; i < dim; i++){
         PyObject* elem = PyList_GetItem(v, i);
         w[i] = PyFloat_AsDouble(elem);
     }
-    arma::uvec neighbors = self->ptr->query(w, k);
+    Eigen::VectorXi neighbors = self->ptr->query(w, k);
     
     PyObject* l = PyList_New(k);
-    for (size_t i = 0; i < k; i++)
+    for (int i = 0; i < k; i++)
         PyList_SetItem(l, i, PyInt_FromLong(neighbors[i]));
     return l;
 }

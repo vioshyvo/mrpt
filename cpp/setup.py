@@ -8,8 +8,10 @@ from distutils.core import setup, Extension
 
 module1 = Extension('mrptlib',
                     sources = ['mrptmodule.cpp', 'Mrpt.cpp'],
-                    extra_compile_args = ['-std=c++11','-O3', '-march=native', '-ffast-math'],
-                    extra_link_args = ['-lblas', '-llapack'])
+                    extra_compile_args = ['-I./lib', '-std=c++11','-O3', '-march=native',
+                                          '-ffast-math', '-mavx', '-mfma', '-DNDEBUG',
+                                          '-Wno-deprecated-declarations', '-Wno-ignored-attributes'],
+                    extra_link_args = [])
 
 setup (name = 'mrpt',
        version = '1.0',
