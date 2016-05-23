@@ -63,17 +63,17 @@ void Mrpt::grow() {
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    split_points = MatrixXf::Zero(n_array, n_trees);
-    VectorXi indices = VectorXi::LinSpaced(n_samples, 0, n_samples - 1);
-
     // generate the random matrix and project the data set onto it
     if (density < 1) {
         sparse_random_matrix = buildSparseRandomMatrix(n_pool, dim, density, gen);
-        projected_data = sparse_random_matrix * X;
+        projected_data.noalias() = sparse_random_matrix * X;
     } else {
         dense_random_matrix = buildDenseRandomMatrix(n_pool, dim, gen);
-        projected_data = dense_random_matrix * X;
+        projected_data.noalias() = dense_random_matrix * X;
     }
+
+    split_points = MatrixXf::Zero(n_array, n_trees);
+    VectorXi indices = VectorXi::LinSpaced(n_samples, 0, n_samples - 1);
 
     // Grow the trees
     for (int n_tree = 0; n_tree < n_trees; n_tree++) {
@@ -152,7 +152,7 @@ std::vector<VectorXi> Mrpt::grow_subtree(const VectorXi &indices, int tree_level
  * @return The indices of the k approximate nearest neighbors in the original
  * data set for which the index was built.
  */
-VectorXi Mrpt::query(const VectorXf& q, int k, int votes_required, int branches) {
+VectorXi Mrpt::query(const VectorXf &q, int k, int votes_required, int branches) {
     VectorXf projected_query = VectorXf(n_pool);
 
     if (density < 1)
@@ -162,26 +162,25 @@ VectorXi Mrpt::query(const VectorXf& q, int k, int votes_required, int branches)
 
     VectorXi votes = VectorXi::Zero(n_samples);
     std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq;
-    
+
     /*
      * The following loops over all trees, and routes the query to exactly one 
      * leaf in each.
      */
     int j = 0; // Used to find the correct projection value, increases through all trees
     for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+        int idx_tree = 0, idx_left, idx_right;
         float split_point = split_points(0, n_tree);
-        int idx_left, idx_right;
-        int idx_tree = 0;
 
-        for (int k = 0; k < depth; ++k) {
+        for (int d = 0; d < depth; ++d) {
             idx_left = 2 * idx_tree + 1;
             idx_right = idx_left + 1;
             if (projected_query(j) <= split_point) {
                 idx_tree = idx_left;
-                pq.push(Gap(n_tree, idx_right, j+1, split_point-projected_query(j)));
+                pq.push(Gap(n_tree, idx_right, j + 1, split_point - projected_query(j)));
             } else {
                 idx_tree = idx_right;
-                pq.push(Gap(n_tree, idx_left, j+1, projected_query(j)-split_point));
+                pq.push(Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point));
             }
             j++;
             split_point = split_points(idx_tree, n_tree);
@@ -192,7 +191,6 @@ VectorXi Mrpt::query(const VectorXf& q, int k, int votes_required, int branches)
             votes(idx_one_tree(i))++;
     }
 
-
     /*
      * The following loop routes the query to extra leaves in the same trees 
      * handled already once above. The extra branches are popped from the 
@@ -202,25 +200,23 @@ VectorXi Mrpt::query(const VectorXf& q, int k, int votes_required, int branches)
         if (pq.empty()) break;
         Gap gap = pq.top();
         pq.pop();
-        
-        const VectorXf& tree = split_points.col(gap.tree);
-        int idx_tree = gap.node;
-        int idx_left, idx_right;
+
         j = gap.level;
-        float split_point = tree(idx_tree);
+        int idx_tree = gap.node, idx_left, idx_right;
+        float split_point = split_points(0, gap.tree);
 
         while (j % depth) {
             idx_left = 2 * idx_tree + 1;
             idx_right = idx_left + 1;
             if (projected_query(j) <= split_point) {
                 idx_tree = idx_left;
-                pq.push(Gap(gap.tree, idx_right, j+1, split_point-projected_query(j)));
+                pq.push(Gap(gap.tree, idx_right, j + 1, split_point - projected_query(j)));
             } else {
                 idx_tree = idx_right;
-                pq.push(Gap(gap.tree, idx_left, j+1, projected_query(j)-split_point));
+                pq.push(Gap(gap.tree, idx_left, j + 1, projected_query(j) - split_point));
             }
             j++;
-            split_point = tree(idx_tree);
+            split_point = split_points(idx_tree, gap.tree);
         }
 
         const VectorXi &idx_one_tree = tree_leaves[gap.tree][idx_tree - pow(2, depth) + 1];
@@ -228,18 +224,34 @@ VectorXi Mrpt::query(const VectorXf& q, int k, int votes_required, int branches)
             votes(idx_one_tree(i))++;
     }
 
-    // Choose the objects with enough votes...
     VectorXi elected(n_samples);
-    do { 
+    for (int l = 0; l < 2; ++l) {
         j = 0;
-        for (int i = 0; i < n_samples; ++i){
-            if (votes(i) >= votes_required){
-                elected(j) = i;
-                j++;
-            }
+
+        for (int i = 0; i < n_samples; ++i) {
+            if (votes(i) >= votes_required)
+                elected(j++) = i;
         }
-        votes_required--; // If not enough objects with enough votes, decrease the requirement
-    } while(j < k);
+
+        if (j >= k) break;
+
+        /* 
+         * If not enough samples had at least votes_required
+         * votes, find the minimum amount of votes needed such
+         * that the final search set size has at least k samples
+         */
+        int vote_count[n_trees + branches + 1] = {0};
+        for (int i = 0; i < n_samples; ++i)
+            vote_count[votes(i)]++;
+
+        int n_elect = 0, min_votes = n_trees + branches;
+        for (; min_votes; --min_votes) {
+            n_elect += vote_count[min_votes];
+            if (n_elect >= k) break;
+        }
+
+        votes_required = min_votes;
+    }
 
     VectorXi indices = elected.head(j);
     return exact_knn(X, X_norms, q, k, indices, metric);
@@ -255,7 +267,7 @@ VectorXi Mrpt::query(const VectorXf& q, int k, int votes_required, int branches)
  * @return The indices of the k approximate nearest neighbors in the original
  * data set for which the index was built.
  */
-VectorXi Mrpt::query(const VectorXf& q, int k) {
+VectorXi Mrpt::query(const VectorXf &q, int k) {
     VectorXf projected_query = VectorXf(n_pool);
 
     if (density < 1)
@@ -263,34 +275,32 @@ VectorXi Mrpt::query(const VectorXf& q, int k) {
     else
         projected_query.noalias() = dense_random_matrix * q;
 
-    VectorXi result = VectorXi(n_samples);
-    bool found[n_samples] = {false};
-    int j = 0, n_found = 0;
+    VectorXi votes = VectorXi::Zero(n_samples);
+    int j = 0;
 
     for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-        const VectorXf& tree = split_points.col(n_tree);
+        float split_point = split_points(0, n_tree);
+        int idx_tree = 0, idx_left, idx_right;
 
-        double split_point = tree(0);
-        int idx_left, idx_right;
-        int idx_tree = 0;
-
-        for (int k = 0; k < depth; ++k) {
+        for (int d = 0; d < depth; ++d) {
             idx_left = 2 * idx_tree + 1;
             idx_right = idx_left + 1;
             idx_tree = projected_query(j++) <= split_point ? idx_left : idx_right;
-            split_point = tree(idx_tree);
+            split_point = split_points(idx_tree, n_tree);
         }
-        
-        const VectorXi& idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
-        for (int i = 0; i < idx_one_tree.size(); ++i) {
-            int sample = idx_one_tree(i);
-            if (found[sample]) continue;
-            found[sample] = true;
-            result(n_found++) = sample;
-        }
+
+        const VectorXi &idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
+        for (int i = 0; i < idx_one_tree.size(); ++i)
+            votes(idx_one_tree(i))++;
     }
 
-    VectorXi indices = result.head(n_found);
+    j = 0;
+    VectorXi elected(n_samples);
+    for (int i = 0; i < n_samples; ++i) {
+        if (votes(i) >= 1) elected(j++) = i;
+    }
+
+    VectorXi indices = elected.head(j);
     return exact_knn(X, X_norms, q, k, indices, metric);
 }
 
@@ -302,7 +312,7 @@ VectorXi Mrpt::query(const VectorXf& q, int k) {
  * @param indices - indices of the points in the original matrix where search is made
  * @return - indices of nearest neighbors in data matrix X as a column vector
  */
-VectorXi exact_knn(const MatrixXf& D, const VectorXf& D_norms, const VectorXf& q, unsigned k,
+VectorXi exact_knn(const MatrixXf &D, const VectorXf &D_norms, const VectorXf &q, unsigned k,
                    const VectorXi &indices, Metric metric) {
     unsigned n_cols = indices.size();
 
@@ -312,7 +322,7 @@ VectorXi exact_knn(const MatrixXf& D, const VectorXf& D_norms, const VectorXf& q
             distances(i) = D_norms(indices(i)) - 2 * q.dot(D.col(indices(i)));
     } else {
         for (unsigned i = 0; i < n_cols; ++i)
-            distances(i) = -D.col(indices(i)).dot(q);
+            distances(i) = -q.dot(D.col(indices(i)));
     }
 
     if (k == 1) {
@@ -324,10 +334,8 @@ VectorXi exact_knn(const MatrixXf& D, const VectorXf& D_norms, const VectorXf& q
     }
 
     VectorXi idx = VectorXi::LinSpaced(distances.size(), 0, distances.size() - 1);
-    std::nth_element(idx.data(), idx.data() + k - 1, idx.data() + idx.size(),
-              [&distances](size_t i1, size_t i2) {return distances(i1) < distances(i2);});
-    std::sort(idx.data(), idx.data() + k,
-              [&distances](size_t i1, size_t i2) {return distances(i1) < distances(i2);});
+    std::partial_sort(idx.data(), idx.data() + k, idx.data() + idx.size(),
+                      [&distances](size_t i1, size_t i2) {return distances(i1) < distances(i2);});
 
     VectorXi result(k);
     for (unsigned i = 0; i < k; ++i) result(i) = indices(idx(i));
@@ -348,7 +356,7 @@ VectorXi exact_knn(const MatrixXf& D, const VectorXf& D_norms, const VectorXf& q
  * @param density - Expected ratio of non-zero components in the resulting matrix.
  * @param gen - A random number engine.
  */
-SparseMatrix<float> buildSparseRandomMatrix(int rows, int cols, float density, std::mt19937 gen) {
+SparseMatrix<float> buildSparseRandomMatrix(int rows, int cols, float density, std::mt19937 &gen) {
     std::uniform_real_distribution<float> uni_dist(0, 1);
     SparseMatrix<float> random_matrix = SparseMatrix<float>(rows, cols);
 
@@ -373,7 +381,7 @@ SparseMatrix<float> buildSparseRandomMatrix(int rows, int cols, float density, s
  * @param cols - The number of rows in the resulting matrix.
  * @param gen - A random number engine.
  */
-MatrixXf buildDenseRandomMatrix(int rows, int cols, std::mt19937 gen) {
+MatrixXf buildDenseRandomMatrix(int rows, int cols, std::mt19937 &gen) {
     std::normal_distribution<float> normal_dist(0, 1);
     return MatrixXf::Zero(rows, cols).unaryExpr(
             [&normal_dist, &gen](float _) -> float { return normal_dist(gen); });

@@ -78,7 +78,7 @@ static PyObject* ann(mrptIndex* self, PyObject* args) {
         return NULL;
     dim = PyList_Size(v);
     Eigen::VectorXf w(dim);
-    for (int i = 0; i < dim; i++){
+    for (int i = 0; i < dim; i++) {
         PyObject* elem = PyList_GetItem(v, i);
         w[i] = PyFloat_AsDouble(elem);
     }
@@ -97,7 +97,7 @@ static PyObject* old_ann(mrptIndex* self, PyObject* args) {
         return NULL;
     dim = PyList_Size(v);
     Eigen::VectorXf w(dim);
-    for (int i = 0; i < dim; i++){
+    for (int i = 0; i < dim; i++) {
         PyObject* elem = PyList_GetItem(v, i);
         w[i] = PyFloat_AsDouble(elem);
     }

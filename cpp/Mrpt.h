@@ -27,7 +27,7 @@ public:
     ~Mrpt() {}
     void grow();
     VectorXi query(const VectorXf& q, int k, int votes_required, int branches);
-    VectorXi query(const VectorXf& q, int k); // the old query */
+    VectorXi query(const VectorXf& q, int k); // the old query
 
 private:
     std::vector<VectorXi> grow_subtree(const VectorXi &indices, int tree_level, int i, unsigned n_tree);
@@ -79,7 +79,7 @@ VectorXi exact_knn(const MatrixXf& D, const VectorXf& D_norms, const VectorXf& q
  * @param density - Expected ratio of non-zero components in the resulting matrix.
  * @param gen - A random number engine.
  */
-SparseMatrix<float> buildSparseRandomMatrix(int rows, int cols, float density, std::mt19937 gen);
+SparseMatrix<float> buildSparseRandomMatrix(int rows, int cols, float density, std::mt19937 &gen);
 
 /*
  * Builds a random dense matrix for use in random projection. The components of
@@ -88,7 +88,7 @@ SparseMatrix<float> buildSparseRandomMatrix(int rows, int cols, float density, s
  * @param cols - The number of rows in the resulting matrix.
  * @param gen - A random number engine.
  */
-MatrixXf buildDenseRandomMatrix(int rows, int cols, std::mt19937 gen);
+MatrixXf buildDenseRandomMatrix(int rows, int cols, std::mt19937 &gen);
 
 /**
  * This class defines the elements that are stored in the priority queue for 
