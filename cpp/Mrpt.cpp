@@ -318,9 +318,11 @@ VectorXi exact_knn(const MatrixXf &D, const VectorXf &D_norms, const VectorXf &q
 
     VectorXf distances(n_cols);
     if (metric == EUCLIDEAN) {
+        #pragma omp parallel for
         for (unsigned i = 0; i < n_cols; ++i)
             distances(i) = D_norms(indices(i)) - 2 * q.dot(D.col(indices(i)));
     } else {
+        #pragma omp parallel for
         for (unsigned i = 0; i < n_cols; ++i)
             distances(i) = -q.dot(D.col(indices(i)));
     }
