@@ -348,9 +348,9 @@ VectorXi exact_knn(const MatrixXf &D, const VectorXf &D_norms, const VectorXf &q
  * Builds a random sparse matrix for use in random projection. The components of
  * the matrix are drawn from the distribution
  *
- * -sqrt(s)   w.p. 1 / 2s
- *  0         w.p. 1 - 1 / s
- * +sqrt(s)   w.p. 1 / 2s
+ * -1  w.p. 1 / 2s
+ *  0  w.p. 1 - 1 / s
+ * +1  w.p. 1 / 2s
  *
  * where s = 1 / density.
  * @param rows - The number of rows in the resulting matrix.
@@ -366,7 +366,7 @@ SparseMatrix<float> buildSparseRandomMatrix(int rows, int cols, float density, s
     for (int j = 0; j < rows; ++j) {
         for (int i = 0; i < cols; ++i) {
             if (uni_dist(gen) > density) continue;
-            float value = sqrt(1. / density) * (uni_dist(gen) <= 0.5 ? -1 : 1);
+            float value = uni_dist(gen) <= 0.5 ? -1 : 1;
             triplets.push_back(Triplet<float>(j, i, value));
         }
     }
