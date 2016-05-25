@@ -177,10 +177,12 @@ VectorXi Mrpt::query(const VectorXf &q, int k, int votes_required, int branches)
             idx_right = idx_left + 1;
             if (projected_query(j) <= split_point) {
                 idx_tree = idx_left;
-                pq.push(Gap(n_tree, idx_right, j + 1, split_point - projected_query(j)));
+                if (branches)
+                    pq.push(Gap(n_tree, idx_right, j + 1, split_point - projected_query(j)));
             } else {
                 idx_tree = idx_right;
-                pq.push(Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point));
+                if (branches)
+                    pq.push(Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point));
             }
             j++;
             split_point = split_points(idx_tree, n_tree);
