@@ -26,7 +26,7 @@ After these steps you should be able to use MRPT in Python by the following code
     data = np.array(<give a samplesize x dimensionality data set>)
     query = np.array(<give a single query object of the same dimensionality>)
 
-    index = MrptIndex(data, n0=500, n_trees=30)
+    index = MrptIndex(data, depth=10, n_trees=30)
     neighbors = index.ann(query, 10, n_extra_branches=150, n_elect=5)
 
 ## Questions
