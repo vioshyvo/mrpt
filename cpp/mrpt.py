@@ -11,7 +11,7 @@ class MRPTIndex(object):
     """
     Wraps the extension module written in C++ and ensures that the arguments are given as lists, not ndarrays.
     """
-    def __init__(self, X, n0, n_trees):
+    def __init__(self, X, depth, n_trees):
         """
         Builds the MRPT index for the input data
         :param X: Input data as a NxDim matrix
@@ -19,7 +19,7 @@ class MRPTIndex(object):
         :param n_trees: The number of trees used in the index
         :return:
         """
-        self.index = mrptlib.MrptIndex(X.tolist(), n0, n_trees)
+        self.index = mrptlib.MrptIndex(X.tolist(), depth, n_trees)
 
     def ann(self, q, k, n_extra_branches=0, votes_required=0):
         """
