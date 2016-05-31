@@ -14,8 +14,8 @@ using namespace arma;
 
 class Mrpt {
 public:
-    Mrpt(const fmat& X_, int n_trees, int n_0_, std::string id_);
-    Mrpt(const std::string X_, int n_trees, int n_0_, std::string id_);
+    Mrpt(const fmat& X_, int n_trees, int depth_, std::string id_);
+    Mrpt(const std::string X_, int n_trees, int depth_, std::string id_);
     ~Mrpt() {}
     void grow();
     uvec query(const fvec& q, int k, int votes_required, int branches);
@@ -25,7 +25,6 @@ private:
     std::vector<uvec> grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree);
     fmat X; // data matrix, col = observation, row = dimension
     int n_trees; // number of RP-trees
-    int n_0; // maximum leaf size of all the RP-trees
     int n_samples; // sample size of data
     int dim; // dimension of data
     int depth; // depth of an RP-tree with median split

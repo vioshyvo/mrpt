@@ -36,13 +36,13 @@ Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 static int
 Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
     PyObject* py_data = NULL;
-    int n0, n_trees, n, dim;
-    if (!PyArg_ParseTuple(args, "Oii", &py_data, &n0, &n_trees))
+    int depth, n_trees, n, dim;
+    if (!PyArg_ParseTuple(args, "Oii", &py_data, &depth, &n_trees))
         return -1;
     
     if (PyString_Check(py_data)){
         // Load the data matrix from file
-        self->ptr = new Mrpt(std::string(PyString_AsString(py_data)), n_trees, n0, "genericTreeID");
+        self->ptr = new Mrpt(std::string(PyString_AsString(py_data)), n_trees, depth, "genericTreeID");
     } else {
         // Load the data matrix from a nested python list
         n = PyList_Size(py_data);
@@ -53,7 +53,7 @@ Mrpt_init(mrptIndex *self, PyObject *args, PyObject *kwds) {
                 X(i, j) = PyFloat_AsDouble(PyList_GetItem(PyList_GetItem(py_data, j), i));
             }
         }
-        self->ptr = new Mrpt(X, n_trees, n0, "genericTreeID");
+        self->ptr = new Mrpt(X, n_trees, depth, "genericTreeID");
     }
     self->ptr->grow();
     return 0;

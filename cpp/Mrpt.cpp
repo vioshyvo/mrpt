@@ -16,37 +16,30 @@ using namespace arma;
 /**
  * The constructor of the index. The inputs are the data for which the index 
  * will be built and additional parameters that affect the accuracy of the NN
- * approximation. Concisely, larger n_trees_ or n_0_ values improve accuracy but
- * slow down the queries. A general rule for the right balance is not known. The
- * constructor does not actually build the trees, but that is done by a separate
- * function 'grow' that has to be called before queries can be made. 
+ * approximation. Concisely, larger n_trees_ or smaller depth values improve 
+ * accuracy but slow down the queries. A general rule for the right balance is 
+ * not known. The constructor does not actually build the trees, but that is 
+ * done by a separate function 'grow' that has to be called before queries can 
+ * be made. 
  * @param X_ - The data to be indexed. Samples as columns, features as rows.
  * @param n_trees_ - The number of trees to be used in the index.
- * @param n_0_ - The maximum leaf size to be used in the index.
+ * @param depth_ - The depth of the trees
  * @param id_ - A name used for filenames when saving.
  */
-Mrpt::Mrpt(const fmat& X_, int n_trees_, int n_0_, std::string id_) : X(X_), n_trees(n_trees_), n_0(n_0_), id(id_){
+Mrpt::Mrpt(const fmat& X_, int n_trees_, int depth_, std::string id_) : X(X_), n_trees(n_trees_), depth(depth_), id(id_){
     n_samples = X.n_cols; 
     dim = X.n_rows;
-    if (n_0 == 1) // n_0==1 => leaves have sizes 1 or 2 (b/c 0.5 is impossible)
-        depth = floor(log2(n_samples));
-    else
-        depth = ceil(log2(n_samples / n_0));
     n_pool = n_trees * depth;
     n_array = pow(2, depth + 1);
     split_points = fmat();
     random_matrix = fmat();
 }
 
-Mrpt::Mrpt(const std::string filename, int n_trees_, int n_0_, std::string id_) : n_trees(n_trees_), n_0(n_0_), id(id_){
+Mrpt::Mrpt(const std::string filename, int n_trees_, int depth_, std::string id_) : n_trees(n_trees_), depth(depth_), id(id_){
     X = fmat();
     X.load(filename);
     n_samples = X.n_cols; 
     dim = X.n_rows;
-    if (n_0 == 1) // n_0==1 => leaves have sizes 1 or 2 (b/c 0.5 is impossible)
-        depth = floor(log2(n_samples));
-    else
-        depth = ceil(log2(n_samples / n_0));
     n_pool = n_trees * depth;
     n_array = pow(2, depth + 1);
     split_points = fmat();
@@ -229,7 +222,7 @@ uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
  */
 uvec Mrpt::query(const fvec& q, int k) {
     fvec projected_query = random_matrix * q;
-    std::vector<int> idx_canditates(n_trees * n_0);
+    std::vector<int> idx_canditates(n_trees * (n_samples/pow(2, depth)));
     int j = 0;
 
 
