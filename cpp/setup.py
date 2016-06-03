@@ -7,12 +7,12 @@
 from distutils.core import setup, Extension
 
 module1 = Extension('mrptlib',
-                    sources = ['mrptmodule.cpp', 'Mrpt.cpp'],
+                    sources = ['mrptmodule.cpp'],
                     extra_compile_args = ['-I./lib', '-std=c++11', '-O3', '-march=native',
                                           '-ffast-math', '-mavx', '-mfma', '-DNDEBUG',
                                           '-Wno-deprecated-declarations', '-Wno-ignored-attributes',
-                                          '-fopenmp', '-DEIGEN_DONT_PARALLELIZE'],
-                    extra_link_args = ['-lgomp'])
+                                          '-Wno-cpp', '-fopenmp', '-DEIGEN_DONT_PARALLELIZE'],
+                    extra_link_args = ['-Wl,-z,defs', '-lgomp'])
 
 setup (name = 'mrpt',
        version = '1.0',
