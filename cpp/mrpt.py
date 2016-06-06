@@ -13,15 +13,13 @@ class MRPTIndex(object):
     """
     Wraps the extension module written in C++
     """
-    def __init__(self, data, depth, n_trees,
-                 projection_sparsity=None, metric='euclidean', shape=None, sparse=False, mmap=False):
+    def __init__(self, data, depth, n_trees, projection_sparsity=None, shape=None, sparse=False, mmap=False):
         """
         Initializes an MRPT index object.
         :param data: Input data either as a NxDim numpy ndarray or as a filepath to a binary file containing the data
         :param depth: The depth of the trees
         :param n_trees: The number of trees used in the index
         :param projection_sparsity: Expected ratio of non-zero components in a projection matrix
-        :param metric: Distance metric to use, currently euclidean or angular
         :param shape: Shape of the data as a tuple (N, dim). Needs to be specified only if loading the data from a file.
         :param sparse: Set to True if the data should be treated as sparse
         :param mmap: If true, the data is mapped into memory. Has effect only if the data is loaded from a file.
@@ -29,7 +27,9 @@ class MRPTIndex(object):
         """
         if isinstance(data, np.ndarray):
             if len(data) == 0 or len(data.shape) != 2:
-                raise ValueError("Invalid data matrix")
+                raise ValueError("Data matrix should be non-empty and two-dimensional")
+            if data.dtype != np.float32:
+                raise ValueError("Data matrix should have type float32")
             if not data.flags['C_CONTIGUOUS'] or not data.flags['ALIGNED']:
                 raise ValueError("The data matrix has to be C_CONTIGUOUS and ALIGNED")
             n_samples, dim = data.shape
@@ -55,11 +55,10 @@ class MRPTIndex(object):
         elif not 0 < projection_sparsity <= 1:
             raise ValueError("Sparsity should be in (0, 1]")
 
-        if metric not in ('euclidean', 'angular'):
-            raise ValueError("Metric must be euclidean or angular")
-        metric_val = 1 if metric == 'angular' else 0
+        if projection_sparsity < 1 and sparse:
+            raise ValueError("Combining sparse data and sparse projections is unsupported")
 
-        self.index = mrptlib.MrptIndex(data, n_samples, dim, depth, n_trees, projection_sparsity, metric_val, sparse, mmap)
+        self.index = mrptlib.MrptIndex(data, n_samples, dim, depth, n_trees, projection_sparsity, sparse, mmap)
         self.built = False
 
     def build(self):
@@ -87,6 +86,7 @@ class MRPTIndex(object):
         :return:
         """
         self.index.load(path)
+        self.built = True
 
     def ann(self, q, k, n_extra_branches=0, votes_required=1):
         """
@@ -97,6 +97,8 @@ class MRPTIndex(object):
         :param votes_required: The number of votes an object has to get to be included in the linear search part of the query.
         :return: The indices of the approximate nearest neighbors in the original input data given to the constructor.
         """
+        if not self.built:
+            raise RuntimeError("Cannot query before building index")
         return self.index.ann(q, k, votes_required, n_extra_branches)
 
     def parallel_ann(self, Q, k, n_extra_branches=0, votes_required=1):
@@ -110,6 +112,8 @@ class MRPTIndex(object):
         :return: Matrix of indices where each row contains the indices of the approximate nearest neighbors in the original
                  input data for the corresponding query.
         """
+        if not self.built:
+            raise RuntimeError("Cannot query before building index")
         return self.index.parallel_ann(Q, k, votes_required, n_extra_branches)
 
     def exact_search(self, Q, k):
@@ -121,4 +125,6 @@ class MRPTIndex(object):
         :return: Matrix of indices where each row contains the indices of the nearest neighbors in the original
                  input data for the corresponding query.
         """
+        if not self.built:
+            raise RuntimeError("Cannot query before building index")
         return self.index.exact_search(Q, k)

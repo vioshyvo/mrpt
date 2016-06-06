@@ -6,11 +6,11 @@
  * 2016                                                 *
  ********************************************************/
 
-#ifndef MRPT_H
-#define MRPT_H
+#ifndef CPP_MRPT_H_
+#define CPP_MRPT_H_
 
 #include <algorithm>
-#include <fstream>
+#include <functional>
 #include <numeric>
 #include <queue>
 #include <random>
@@ -22,24 +22,21 @@
 
 using namespace Eigen;
 
-enum Metric { EUCLIDEAN, ANGULAR };
-
 /**
- * This class defines the elements that are stored in the priority queue for 
+ * This class defines the elements that are stored in the priority queue for
  * the extra branch / priority queue trick. An instance of the class describes a
- * single node in a rp-tree in a single query. The most important field 
- * gap_width tells the difference of the split value used in this node and the 
- * projection of the query vector in this node. This is used as a criterion to 
+ * single node in a rp-tree in a single query. The most important field
+ * gap_width tells the difference of the split value used in this node and the
+ * projection of the query vector in this node. This is used as a criterion to
  * choose extra branches -- a small distance indicates that some neighbors may
- * easily end up on the other side of split. The rest of the fields are needed 
- * to start a tree traversal from the node "on the other side of the split", 
+ * easily end up on the other side of split. The rest of the fields are needed
+ * to start a tree traversal from the node "on the other side of the split",
  * and the methods are needed for sorting in the priority queue.
  */
 class Gap {
-public:
+ public:
     Gap(int tree_, int node_, int level_, double gap_width_)
-        : tree(tree_), node(node_), level(level_), gap_width(gap_width_) {
-    }
+        : tree(tree_), node(node_), level(level_), gap_width(gap_width_) { }
 
     friend bool operator<(const Gap &a, const Gap &b) {
         return a.gap_width < b.gap_width;
@@ -52,44 +49,33 @@ public:
     int tree; // The ordinal of the tree
     int node; // The node corresponding to the other side of the split
     int level; // The level in the tree where node lies
-    double gap_width; // The gap between the query projection and split value at the parent of node.
+    double gap_width; // The gap between the query projection and split value at the parent of node
 };
 
-class MrptInterface {
-public:
-    virtual ~MrptInterface() {}
-    virtual void grow() {}
-    virtual void query(const Map<VectorXf> &q, int k, int votes_required, int branches, int *out) {}
-    virtual void exact_knn(const Map<VectorXf> &q, unsigned k, const VectorXi &indices, int n_elected, int *out) {}
-    virtual void save(std::string fname) {}
-    virtual void load(std::string fname) {}
-    virtual int get_n_samples() { return 0; }
-};
-
-template<typename MatrixType> class Mrpt: public MrptInterface {
-public:
+class Mrpt {
+ public:
     /**
-    * The constructor of the index. The inputs are the data for which the index 
+    * The constructor of the index. The inputs are the data for which the index
     * will be built and additional parameters that affect the accuracy of the NN
-    * approximation. Concisely, larger n_trees_ or smaller depth values improve 
-    * accuracy but slow down the queries. A general rule for the right balance is 
-    * not known. The constructor does not actually build the trees, but that is 
-    * done by a separate function 'grow' that has to be called before queries can 
-    * be made. 
+    * approximation. Concisely, larger n_trees_ or smaller depth values improve
+    * accuracy but slow down the queries. A general rule for the right balance is
+    * not known. The constructor does not actually build the trees, but that is
+    * done by a separate function 'grow' that has to be called before queries can
+    * be made.
     * @param X_ - Pointer to a matrix containing the data.
-    * @param n_samples_ - Number of samples in the data.
-    * @param dim_ - Dimensionality of the data.
     * @param n_trees_ - The number of trees to be used in the index.
     * @param depth_ - The depth of the trees.
     * @param density_ - Expected ratio of non-zero components in a projection matrix.
-    * @param metric_ - The metric to use, currently euclidean or angular.
     */
-    explicit
-        Mrpt(MatrixType *X_, int n_samples_, int dim_, int n_trees_, int depth_, float density_, Metric metric_)
-             : X(X_), n_samples(n_samples_), dim(dim_), n_trees(n_trees_), depth(depth_), density(density_),
-               metric(metric_), n_pool(n_trees_ * depth_), n_array(2 << (depth_ + 1)) { }
+    Mrpt(const Map<MatrixXf> *X_, int n_trees_, int depth_, float density_)
+         : X(X_), Y(NULL), n_samples(X_->cols()), dim(X_->rows()), n_trees(n_trees_), depth(depth_),
+           density(density_), n_pool(n_trees_ * depth_), n_array(1 << (depth_ + 1)), sparse(false) { }
 
-    ~Mrpt() { delete X; };
+    Mrpt(const SparseMatrix<float> *Y_, int n_trees_, int depth_, float density_)
+         : X(NULL), Y(Y_), n_samples(Y_->cols()), dim(Y_->rows()), n_trees(n_trees_), depth(depth_),
+           density(density_), n_pool(n_trees_ * depth_), n_array(1 << (depth_ + 1)), sparse(true) { }
+
+    ~Mrpt() {}
 
     /**
     * The function whose call starts the actual index construction. Initializes 
@@ -98,10 +84,12 @@ public:
     * RP-tree.
     */
     void grow() {
-        if (metric == EUCLIDEAN) {
-            X_norms = VectorXf(n_samples);
+        X_norms = VectorXf(n_samples);
+        if (sparse) {
             for (int i = 0; i < n_samples; ++i)
-                X_norms(i) = X->col(i).squaredNorm();
+                X_norms(i) = Y->col(i).squaredNorm();
+        } else {
+            X_norms.noalias() = X->colwise().squaredNorm();
         }
 
         // generate the random matrix
@@ -111,15 +99,19 @@ public:
         VectorXi indices(n_samples);
         std::iota(indices.data(), indices.data() + n_samples, 0);
 
-        tree_leaves = new std::vector<VectorXi>[n_trees];
+        tree_leaves = std::vector<std::vector<VectorXi>>(n_trees);
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; n_tree++) {
             MatrixXf tree_projections;
-            if (density < 1) {
-                tree_projections.noalias() = MatrixXf(sparse_random_matrix.middleRows(n_tree * depth, depth) * *X);
+
+            if (sparse) {
+                tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *Y;
             } else {
-                tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *X;
+                if (density < 1)
+                    tree_projections.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth) * *X;
+                else
+                    tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *X;
             }
 
             std::vector<VectorXi> t = grow_subtree(indices, 0, 0, n_tree, tree_projections);
@@ -144,14 +136,20 @@ public:
     * @param out - The output buffer
     * @return 
     */
-    void query(const Map<VectorXf> &q, int k, int votes_required, int branches, int *out) {
-        VectorXf projected_query;
+    void query(const Map<VectorXf> &q, int k, int votes_required, int branches, int *out) const {
+        VectorXi elected(n_samples);
+        const int n_elected = elect((density < 1 ? sparse_random_matrix : dense_random_matrix) * q,
+                                     k, votes_required, branches, elected.data());
+        exact_knn(q, k, elected, n_elected, out);
+    }
 
-        if (density < 1)
-            projected_query.noalias() = sparse_random_matrix * q;
-        else
-            projected_query.noalias() = dense_random_matrix * q;
+    void sparse_query(const SparseMatrix<float>::ColXpr &q, int k, int votes_required, int branches, int *out) const {
+        VectorXi elected(n_samples);
+        const int n_elected = elect(dense_random_matrix * q, k, votes_required, branches, elected.data());
+        sparse_exact_knn(q, k, elected, n_elected, out);
+    }
 
+    int elect(const VectorXf &projected_query, int k, int votes_required, int branches, int *out) const {
         VectorXi votes = VectorXi::Zero(n_samples);
         std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq;
 
@@ -159,15 +157,14 @@ public:
         * The following loops over all trees, and routes the query to exactly one 
         * leaf in each.
         */
-        VectorXi elected(n_samples);
-        int n_elected = 0, j = 0; // Used to find the correct projection value, increases through all trees
+        int found_leaves[n_trees], n_elected = 0;
+        int j = 0; // Used to find the correct projection value, increases through all trees
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            int idx_tree = 0, idx_left, idx_right;
-            float split_point = split_points(0, n_tree);
-
+            int idx_tree = 0;
             for (int d = 0; d < depth; ++d) {
-                idx_left = 2 * idx_tree + 1;
-                idx_right = idx_left + 1;
+                const int idx_left = 2 * idx_tree + 1;
+                const int idx_right = idx_left + 1;
+                const float split_point = split_points(idx_tree, n_tree);
                 if (projected_query(j) <= split_point) {
                     idx_tree = idx_left;
                     if (branches)
@@ -178,13 +175,17 @@ public:
                         pq.push(Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point));
                 }
                 j++;
-                split_point = split_points(idx_tree, n_tree);
             }
+            found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
+        }
 
-            const VectorXi &idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
-            for (int i = 0; i < idx_one_tree.size(); ++i) {
-                if (++votes(idx_one_tree(i)) == votes_required) {
-                    elected(n_elected++) = idx_one_tree(i);
+        // slightly faster to do this in a separate loop
+        for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+            const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
+            const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
+            for (int i = 0; i < nn; ++i) {
+                if (++votes(data[i]) == votes_required) {
+                    out[n_elected++] = data[i];
                 }
             }
         }
@@ -196,16 +197,15 @@ public:
         */
         for (int b = 0; b < branches; ++b) {
             if (pq.empty()) break;
-            Gap gap = pq.top();
+            Gap gap(pq.top());
             pq.pop();
 
             j = gap.level;
-            int idx_tree = gap.node, idx_left, idx_right;
-            float split_point = split_points(0, gap.tree);
-
+            int idx_tree = gap.node;
             while (j % depth) {
-                idx_left = 2 * idx_tree + 1;
-                idx_right = idx_left + 1;
+                const int idx_left = 2 * idx_tree + 1;
+                const int idx_right = idx_left + 1;
+                const float split_point = split_points(idx_tree, gap.tree);
                 if (projected_query(j) <= split_point) {
                     idx_tree = idx_left;
                     pq.push(Gap(gap.tree, idx_right, j + 1, split_point - projected_query(j)));
@@ -214,13 +214,13 @@ public:
                     pq.push(Gap(gap.tree, idx_left, j + 1, projected_query(j) - split_point));
                 }
                 j++;
-                split_point = split_points(idx_tree, gap.tree);
             }
 
             const VectorXi &idx_one_tree = tree_leaves[gap.tree][idx_tree - pow(2, depth) + 1];
-            for (int i = 0; i < idx_one_tree.size(); ++i) {
-                if (++votes(idx_one_tree(i)) == votes_required) {
-                    elected(n_elected++) = idx_one_tree(i);
+            const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
+            for (int i = 0; i < nn; ++i) {
+                if (++votes(data[i]) == votes_required) {
+                    out[n_elected++] = data[i];
                 }
             }
         }
@@ -235,22 +235,22 @@ public:
             votes.maxCoeff(&max_index);
             int max_votes = votes(max_index);
 
-            int vote_count[max_votes + 1] = {0};
+            VectorXi vote_count = VectorXi::Zero(max_votes + 1);
             for (int i = 0; i < n_samples; ++i)
-                vote_count[votes(i)]++;
+                vote_count(votes(i))++;
 
             for (int would_elect = 0; max_votes; --max_votes) {
-                would_elect += vote_count[max_votes];
+                would_elect += vote_count(max_votes);
                 if (would_elect >= k) break;
             }
 
             for (int i = 0; i < n_samples; ++i) {
                 if (votes(i) >= max_votes && votes(i) < votes_required)
-                    elected(n_elected++) = i;
+                    out[n_elected++] = i;
             }
         }
 
-        exact_knn(q, k, elected, n_elected, out);
+        return n_elected;
     }
 
     /**
@@ -261,104 +261,124 @@ public:
     * @param out - output buffer
     * @return
     */
-    void exact_knn(const Map<VectorXf> &q, unsigned k, const VectorXi &indices, int n_elected, int *out) {
+    void exact_knn(const Map<VectorXf> &q,
+                   int k, const VectorXi &indices, int n_elected, int *out) const {
         VectorXf distances(n_elected);
 
-        if (metric == EUCLIDEAN) {
-            for (unsigned i = 0; i < n_elected; ++i)
-                distances(i) = X_norms(indices(i)) - 2 * X->col(indices(i)).dot(q);
+        if (sparse) {
+            for (int i = 0; i < n_elected; ++i)
+                distances(i) = X_norms(indices(i)) - 2 * Y->col(indices(i)).dot(q);
         } else {
-            for (unsigned i = 0; i < n_elected; ++i)
-                distances(i) = -X->col(indices(i)).dot(q);
+            for (int i = 0; i < n_elected; ++i)
+                distances(i) = X_norms(indices(i)) - 2 * X->col(indices(i)).dot(q);
         }
 
         if (k == 1) {
             MatrixXf::Index index;
             distances.minCoeff(&index);
-            out[0] = (int) indices(index);
+            out[0] = indices(index);
         }
 
-        VectorXi idx(distances.size());
-        std::iota(idx.data(), idx.data() + idx.size(), 0);
-        std::partial_sort(idx.data(), idx.data() + k, idx.data() + idx.size(),
-                          [&distances](size_t i1, size_t i2) {return distances(i1) < distances(i2);});
+        VectorXi idx(n_elected);
+        std::iota(idx.data(), idx.data() + n_elected, 0);
+        std::nth_element(idx.data(), idx.data() + k, idx.data() + n_elected,
+                         [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
-        for (unsigned i = 0; i < k; ++i) out[i] = indices(idx(i));
+        for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
+    }
+
+    void sparse_exact_knn(const SparseMatrix<float>::ColXpr &q,
+                          int k, const VectorXi &indices, int n_elected, int *out) const {
+        VectorXf distances(n_elected);
+        for (int i = 0; i < n_elected; ++i)
+            distances(i) = X_norms(indices(i)) - 2 * Y->col(indices(i)).dot(q);
+
+        if (k == 1) {
+            MatrixXf::Index index;
+            distances.minCoeff(&index);
+            out[0] = indices(index);
+        }
+
+        VectorXi idx(n_elected);
+        std::iota(idx.data(), idx.data() + n_elected, 0);
+        std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_elected,
+                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
+
+        for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
     }
 
     /**
     * Saves the index to a file.
     * @param path - Filepath to the output file.
     */
-    void save(std::string path) {
-        std::ofstream file(path.c_str(), std::ios::out | std::ios::binary);
-        file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+    bool save(const char *path) const {
+        FILE *fd;
+        if ((fd = fopen(path, "wb")) == NULL) {
+            return false;
+        }
 
-        file.write(reinterpret_cast<const char *>(X_norms.data()), sizeof(float) * X_norms.size());
-        file.write(reinterpret_cast<const char *>(split_points.data()),
-                sizeof(float) * split_points.cols() * split_points.rows());
+        fwrite(X_norms.data(), sizeof(float), n_samples, fd);
+        fwrite(split_points.data(), sizeof(float), n_array * n_trees, fd);
 
         // save tree leaves
         for (int i = 0; i < n_trees; ++i) {
             int sz = tree_leaves[i].size();
-            file.write(reinterpret_cast<const char *>(&sz), sizeof(sz));
+            fwrite(&sz, sizeof(sz), 1, fd);
             for (int j = 0; j < sz; ++j) {
                 int lsz = tree_leaves[i][j].size();
-                file.write(reinterpret_cast<const char *>(&lsz), sizeof(lsz));
-                file.write(reinterpret_cast<const char *>(tree_leaves[i][j].data()),
-                        sizeof(int) * tree_leaves[i][j].size());
+                fwrite(&lsz, sizeof(lsz), 1, fd);
+                fwrite(tree_leaves[i][j].data(), sizeof(int), lsz, fd);
             }
         }
 
         // save random matrix
         if (density < 1) {
             int non_zeros = sparse_random_matrix.nonZeros();
-            file.write(reinterpret_cast<const char *>(&non_zeros), sizeof(non_zeros));
+            fwrite(&non_zeros, sizeof(non_zeros), 1, fd);
             for (int k = 0; k < sparse_random_matrix.outerSize(); ++k) {
                 for (SparseMatrix<float>::InnerIterator it(sparse_random_matrix, k); it; ++it) {
                     float val = it.value();
                     int row = it.row(), col = it.col();
-                    file.write(reinterpret_cast<const char *>(&row), sizeof(row));
-                    file.write(reinterpret_cast<const char *>(&col), sizeof(col));
-                    file.write(reinterpret_cast<const char *>(&val), sizeof(val));
+                    fwrite(&row, sizeof(row), 1, fd);
+                    fwrite(&col, sizeof(col), 1, fd);
+                    fwrite(&val, sizeof(val), 1, fd);
                 }
             }
         } else {
-            file.write(reinterpret_cast<const char *>(dense_random_matrix.data()),
-                    sizeof(float) * dense_random_matrix.cols() * dense_random_matrix.rows());
+            fwrite(dense_random_matrix.data(), sizeof(float), n_pool * dim, fd);
         }
 
-        file.close();
+        fclose(fd);
+        return true;
     }
 
     /**
     * Loads the index from a file.
     * @param path - Filepath to the index file.
     */
-    void load(std::string path) {
-        std::ifstream file(path.c_str(), std::ios::in | std::ios::binary);
-        file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    bool load(const char *path) {
+        FILE *fd;
+        if ((fd = fopen(path, "rb")) == NULL)
+            return false;
 
         X_norms = VectorXf(n_samples);
-        file.read(reinterpret_cast<char *>(X_norms.data()), n_samples * sizeof(float));
+        fread(X_norms.data(), sizeof(float), n_samples, fd);
 
-        MatrixXf splits = MatrixXf(n_array, n_trees);
-        file.read(reinterpret_cast<char *>(splits.data()), sizeof(float) * n_array * n_trees);
-        split_points = splits;
+        split_points = MatrixXf(n_array, n_trees);
+        fread(split_points.data(), sizeof(float), n_array * n_trees, fd);
 
         // load tree leaves
-        tree_leaves = new std::vector<VectorXi>[n_trees];
+        tree_leaves = std::vector<std::vector<VectorXi>>(n_trees);
         for (int i = 0; i < n_trees; ++i) {
             int sz;
-            file.read(reinterpret_cast<char *>(&sz), sizeof(int));
-            std::vector<VectorXi> leaves;
-            leaves.reserve(sz);
+            fread(&sz, sizeof(sz), 1, fd);
+            std::vector<VectorXi> leaves(sz);
             for (int j = 0; j < sz; ++j) {
                 int leaf_size;
-                file.read(reinterpret_cast<char *>(&leaf_size), sizeof(int));
-                VectorXi samples = VectorXi(leaf_size);
-                file.read(reinterpret_cast<char *>(samples.data()), sizeof(int) * leaf_size);
-                leaves.push_back(samples);
+                fread(&leaf_size, sizeof(leaf_size), 1, fd);
+                VectorXi samples(leaf_size);
+                fread(samples.data(), sizeof(int), leaf_size, fd);
+                leaves[j] = samples;
             }
             tree_leaves[i] = leaves;
         }
@@ -366,32 +386,31 @@ public:
         // load random matrix
         if (density < 1) {
             int non_zeros;
-            file.read(reinterpret_cast<char *>(&non_zeros), sizeof(int));
+            fread(&non_zeros, sizeof(non_zeros), 1, fd);
 
             sparse_random_matrix = SparseMatrix<float>(n_pool, dim);
-            std::vector<Triplet<float> > triplets;
+            std::vector<Triplet<float>> triplets;
             for (int k = 0; k < non_zeros; ++k) {
                 int row, col;
-                float value;
-                file.read(reinterpret_cast<char *>(&row), sizeof(int));
-                file.read(reinterpret_cast<char *>(&col), sizeof(int));
-                file.read(reinterpret_cast<char *>(&value), sizeof(float));
-                triplets.push_back(Triplet<float>(row, col, value));
+                float val;
+                fread(&row, sizeof(&row), 1, fd);
+                fread(&col, sizeof(&col), 1, fd);
+                fread(&val, sizeof(&val), 1, fd);
+                triplets.push_back(Triplet<float>(row, col, val));
             }
 
             sparse_random_matrix.setFromTriplets(triplets.begin(), triplets.end());
             sparse_random_matrix.makeCompressed();
         } else {
-            dense_random_matrix.resize(n_pool, dim);
-            file.read(reinterpret_cast<char *>(dense_random_matrix.data()), sizeof(float) * n_pool * dim);
+            dense_random_matrix = MatrixXf(n_pool, dim);
+            fread(dense_random_matrix.data(), sizeof(float), n_pool * dim, fd);
         }
 
-        file.close();
+        fclose(fd);
+        return true;
     }
 
-    int get_n_samples() { return n_samples; }
-
-private:
+ private:
     /**
     * Builds a single random projection tree. The tree is constructed by recursively
     * projecting the data on a random vector and splitting into two by the median.
@@ -402,7 +421,7 @@ private:
     * @param tree_projections - Precalculated projection values for the current tree
     * @return The leaves as a vector of VectorXis
     */
-    std::vector<VectorXi> grow_subtree(const VectorXi &indices, int tree_level, int i, unsigned n_tree, const MatrixXf &tree_projections) {
+    std::vector<VectorXi> grow_subtree(const VectorXi &indices, int tree_level, int i, int n_tree, const MatrixXf &tree_projections) {
         int n = indices.size();
         int idx_left = 2 * i + 1;
         int idx_right = idx_left + 1;
@@ -421,14 +440,14 @@ private:
         VectorXi ordered(n);
         std::iota(ordered.data(), ordered.data() + n, 0);
         std::sort(ordered.data(), ordered.data() + ordered.size(),
-                [&projections](size_t i1, size_t i2) {return projections(i1) < projections(i2);});
+                [&projections](int i1, int i2) {return projections(i1) < projections(i2);});
 
-        int split_point = n % 2 ? n / 2 : n / 2 - 1; // median split
+        int split_point = (n % 2) ? n / 2 : n / 2 - 1; // median split
         int idx_split_point = ordered(split_point);
         int idx_split_point2 = ordered(split_point + 1);
 
-        split_points(i, n_tree) = n % 2 ? projections(idx_split_point) :
-                                (projections(idx_split_point) + projections(idx_split_point2)) / 2;
+        split_points(i, n_tree) = (n % 2) ? projections(idx_split_point) :
+                                  (projections(idx_split_point) + projections(idx_split_point2)) / 2;
         VectorXi left_indices = ordered.head(split_point + 1);
         VectorXi right_indices = ordered.tail(n - split_point - 1);
 
@@ -463,7 +482,7 @@ private:
         std::mt19937 gen(rd());
         std::uniform_real_distribution<float> uni_dist(0, 1);
 
-        std::vector<Triplet<float> > triplets;
+        std::vector<Triplet<float>> triplets;
         for (int j = 0; j < n_pool; ++j) {
             for (int i = 0; i < dim; ++i) {
                 if (uni_dist(gen) > density) continue;
@@ -491,21 +510,23 @@ private:
                       [&normal_dist, &gen] { return normal_dist(gen); });
     }
 
-    const MatrixType *X; // the data matrix
+    const Map<MatrixXf> *X; // the data matrix
+    const SparseMatrix<float> *Y; // the data matrix
     VectorXf X_norms; // cache norms of the observations in X for distance calculations
     MatrixXf split_points; // all split points in all trees
-    std::vector<VectorXi> *tree_leaves; // contains all leaves of all trees, indexed as tree_leaves[tree number][leaf number][index in leaf]
+    std::vector<std::vector<VectorXi>> tree_leaves; // contains all leaves of all trees,
+                                                    // indexed as tree_leaves[tree number][leaf number][index in leaf]
     MatrixXf dense_random_matrix; // random vectors needed for all the RP-trees
     SparseMatrix<float> sparse_random_matrix; // random vectors needed for all the RP-trees
 
     const int n_samples; // sample size of data
-    const int n_trees; // number of RP-trees
     const int dim; // dimension of data
+    const int n_trees; // number of RP-trees
     const int depth; // depth of an RP-tree with median split
+    const float density; // expected ratio of non-zero components in a projection matrix
     const int n_pool; // amount of random vectors needed for all the RP-trees
     const int n_array; // length of the one RP-tree as array
-    const float density; // expected ratio of non-zero components in a projection matrix
-    const Metric metric; // the metric to use, currently euclidean or angular
+    const bool sparse; // whether the data is sparse or not
 };
 
-#endif /* MRPT_H */
+#endif // CPP_MRPT_H_

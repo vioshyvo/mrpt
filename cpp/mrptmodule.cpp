@@ -11,134 +11,135 @@
  */
 
 #include "Python.h"
-#include <cstdio>
-#include <cstdlib>
-#include <string>
-#include <numeric>
-#include <fstream>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <cstdio>
+#include <cstdlib>
+#include <numeric>
+#include <string>
+#include <vector>
+#include <memory>
 #include "Mrpt.h"
 
 #include "numpy/arrayobject.h"
 
 #include <Eigen/Dense>
+#include <Eigen/SparseCore>
+
+using Eigen::MatrixXf;
+using Eigen::SparseMatrix;
+using Eigen::VectorXf;
+using Eigen::VectorXi;
 
 typedef struct {
     PyObject_HEAD
-    MrptInterface* ptr;
+    Mrpt *ptr;
+    float *data;
+    bool mmap;
+    int n;
+    int dim;
+    bool sparse;
 } mrptIndex;
-
-struct { PyObject *err; std::string str; } errors[] =
-{
-    {PyExc_IOError, "Could not open input file"},
-    {PyExc_ValueError, "Size of the input file is not N * dim"},
-    {PyExc_IOError, "Failed to mmap data"},
-    {PyExc_MemoryError, "Failed to allocate enough memory"},
-    {PyExc_IOError, "Unable to save index"},
-    {PyExc_IOError, "Unable to load saved index"},
-
-};
-
-static void handle_exception(int e) {
-    PyErr_SetString(errors[e - 1].err, errors[e - 1].str.c_str());
-}
 
 static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
     mrptIndex *self;
-    self = (mrptIndex *) type->tp_alloc(type, 0);
+    self = reinterpret_cast<mrptIndex *>(type->tp_alloc(type, 0));
     if (self != NULL) {
         self->ptr = NULL;
+        self->data = NULL;
     }
-    return (PyObject *) self;
+    return reinterpret_cast<PyObject *>(self);
 }
 
 float *read_memory(char *file, int n, int dim) {
-    float *data;
-    try {
-        data = new float[n * dim];
-    } catch (std::bad_alloc &ba) {
-        throw 4;
-    }
+    float *data = new float[n * dim];
 
-    try {
-        std::ifstream in(file, std::ios::in | std::ios::binary);
-        in.read(reinterpret_cast<char *>(data), n * dim * sizeof(float));
-        in.close();
-    } catch (std::exception &e) {
-        throw 1;
-    }
+    FILE *fd;
+    if ((fd = fopen(file, "rb")) == NULL)
+        return NULL;
 
+    int read = fread(data, sizeof(float), n * dim, fd);
+    if (read != n * dim)
+        return NULL;
+
+    fclose(fd);
     return data;
 }
 
 float *read_mmap(char *file, int n, int dim) {
     FILE *fd;
     if ((fd = fopen(file, "rb")) == NULL)
-        throw 1;
+        return NULL;
 
     float *data;
-    if ((data = (float *) mmap(0, n * dim * sizeof(float), PROT_READ,
-                               MAP_SHARED | MAP_POPULATE, fileno(fd), 0)) == MAP_FAILED) {
-        throw 3;
+    if ((data = reinterpret_cast<float *>(
+                    mmap(0, n * dim * sizeof(float), PROT_READ,
+                         MAP_SHARED | MAP_POPULATE, fileno(fd), 0))) == MAP_FAILED) {
+        return NULL;
     }
 
+    fclose(fd);
     return data;
-}
-
-void check_size(char *file, int n, int dim) {
-    struct stat sb;
-    if (stat(file, &sb) != 0)
-        throw 1;
-
-    if (sb.st_size != sizeof(float) * dim * n) {
-        throw 2;
-    }
 }
 
 static int Mrpt_init(mrptIndex *self, PyObject *args) {
     PyObject *py_data;
-    int depth, n_trees, n, dim, mmap, sparse, metric_val;
+    int depth, n_trees, n, dim, mmap, sparse;
     float density;
 
-    if (!PyArg_ParseTuple(args, "Oiiiifiii", &py_data, &n, &dim, &depth, &n_trees, &density, &metric_val, &sparse, &mmap))
+    if (!PyArg_ParseTuple(args, "Oiiiifii", &py_data, &n, &dim, &depth, &n_trees, &density, &sparse, &mmap))
         return -1;
 
     float *data;
     if (PyString_Check(py_data)) {
-        try {
-            char *file = PyString_AsString(py_data);
-            check_size(file, n, dim);
-            data = mmap ? read_mmap(file, n, dim) : read_memory(file, n, dim);
-        } catch (int e) {
-            handle_exception(e);
+        char *file = PyString_AsString(py_data);
+
+        struct stat sb;
+        if (stat(file, &sb) != 0) {
+            PyErr_SetString(PyExc_IOError, strerror(errno));
             return -1;
         }
+
+        if (sb.st_size != static_cast<unsigned>(sizeof(float) * dim * n)) {
+            PyErr_SetString(PyExc_ValueError, "Size of the input is not N x dim");
+            return -1;
+        }
+
+        data = mmap ? read_mmap(file, n, dim) : read_memory(file, n, dim);
+        if (data == NULL) {
+            PyErr_SetString(PyExc_IOError, "Unable to read data from file or allocate memory for it");
+            return -1;
+        }
+
+        self->mmap = mmap;
+        self->data = data;
     } else {
-        data = (float *) PyArray_DATA(py_data);
+        data = reinterpret_cast<float *>(PyArray_DATA(py_data));
     }
 
-    Metric metric = static_cast<Metric>(metric_val);
+    self->n = n;
+    self->dim = dim;
+    self->sparse = sparse;
+
     if (sparse) {
         SparseMatrix<float> *X = new SparseMatrix<float>(dim, n);
-        std::vector<Triplet<float> > triplets;
+        std::vector<Eigen::Triplet<float> > triplets;
         for (int i = 0; i < n; ++i) {
             for (int j = 0; j < dim; ++j) {
                 float val = data[i * dim + j];
                 if (val != 0) {
-                    triplets.push_back(Triplet<float>(j, i, val));
+                    triplets.push_back(Eigen::Triplet<float>(j, i, val));
                 }
             }
         }
 
         X->setFromTriplets(triplets.begin(), triplets.end());
         X->makeCompressed();
-
-        self->ptr = new Mrpt<SparseMatrix<float>>(X, n, dim, n_trees, depth, density, metric);
+        self->ptr = new Mrpt(X, n_trees, depth, density);
     } else {
-        Map<MatrixXf> *X = new Map<MatrixXf>(data, dim, n);
-        self->ptr = new Mrpt<Map<MatrixXf>>(X, n, dim, n_trees, depth, density, metric);
+        const Eigen::Map<MatrixXf> *X = new Eigen::Map<MatrixXf>(data, dim, n);
+        self->ptr = new Mrpt(X, n_trees, depth, density);
     }
 
     return 0;
@@ -150,12 +151,18 @@ static PyObject *build(mrptIndex *self) {
 }
 
 static void mrpt_dealloc(mrptIndex *self) {
+    if (self->data) {
+        if (self->mmap)
+            munmap(self->data, self->n * self->dim * sizeof(float));
+        else
+            delete[] self->data;
+    }
     if (self->ptr)
         delete self->ptr;
-    self->ob_type->tp_free((PyObject*) self);
+    self->ob_type->tp_free(reinterpret_cast<PyObject *>(self));
 }
 
-static PyObject *ann(mrptIndex *self, PyObject *args) { 
+static PyObject *ann(mrptIndex *self, PyObject *args) {
     PyObject *v;
     int k, elect, branches, dim;
 
@@ -163,14 +170,24 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
         return NULL;
 
     dim = PyArray_DIM(v, 0);
-    float *indata = (float *) PyArray_DATA(v);
+    float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
 
     // create a numpy array to hold the output
     npy_intp dims[1] = {k};
     PyObject *ret = PyArray_SimpleNew(1, dims, NPY_INT);
-    int *outdata = (int *) PyArray_DATA(ret);
+    int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-    self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, branches, outdata);
+    if (self->sparse) {
+        Eigen::SparseMatrix<float> sparse_hack(dim, 1);
+        std::vector<Eigen::Triplet<float>> triplets;
+        for (int j = 0; j < dim; ++j)
+            if (indata[j]) triplets.push_back(Eigen::Triplet<float>(j, 0, indata[j]));
+        sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
+        self->ptr->sparse_query(sparse_hack.col(0), k, elect, branches, outdata);
+    } else {
+        self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, branches, outdata);
+    }
+
     return ret;
 }
 
@@ -183,17 +200,29 @@ static PyObject *parallel_ann(mrptIndex *self, PyObject *args) {
 
     n = PyArray_DIM(v, 0);
     dim = PyArray_DIM(v, 1);
-    float *indata = (float *) PyArray_DATA(v);
+    float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
 
     // create a numpy array to hold the output
     npy_intp dims[2] = {n, k};
     PyObject *ret = PyArray_SimpleNew(2, dims, NPY_INT);
-    int *outdata = (int *) PyArray_DATA(ret);
+    int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-    #pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-        self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim),
-                         k, elect, branches, outdata + i * k);
+    if (self->sparse) {
+        #pragma omp parallel for
+        for (int i = 0; i < n; ++i) {
+            Eigen::SparseMatrix<float> sparse_hack(dim, 1);
+            std::vector<Eigen::Triplet<float>> triplets;
+            for (int j = 0; j < dim; ++j)
+                if (indata[i * dim + j])
+                    triplets.push_back(Eigen::Triplet<float>(j, 0, indata[i * dim + j]));
+            sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
+            self->ptr->sparse_query(sparse_hack.col(0), k, elect, branches, outdata + i * k);
+        }
+    } else {
+        #pragma omp parallel for
+        for (int i = 0; i < n; ++i) {
+            self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, branches, outdata + i * k);
+        }
     }
 
     return ret;
@@ -208,20 +237,32 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
 
     n = PyArray_DIM(v, 0);
     dim = PyArray_DIM(v, 1);
-    float *indata = (float *) PyArray_DATA(v);
+    float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
 
     // create a numpy array to hold the output
     npy_intp dims[2] = {n, k};
     PyObject *ret = PyArray_SimpleNew(2, dims, NPY_INT);
-    int *outdata = (int *) PyArray_DATA(ret);
+    int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-    VectorXi indices(self->ptr->get_n_samples());
-    std::iota(indices.data(), indices.data() + self->ptr->get_n_samples(), 0);
+    VectorXi indices(self->n);
+    std::iota(indices.data(), indices.data() + self->n, 0);
 
-    #pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-        self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim),
-                             k, indices, indices.size(), outdata + i * k);
+    if (self->sparse) {
+        #pragma omp parallel for
+        for (int i = 0; i < n; ++i) {
+            Eigen::SparseMatrix<float> sparse_hack(dim, 1);
+            std::vector<Eigen::Triplet<float>> triplets;
+            for (int j = 0; j < dim; ++j)
+                if (indata[i * dim + j])
+                    triplets.push_back(Eigen::Triplet<float>(j, 0, indata[i * dim + j]));
+            sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
+            self->ptr->sparse_exact_knn(sparse_hack.col(0), k, indices, indices.size(), outdata + i * k);
+        }
+    } else {
+        #pragma omp parallel for
+        for (int i = 0; i < n; ++i) {
+            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim), k, indices, indices.size(), outdata + i * k);
+        }
     }
 
     return ret;
@@ -233,10 +274,8 @@ static PyObject *save(mrptIndex *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "s", &fn))
         return NULL;
 
-    try {
-        self->ptr->save(fn);
-    } catch (std::exception &e) {
-        handle_exception(5);
+    if (!self->ptr->save(fn)) {
+        PyErr_SetString(PyExc_IOError, "Unable to save index to file");
         return NULL;
     }
 
@@ -249,10 +288,8 @@ static PyObject *load(mrptIndex *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "s", &fn))
         return NULL;
 
-    try {
-        self->ptr->load(fn);
-    } catch (std::exception &e) {
-        handle_exception(6);
+    if (!self->ptr->load(fn)) {
+        PyErr_SetString(PyExc_IOError, "Unable to load index from file");
         return NULL;
     }
 
@@ -329,5 +366,5 @@ PyMODINIT_FUNC initmrptlib(void) {
     import_array();
 
     Py_INCREF(&MrptIndexType);
-    PyModule_AddObject(m, "MrptIndex", (PyObject*) &MrptIndexType);
+    PyModule_AddObject(m, "MrptIndex", reinterpret_cast<PyObject *>(&MrptIndexType));
 }
