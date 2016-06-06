@@ -123,7 +123,7 @@ double2 ppolygamma<double2>(const double2& n, const double2& x)
 template<> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
 float4 perf<float4>(const float4& a)
 {
-  return make_float4(erf(a.x), erf(a.y), erf(a.z), erf(a.w));
+  return make_float4(erff(a.x), erff(a.y), erff(a.z), erff(a.w));
 }
 
 template<> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
@@ -135,7 +135,7 @@ double2 perf<double2>(const double2& a)
 template<> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
 float4 perfc<float4>(const float4& a)
 {
-  return make_float4(erfc(a.x), erfc(a.y), erfc(a.z), erfc(a.w));
+  return make_float4(erfcf(a.x), erfcf(a.y), erfcf(a.z), erfcf(a.w));
 }
 
 template<> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
@@ -179,6 +179,24 @@ double2 pigammac<double2>(const double2& a, const double2& x)
 {
   using numext::igammac;
   return make_double2(igammac(a.x, x.x), igammac(a.y, x.y));
+}
+
+template<> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
+float4 pbetainc<float4>(const float4& a, const float4& b, const float4& x)
+{
+  using numext::betainc;
+  return make_float4(
+      betainc(a.x, b.x, x.x),
+      betainc(a.y, b.y, x.y),
+      betainc(a.z, b.z, x.z),
+      betainc(a.w, b.w, x.w));
+}
+
+template<> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
+double2 pbetainc<double2>(const double2& a, const double2& b, const double2& x)
+{
+  using numext::betainc;
+  return make_double2(betainc(a.x, b.x, x.x), betainc(a.y, b.y, x.y));
 }
 
 #endif

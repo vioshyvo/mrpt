@@ -62,6 +62,7 @@ struct default_packet_traits
     HasRsqrt  = 0,
     HasExp    = 0,
     HasLog    = 0,
+    HasLog1p  = 0,
     HasLog10  = 0,
     HasPow    = 0,
 
@@ -82,6 +83,7 @@ struct default_packet_traits
     HasErfc = 0,
     HasIGamma = 0,
     HasIGammac = 0,
+    HasBetaInc = 0,
 
     HasRound  = 0,
     HasFloor  = 0,
@@ -346,22 +348,6 @@ template<typename Packet> EIGEN_DEVICE_FUNC inline typename unpacket_traits<Pack
 template<typename Packet> EIGEN_DEVICE_FUNC inline Packet preverse(const Packet& a)
 { return a; }
 
-template<size_t offset, typename Packet>
-struct protate_impl
-{
-  // Empty so attempts to use this unimplemented path will fail to compile.
-  // Only specializations of this template should be used.
-};
-
-/** \internal \returns a packet with the coefficients rotated to the right in little-endian convention,
-  * by the given offset, e.g. for offset == 1:
-  *     (packet[3], packet[2], packet[1], packet[0]) becomes (packet[0], packet[3], packet[2], packet[1])
-  */
-template<size_t offset, typename Packet> EIGEN_DEVICE_FUNC inline Packet protate(const Packet& a)
-{
-  return offset ? protate_impl<offset, Packet>::run(a) : a;
-}
-
 /** \internal \returns \a a with real and imaginary part flipped (for complex type only) */
 template<typename Packet> EIGEN_DEVICE_FUNC inline Packet pcplxflip(const Packet& a)
 {
@@ -418,6 +404,10 @@ Packet pexp(const Packet& a) { using std::exp; return exp(a); }
 /** \internal \returns the log of \a a (coeff-wise) */
 template<typename Packet> EIGEN_DECLARE_FUNCTION_ALLOWING_MULTIPLE_DEFINITIONS
 Packet plog(const Packet& a) { using std::log; return log(a); }
+
+/** \internal \returns the log1p of \a a (coeff-wise) */
+template<typename Packet> EIGEN_DECLARE_FUNCTION_ALLOWING_MULTIPLE_DEFINITIONS
+Packet plog1p(const Packet& a) { return numext::log1p(a); }
 
 /** \internal \returns the log10 of \a a (coeff-wise) */
 template<typename Packet> EIGEN_DECLARE_FUNCTION_ALLOWING_MULTIPLE_DEFINITIONS
@@ -476,6 +466,10 @@ Packet pigamma(const Packet& a, const Packet& x) { using numext::igamma; return 
 /** \internal \returns the complementary incomplete gamma function igammac(\a a, \a x) */
 template<typename Packet> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
 Packet pigammac(const Packet& a, const Packet& x) { using numext::igammac; return igammac(a, x); }
+
+/** \internal \returns the complementary incomplete gamma function betainc(\a a, \a b, \a x) */
+template<typename Packet> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
+Packet pbetainc(const Packet& a, const Packet& b,const Packet& x) { using numext::betainc; return betainc(a, b, x); }
 
 /***************************************************************************
 * The following functions might not have to be overwritten for vectorized types

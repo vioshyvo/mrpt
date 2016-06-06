@@ -27,6 +27,16 @@ namespace internal {
   * we however don't want to add a dependency to Boost.
   */
 
+// Only recent versions of ICC complain about using ptrdiff_t to hold pointers,
+// and older versions do not provide *intptr_t types.
+#if EIGEN_COMP_ICC>=1600
+typedef std::intptr_t  IntPtr;
+typedef std::uintptr_t UIntPtr;
+#else
+typedef std::ptrdiff_t IntPtr;
+typedef std::size_t UIntPtr;
+#endif
+
 struct true_type {  enum { value = 1 }; };
 struct false_type { enum { value = 0 }; };
 
@@ -115,7 +125,14 @@ private:
 
 public:
   static From ms_from;
+#ifdef __INTEL_COMPILER
+  #pragma warning push
+  #pragma warning ( disable : 2259 )
+#endif
   enum { value = sizeof(test(ms_from, 0))==sizeof(yes) };
+#ifdef __INTEL_COMPILER
+  #pragma warning pop
+#endif
 };
 
 template<typename From, typename To>
@@ -254,7 +271,7 @@ protected:
   * upcoming next STL generation (using a templated result member).
   * If none of these members is provided, then the type of the first argument is returned. FIXME, that behavior is a pretty bad hack.
   */
-#ifdef EIGEN_HAS_STD_RESULT_OF
+#if EIGEN_HAS_STD_RESULT_OF
 template<typename T> struct result_of {
   typedef typename std::result_of<T>::type type1;
   typedef typename remove_all<type1>::type type;

@@ -11,7 +11,9 @@
 #define EIGEN_MATHFUNCTIONS_H
 
 // source: http://www.geom.uiuc.edu/~huberty/math5337/groupe/digits.html
-#define EIGEN_PI 3.141592653589793238462643383279502884197169399375105820974944592307816406
+// TODO this should better be moved to NumTraits
+#define EIGEN_PI 3.141592653589793238462643383279502884197169399375105820974944592307816406L
+
 
 namespace Eigen {
 
@@ -825,7 +827,7 @@ template<>
 EIGEN_DEVICE_FUNC
 EIGEN_ALWAYS_INLINE float mini(const float& x, const float& y)
 {
-  return fmin(x, y);
+  return fminf(x, y);
 }
 template<typename T>
 EIGEN_DEVICE_FUNC
@@ -837,7 +839,7 @@ template<>
 EIGEN_DEVICE_FUNC
 EIGEN_ALWAYS_INLINE float maxi(const float& x, const float& y)
 {
-  return fmax(x, y);
+  return fmaxf(x, y);
 }
 #endif
 
@@ -847,7 +849,7 @@ EIGEN_DEVICE_FUNC
 inline EIGEN_MATHFUNC_RETVAL(real, Scalar) real(const Scalar& x)
 {
   return EIGEN_MATHFUNC_IMPL(real, Scalar)::run(x);
-}  
+}
 
 template<typename Scalar>
 EIGEN_DEVICE_FUNC
