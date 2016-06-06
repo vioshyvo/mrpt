@@ -21,8 +21,9 @@ After these steps you should be able to use MRPT in Python by the following code
     data = np.array(<give a samplesize x dimensionality data set>)
     query = np.array(<give a single query object of the same dimensionality>)
 
-    index = MRPTIndex(data, n0=500, n_trees=30)
-    neighbors = index.ann(query, 10, n_extra_branches=150, n_elect=5)
+    index = MRPTIndex(data, depth=8, n_trees=30)
+    index.build()
+    neighbors = index.ann(query, 10, votes_required=5, n_extra_branches=150)
 
 ## Questions
 Feel free to contact: teemu.pitkanen'at'cs.helsinki.fi 
