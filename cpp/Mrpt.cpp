@@ -124,47 +124,22 @@ std::vector<uvec> Mrpt::grow_subtree(const uvec &indices, int tree_level, int i,
  * data set for which the index was built.
  */
 uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
-    
+    // Compute projections for all levels in all trees
+    // initialize pq and vote-count vector
     fvec projected_query = random_matrix * q;
     uvec votes = zeros<uvec>(n_samples);
     std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq;
+    int j;
     
-    /*
-     * The following loops over all trees, and routes the query to exactly one 
-     * leaf in each.
-     */
-    int j = 0; // Used to find the correct projection value, increases through all trees
-    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        const fvec& tree = split_points.unsafe_col(n_tree);
-
-        double split_point = tree[0];
-        int idx_left, idx_right;
-        int idx_tree = 0;
-
-        while (split_point) {
-            idx_left = 2 * idx_tree + 1;
-            idx_right = idx_left + 1;
-            if (projected_query(j) <= split_point) {
-                idx_tree = idx_left;
-                pq.push(Gap(n_tree, idx_right, j+1, split_point-projected_query(j)));
-            } else {
-                idx_tree = idx_right;
-                pq.push(Gap(n_tree, idx_left, j+1, projected_query(j)-split_point));
-            }
-            j++;
-            split_point = tree[idx_tree];
-        }
-        const uvec& idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
-        for (int idx : idx_one_tree)
-            votes[idx]++;
+    // First push RP tree roots to priority queue with negative gap widths 
+    // (will be handled before extra branches)
+    for (int n_tree = 0; n_tree < n_trees; n_tree++){
+        pq.push(Gap(n_tree, 0, n_tree*depth, -1));
     }
-    
-    /*
-     * The following loop routes the query to extra leaves in the same trees 
-     * handled already once above. The extra branches are popped from the 
-     * priority queue and routed down the tree just as new root-to-leaf queries.
-     */
-    for (int b = 0; b < branches; b++){
+  
+    // The tree traversal phase. At first the top of the queue will contain the 
+    // 'n_trees' tree roots, after which 'b' extra branches will be explored
+    for (int b = 0; b < branches + n_trees; b++){
         if (pq.empty()) break;
         Gap gap = pq.top();
         pq.pop();
@@ -194,7 +169,7 @@ uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
             votes[idx]++;
     } 
     
-    // Choose the objects with enough votes...
+    // The election phase. Choose the objects with enough votes.
     uvec elected(n_samples);
     do { 
         j = 0;
@@ -204,9 +179,13 @@ uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
                 j++;
             }
         }
-        votes_required--; // If not enough objects with enough votes, decrease the requirement
+        // If not enough objects (at least k required) with enough votes 
+        // decrease vote count requirement
+        votes_required--;
     } while(j < k);
     elected.resize(j);
+    
+    // The linear search phase
     return exact_knn(X, q, k, elected);
 }
 
