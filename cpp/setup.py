@@ -5,17 +5,35 @@
 #
 
 from distutils.core import setup, Extension
+import os
+import numpy
+import sys
 
-module1 = Extension('mrptlib',
-                    sources = ['mrptmodule.cpp'],
-                    extra_compile_args = ['-std=c++11', '-Wall', '-O3', '-march=native', '-ffast-math',
-                                          '-s', '-mavx', '-mfma', '-Wno-deprecated-declarations',
-                                          '-Wno-ignored-attributes', '-Wno-cpp', '-fopenmp',
-                                          '-fno-rtti', '-fno-stack-protector', '-fno-exceptions',
-                                          '-DNDEBUG', '-DEIGEN_DONT_PARALLELIZE', '-I./lib'],
-                    extra_link_args = ['-Wl,-z,defs', '-lgomp'])
+if sys.platform == 'darwin':
+    # A quick fix to make this work on my mac -Teemu
+    os.environ["CC"] = "g++-6"
+    os.environ["CXX"] = "g++-6"
+    module1 = Extension('mrptlib',
+                        sources=['mrptmodule.cpp'],
+                        extra_compile_args=['-std=c++11', '-Wall', '-O3', '-march=native', '-ffast-math',
+                                              '-s', '-mavx', '-mfma', '-Wno-deprecated-declarations',
+                                              '-Wno-ignored-attributes', '-Wno-cpp', '-fopenmp',
+                                              '-fno-rtti', '-fno-stack-protector', '-fno-exceptions',
+                                              '-DNDEBUG', '-DEIGEN_DONT_PARALLELIZE', '-I./lib'],
+                        extra_link_args=['-lgomp'],  # NEED TO CHECK HOW THE REMOVED OPTIONS AFFECT
+                        include_dirs=[numpy.get_include()])
 
-setup (name = 'mrpt',
-       version = '1.0',
-       description = 'This is a module for mrpt approximate nearest neighbor search',
-       ext_modules = [module1])
+else:
+    module1 = Extension('mrptlib',
+                        sources=['mrptmodule.cpp'],
+                        extra_compile_args=['-std=c++11', '-Wall', '-O3', '-march=native', '-ffast-math',
+                                              '-s', '-mavx', '-mfma', '-Wno-deprecated-declarations',
+                                              '-Wno-ignored-attributes', '-Wno-cpp', '-fopenmp',
+                                              '-fno-rtti', '-fno-stack-protector', '-fno-exceptions',
+                                              '-DNDEBUG', '-DEIGEN_DONT_PARALLELIZE', '-I./lib'],
+                        extra_link_args = ['-Wl,-z,defs', '-lgomp'])
+
+setup(name='mrpt',
+      version='1.0',
+      description='This is a module for mrpt approximate nearest neighbor search',
+      ext_modules=[module1])
