@@ -72,12 +72,12 @@ float *read_mmap(char *file, int n, int dim) {
     float *data;
 
     if ((data = reinterpret_cast<float *> (
-#ifdef __APPLE_CC__
-            mmap(0, n * dim * sizeof (float), PROT_READ,
-            MAP_SHARED, fileno(fd), 0))) == MAP_FAILED) {
-#else
-            mmap(0, n * dim * sizeof (float), PROT_READ,
+#ifdef MAP_POPULATE
+            mmap(0, n * dim * sizeof(float), PROT_READ,
             MAP_SHARED | MAP_POPULATE, fileno(fd), 0))) == MAP_FAILED) {
+#else
+            mmap(0, n * dim * sizeof(float), PROT_READ,
+            MAP_SHARED, fileno(fd), 0))) == MAP_FAILED) {
 #endif
             return NULL;
     }
