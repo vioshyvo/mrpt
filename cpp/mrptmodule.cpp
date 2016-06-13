@@ -25,10 +25,8 @@
 #include "numpy/arrayobject.h"
 
 #include <Eigen/Dense>
-#include <Eigen/SparseCore>
 
 using Eigen::MatrixXf;
-using Eigen::SparseMatrix;
 using Eigen::VectorXf;
 using Eigen::VectorXi;
 
@@ -39,7 +37,6 @@ typedef struct {
     bool mmap;
     int n;
     int dim;
-    bool sparse;
 } mrptIndex;
 
 static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
@@ -91,10 +88,10 @@ float *read_mmap(char *file, int n, int dim) {
 
 static int Mrpt_init(mrptIndex *self, PyObject *args) {
     PyObject *py_data;
-    int depth, n_trees, n, dim, mmap, sparse;
+    int depth, n_trees, n, dim, mmap;
     float density;
 
-    if (!PyArg_ParseTuple(args, "Oiiiifii", &py_data, &n, &dim, &depth, &n_trees, &density, &sparse, &mmap))
+    if (!PyArg_ParseTuple(args, "Oiiiifi", &py_data, &n, &dim, &depth, &n_trees, &density, &mmap))
         return -1;
 
     float *data;
@@ -126,27 +123,9 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
 
     self->n = n;
     self->dim = dim;
-    self->sparse = sparse;
 
-    if (sparse) {
-        SparseMatrix<float> *X = new SparseMatrix<float>(dim, n);
-        std::vector<Eigen::Triplet<float> > triplets;
-        for (int i = 0; i < n; ++i) {
-            for (int j = 0; j < dim; ++j) {
-                float val = data[i * dim + j];
-                if (val != 0) {
-                    triplets.push_back(Eigen::Triplet<float>(j, i, val));
-                }
-            }
-        }
-
-        X->setFromTriplets(triplets.begin(), triplets.end());
-        X->makeCompressed();
-        self->ptr = new Mrpt(X, n_trees, depth, density);
-    } else {
-        const Eigen::Map<MatrixXf> *X = new Eigen::Map<MatrixXf>(data, dim, n);
-        self->ptr = new Mrpt(X, n_trees, depth, density);
-    }
+    const Eigen::Map<MatrixXf> *X = new Eigen::Map<MatrixXf>(data, dim, n);
+    self->ptr = new Mrpt(X, n_trees, depth, density);
 
     return 0;
 }
@@ -183,17 +162,7 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
     PyObject *ret = PyArray_SimpleNew(1, dims, NPY_INT);
     int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-    if (self->sparse) {
-        Eigen::SparseMatrix<float> sparse_hack(dim, 1);
-        std::vector<Eigen::Triplet<float>> triplets;
-        for (int j = 0; j < dim; ++j)
-            if (indata[j]) triplets.push_back(Eigen::Triplet<float>(j, 0, indata[j]));
-        sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
-        self->ptr->sparse_query(sparse_hack.col(0), k, elect, branches, outdata);
-    } else {
-        self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, branches, outdata);
-    }
-
+    self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, branches, outdata);
     return ret;
 }
 
@@ -213,22 +182,9 @@ static PyObject *parallel_ann(mrptIndex *self, PyObject *args) {
     PyObject *ret = PyArray_SimpleNew(2, dims, NPY_INT);
     int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-    if (self->sparse) {
-        #pragma omp parallel for
-        for (int i = 0; i < n; ++i) {
-            Eigen::SparseMatrix<float> sparse_hack(dim, 1);
-            std::vector<Eigen::Triplet<float>> triplets;
-            for (int j = 0; j < dim; ++j)
-                if (indata[i * dim + j])
-                    triplets.push_back(Eigen::Triplet<float>(j, 0, indata[i * dim + j]));
-            sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
-            self->ptr->sparse_query(sparse_hack.col(0), k, elect, branches, outdata + i * k);
-        }
-    } else {
-        #pragma omp parallel for
-        for (int i = 0; i < n; ++i) {
-            self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, branches, outdata + i * k);
-        }
+    #pragma omp parallel for
+    for (int i = 0; i < n; ++i) {
+        self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, branches, outdata + i * k);
     }
 
     return ret;
@@ -253,22 +209,9 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
     VectorXi indices(self->n);
     std::iota(indices.data(), indices.data() + self->n, 0);
 
-    if (self->sparse) {
-        #pragma omp parallel for
-        for (int i = 0; i < n; ++i) {
-            Eigen::SparseMatrix<float> sparse_hack(dim, 1);
-            std::vector<Eigen::Triplet<float>> triplets;
-            for (int j = 0; j < dim; ++j)
-                if (indata[i * dim + j])
-                    triplets.push_back(Eigen::Triplet<float>(j, 0, indata[i * dim + j]));
-            sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
-            self->ptr->sparse_exact_knn(sparse_hack.col(0), k, indices, indices.size(), outdata + i * k);
-        }
-    } else {
-        #pragma omp parallel for
-        for (int i = 0; i < n; ++i) {
-            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim), k, indices, indices.size(), outdata + i * k);
-        }
+    #pragma omp parallel for
+    for (int i = 0; i < n; ++i) {
+        self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim), k, indices, indices.size(), outdata + i * k);
     }
 
     return ret;

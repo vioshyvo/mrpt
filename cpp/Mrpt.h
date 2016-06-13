@@ -69,11 +69,7 @@ class Mrpt {
     */
     Mrpt(const Map<MatrixXf> *X_, int n_trees_, int depth_, float density_)
          : X(X_), Y(NULL), n_samples(X_->cols()), dim(X_->rows()), n_trees(n_trees_), depth(depth_),
-           density(density_), n_pool(n_trees_ * depth_), n_array(1 << (depth_ + 1)), sparse(false) { }
-
-    Mrpt(const SparseMatrix<float> *Y_, int n_trees_, int depth_, float density_)
-         : X(NULL), Y(Y_), n_samples(Y_->cols()), dim(Y_->rows()), n_trees(n_trees_), depth(depth_),
-           density(density_), n_pool(n_trees_ * depth_), n_array(1 << (depth_ + 1)), sparse(true) { }
+           density(density_), n_pool(n_trees_ * depth_), n_array(1 << (depth_ + 1)) { }
 
     ~Mrpt() {}
 
@@ -84,13 +80,7 @@ class Mrpt {
     * RP-tree.
     */
     void grow() {
-        X_norms = VectorXf(n_samples);
-        if (sparse) {
-            for (int i = 0; i < n_samples; ++i)
-                X_norms(i) = Y->col(i).squaredNorm();
-        } else {
-            X_norms.noalias() = X->colwise().squaredNorm();
-        }
+        X_norms = X->colwise().squaredNorm();
 
         // generate the random matrix
         density < 1 ? build_sparse_random_matrix() : build_dense_random_matrix();
@@ -105,14 +95,10 @@ class Mrpt {
         for (int n_tree = 0; n_tree < n_trees; n_tree++) {
             MatrixXf tree_projections;
 
-            if (sparse) {
-                tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *Y;
-            } else {
-                if (density < 1)
-                    tree_projections.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth) * *X;
-                else
-                    tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *X;
-            }
+            if (density < 1)
+                tree_projections.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth) * *X;
+            else
+                tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *X;
 
             std::vector<VectorXi> t = grow_subtree(indices, 0, 0, n_tree, tree_projections);
             tree_leaves[n_tree] = t;
@@ -141,12 +127,6 @@ class Mrpt {
         const int n_elected = elect((density < 1 ? sparse_random_matrix : dense_random_matrix) * q,
                                      k, votes_required, branches, elected.data());
         exact_knn(q, k, elected, n_elected, out);
-    }
-
-    void sparse_query(const SparseMatrix<float>::ColXpr &q, int k, int votes_required, int branches, int *out) const {
-        VectorXi elected(n_samples);
-        const int n_elected = elect(dense_random_matrix * q, k, votes_required, branches, elected.data());
-        sparse_exact_knn(q, k, elected, n_elected, out);
     }
 
     int elect(const VectorXf &projected_query, int k, int votes_required, int branches, int *out) const {
@@ -264,14 +244,8 @@ class Mrpt {
     void exact_knn(const Map<VectorXf> &q,
                    int k, const VectorXi &indices, int n_elected, int *out) const {
         VectorXf distances(n_elected);
-
-        if (sparse) {
-            for (int i = 0; i < n_elected; ++i)
-                distances(i) = X_norms(indices(i)) - 2 * Y->col(indices(i)).dot(q);
-        } else {
-            for (int i = 0; i < n_elected; ++i)
-                distances(i) = X_norms(indices(i)) - 2 * X->col(indices(i)).dot(q);
-        }
+        for (int i = 0; i < n_elected; ++i)
+            distances(i) = X_norms(indices(i)) - 2 * X->col(indices(i)).dot(q);
 
         if (k == 1) {
             MatrixXf::Index index;
@@ -283,26 +257,6 @@ class Mrpt {
         std::iota(idx.data(), idx.data() + n_elected, 0);
         std::nth_element(idx.data(), idx.data() + k, idx.data() + n_elected,
                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
-
-        for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
-    }
-
-    void sparse_exact_knn(const SparseMatrix<float>::ColXpr &q,
-                          int k, const VectorXi &indices, int n_elected, int *out) const {
-        VectorXf distances(n_elected);
-        for (int i = 0; i < n_elected; ++i)
-            distances(i) = X_norms(indices(i)) - 2 * Y->col(indices(i)).dot(q);
-
-        if (k == 1) {
-            MatrixXf::Index index;
-            distances.minCoeff(&index);
-            out[0] = indices(index);
-        }
-
-        VectorXi idx(n_elected);
-        std::iota(idx.data(), idx.data() + n_elected, 0);
-        std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_elected,
-                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
         for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
     }
@@ -526,7 +480,6 @@ class Mrpt {
     const float density; // expected ratio of non-zero components in a projection matrix
     const int n_pool; // amount of random vectors needed for all the RP-trees
     const int n_array; // length of the one RP-tree as array
-    const bool sparse; // whether the data is sparse or not
 };
 
 #endif // CPP_MRPT_H_
