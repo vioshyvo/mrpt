@@ -97,21 +97,6 @@ class MRPTIndex(object):
             raise RuntimeError("Cannot query before building index")
         return self.index.ann(q, k, votes_required, n_extra_branches)
 
-    def parallel_ann(self, Q, k, n_extra_branches=0, votes_required=1):
-        """
-        Parallel version of the MRPT approximate nearest neighbor query for performing several
-        queries at once. The queries are given as a numpy matrix where each row contains a query.
-        :param Q: The query matrix, i.e. a matrix where each row is a vector whose nearest neighbors are searched for
-        :param k: The number of neighbors the user wants the query to return
-        :param n_extra_branches: The number of extra branches to be explored by the priority queue trick
-        :param votes_required: The number of votes an object has to get to be included in the linear search part of the query.
-        :return: Matrix of indices where each row contains the indices of the approximate nearest neighbors in the original
-                 input data for the corresponding query.
-        """
-        if not self.built:
-            raise RuntimeError("Cannot query before building index")
-        return self.index.parallel_ann(Q, k, votes_required, n_extra_branches)
-
     def exact_search(self, Q, k):
         """
         Performs an exact nearest neighbor query for several queries in parallel. The queries are
@@ -121,6 +106,4 @@ class MRPTIndex(object):
         :return: Matrix of indices where each row contains the indices of the nearest neighbors in the original
                  input data for the corresponding query.
         """
-        if not self.built:
-            raise RuntimeError("Cannot query before building index")
         return self.index.exact_search(Q, k)

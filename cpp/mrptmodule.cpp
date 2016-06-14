@@ -149,42 +149,32 @@ static void mrpt_dealloc(mrptIndex *self) {
 
 static PyObject *ann(mrptIndex *self, PyObject *args) {
     PyObject *v;
-    int k, elect, branches, dim;
+    int k, elect, branches, dim, n;
 
     if (!PyArg_ParseTuple(args, "Oiii", &v, &k, &elect, &branches))
         return NULL;
 
-    dim = PyArray_DIM(v, 0);
     float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
+    PyObject *ret;
 
-    // create a numpy array to hold the output
-    npy_intp dims[1] = {k};
-    PyObject *ret = PyArray_SimpleNew(1, dims, NPY_INT);
-    int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
+    if (PyArray_NDIM(v) == 1) {
+        dim = PyArray_DIM(v, 0);
 
-    self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, branches, outdata);
-    return ret;
-}
+        npy_intp dims[1] = {k};
+        ret = PyArray_SimpleNew(1, dims, NPY_INT);
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-static PyObject *parallel_ann(mrptIndex *self, PyObject *args) {
-    PyObject *v;
-    int k, n, elect, branches, dim;
+        self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, branches, outdata);
+    } else {
+        n = PyArray_DIM(v, 0);
+        dim = PyArray_DIM(v, 1);
 
-    if (!PyArg_ParseTuple(args, "Oiii", &v, &k, &elect, &branches))
-        return NULL;
+        npy_intp dims[2] = {n, k};
+        ret = PyArray_SimpleNew(2, dims, NPY_INT);
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-    n = PyArray_DIM(v, 0);
-    dim = PyArray_DIM(v, 1);
-    float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
-
-    // create a numpy array to hold the output
-    npy_intp dims[2] = {n, k};
-    PyObject *ret = PyArray_SimpleNew(2, dims, NPY_INT);
-    int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
-
-    #pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-        self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, branches, outdata + i * k);
+        for (int i = 0; i < n; ++i)
+            self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, branches, outdata + i * k);
     }
 
     return ret;
@@ -197,21 +187,30 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "Oi", &v, &k))
         return NULL;
 
-    n = PyArray_DIM(v, 0);
-    dim = PyArray_DIM(v, 1);
     float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
+    PyObject *ret;
 
-    // create a numpy array to hold the output
-    npy_intp dims[2] = {n, k};
-    PyObject *ret = PyArray_SimpleNew(2, dims, NPY_INT);
-    int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
+    VectorXi idx(self->n);
+    std::iota(idx.data(), idx.data() + self->n, 0);
 
-    VectorXi indices(self->n);
-    std::iota(indices.data(), indices.data() + self->n, 0);
+    if (PyArray_NDIM(v) == 1) {
+        dim = PyArray_DIM(v, 0);
 
-    #pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-        self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim), k, indices, indices.size(), outdata + i * k);
+        npy_intp dims[1] = {k};
+        ret = PyArray_SimpleNew(1, dims, NPY_INT);
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
+
+        self->ptr->exact_knn(Eigen::Map<VectorXf>(indata, dim), k, idx, self->n, outdata);
+    } else {
+        n = PyArray_DIM(v, 0);
+        dim = PyArray_DIM(v, 1);
+
+        npy_intp dims[2] = {n, k};
+        ret = PyArray_SimpleNew(2, dims, NPY_INT);
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
+
+        for (int i = 0; i < n; ++i)
+            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim), k, idx, self->n, outdata + i * k);
     }
 
     return ret;
@@ -248,8 +247,6 @@ static PyObject *load(mrptIndex *self, PyObject *args) {
 static PyMethodDef MrptMethods[] = {
     {"ann", (PyCFunction) ann, METH_VARARGS,
             "Return approximate nearest neighbors"},
-    {"parallel_ann", (PyCFunction) parallel_ann, METH_VARARGS,
-            "Return approximate nearest neighbors calculated in parallel"},
     {"exact_search", (PyCFunction) exact_search, METH_VARARGS,
             "Return exact nearest neighbors"},
     {"build", (PyCFunction) build, METH_VARARGS,

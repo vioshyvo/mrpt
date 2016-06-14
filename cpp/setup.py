@@ -20,7 +20,7 @@ module1 = Extension('mrptlib',
                                         '-s', '-mavx', '-mfma', '-Wno-deprecated-declarations',
                                         '-Wno-ignored-attributes', '-Wno-cpp', '-fopenmp',
                                         '-fno-rtti', '-fno-stack-protector', '-fno-exceptions',
-                                        '-DNDEBUG', '-DEIGEN_DONT_PARALLELIZE', '-I./lib'],
+                                        '-DNDEBUG', '-I./lib'],
                     extra_link_args=['-lgomp', '-lpython2.7'],
                     include_dirs=[numpy.get_include()])
 

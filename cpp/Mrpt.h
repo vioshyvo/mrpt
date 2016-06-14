@@ -68,7 +68,7 @@ class Mrpt {
     * @param density_ - Expected ratio of non-zero components in a projection matrix.
     */
     Mrpt(const Map<MatrixXf> *X_, int n_trees_, int depth_, float density_)
-         : X(X_), Y(NULL), n_samples(X_->cols()), dim(X_->rows()), n_trees(n_trees_), depth(depth_),
+         : X(X_), n_samples(X_->cols()), dim(X_->rows()), n_trees(n_trees_), depth(depth_),
            density(density_), n_pool(n_trees_ * depth_), n_array(1 << (depth_ + 1)) { }
 
     ~Mrpt() {}
@@ -123,49 +123,48 @@ class Mrpt {
     * @return 
     */
     void query(const Map<VectorXf> &q, int k, int votes_required, int branches, int *out) const {
-        VectorXi elected(n_samples);
-        const int n_elected = elect((density < 1 ? sparse_random_matrix : dense_random_matrix) * q,
-                                     k, votes_required, branches, elected.data());
-        exact_knn(q, k, elected, n_elected, out);
-    }
-
-    int elect(const VectorXf &projected_query, int k, int votes_required, int branches, int *out) const {
-        VectorXi votes = VectorXi::Zero(n_samples);
         std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq;
+        VectorXf projected_query = (density < 1 ? sparse_random_matrix : dense_random_matrix) * q;
+
+        int found_leaves[n_trees];
+        const bool threads = omp_get_max_threads() > 1;
 
         /*
         * The following loops over all trees, and routes the query to exactly one 
         * leaf in each.
         */
-        int found_leaves[n_trees], n_elected = 0;
-        int j = 0; // Used to find the correct projection value, increases through all trees
+        #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
             int idx_tree = 0;
             for (int d = 0; d < depth; ++d) {
+                const int j = n_tree * depth + d;
                 const int idx_left = 2 * idx_tree + 1;
                 const int idx_right = idx_left + 1;
                 const float split_point = split_points(idx_tree, n_tree);
                 if (projected_query(j) <= split_point) {
                     idx_tree = idx_left;
-                    if (branches)
+                    if (branches && !threads)
                         pq.push(Gap(n_tree, idx_right, j + 1, split_point - projected_query(j)));
                 } else {
                     idx_tree = idx_right;
-                    if (branches)
+                    if (branches && !threads)
                         pq.push(Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point));
                 }
-                j++;
             }
             found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
         }
 
-        // slightly faster to do this in a separate loop
+        int n_elected = 0, max_leaf_size = n_samples / (1 << depth) + 1;
+        VectorXi elected(n_trees * max_leaf_size);
+        VectorXi votes = VectorXi::Zero(n_samples);
+
+        // count votes
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
             const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
             for (int i = 0; i < nn; ++i) {
                 if (++votes(data[i]) == votes_required) {
-                    out[n_elected++] = data[i];
+                    elected(n_elected++) = data[i];
                 }
             }
         }
@@ -175,12 +174,12 @@ class Mrpt {
         * handled already once above. The extra branches are popped from the 
         * priority queue and routed down the tree just as new root-to-leaf queries.
         */
-        for (int b = 0; b < branches; ++b) {
+        for (int b = 0; !threads && b < branches; ++b) {
             if (pq.empty()) break;
             Gap gap(pq.top());
             pq.pop();
 
-            j = gap.level;
+            int j = gap.level;
             int idx_tree = gap.node;
             while (j % depth) {
                 const int idx_left = 2 * idx_tree + 1;
@@ -196,11 +195,11 @@ class Mrpt {
                 j++;
             }
 
-            const VectorXi &idx_one_tree = tree_leaves[gap.tree][idx_tree - pow(2, depth) + 1];
+            const VectorXi &idx_one_tree = tree_leaves[gap.tree][idx_tree - (1 << depth) + 1];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
             for (int i = 0; i < nn; ++i) {
                 if (++votes(data[i]) == votes_required) {
-                    out[n_elected++] = data[i];
+                    elected(n_elected++) = data[i];
                 }
             }
         }
@@ -226,11 +225,11 @@ class Mrpt {
 
             for (int i = 0; i < n_samples; ++i) {
                 if (votes(i) >= max_votes && votes(i) < votes_required)
-                    out[n_elected++] = i;
+                    elected(n_elected++) = i;
             }
         }
 
-        return n_elected;
+        exact_knn(q, k, elected, n_elected, out);
     }
 
     /**
@@ -241,9 +240,10 @@ class Mrpt {
     * @param out - output buffer
     * @return
     */
-    void exact_knn(const Map<VectorXf> &q,
-                   int k, const VectorXi &indices, int n_elected, int *out) const {
+    void exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices, int n_elected, int *out) const {
         VectorXf distances(n_elected);
+
+        #pragma omp parallel for
         for (int i = 0; i < n_elected; ++i)
             distances(i) = X_norms(indices(i)) - 2 * X->col(indices(i)).dot(q);
 
@@ -251,6 +251,7 @@ class Mrpt {
             MatrixXf::Index index;
             distances.minCoeff(&index);
             out[0] = indices(index);
+            return;
         }
 
         VectorXi idx(n_elected);
@@ -465,7 +466,6 @@ class Mrpt {
     }
 
     const Map<MatrixXf> *X; // the data matrix
-    const SparseMatrix<float> *Y; // the data matrix
     VectorXf X_norms; // cache norms of the observations in X for distance calculations
     MatrixXf split_points; // all split points in all trees
     std::vector<std::vector<VectorXi>> tree_leaves; // contains all leaves of all trees,
