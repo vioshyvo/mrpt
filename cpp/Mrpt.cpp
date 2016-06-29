@@ -189,47 +189,6 @@ uvec Mrpt::query(const fvec& q, int k, int votes_required, int branches) {
     return exact_knn(X, q, k, elected);
 }
 
-/**
- * This function implements the barebones MRPT algorithm and finds the k 
- * approximate nearest neighbors of the query object q using multiple random 
- * projection trees. The accuracy of the query depends on the parameters used 
- * for index construction. Separated from the function above for optimal performance.
- * @param q - The query object whose neighbors the function finds.
- * @param k - The number of neighbors the user wants the function to return
- * @return The indices of the k approximate nearest neighbors in the original
- * data set for which the index was built.
- */
-uvec Mrpt::query(const fvec& q, int k) {
-    fvec projected_query = random_matrix * q;
-    std::vector<int> idx_canditates(n_trees * (n_samples/pow(2, depth)));
-    int j = 0;
-
-
-    for (int n_tree = 0; n_tree < n_trees; n_tree++) {
-        const fvec& tree = split_points.unsafe_col(n_tree);
-
-        double split_point = tree[0];
-        int idx_left, idx_right;
-        int idx_tree = 0;
-
-        while (split_point) {
-            idx_left = 2 * idx_tree + 1;
-            idx_right = idx_left + 1;
-            idx_tree = projected_query(j++) <= split_point ? idx_left : idx_right;
-            split_point = tree[idx_tree];
-        }
-        
-        const uvec& idx_one_tree = tree_leaves[n_tree][idx_tree - pow(2, depth) + 1];
-        idx_canditates.insert(idx_canditates.begin(), idx_one_tree.begin(), idx_one_tree.end());
-    }
-
-    std::sort(idx_canditates.begin(), idx_canditates.end());
-    auto last = std::unique(idx_canditates.begin(), idx_canditates.end());
-    idx_canditates.erase(last, idx_canditates.end());
-
-    return exact_knn(X, q, k, conv_to<uvec>::from(idx_canditates));
-}
-
 
 /**
  * find k nearest neighbors from data for the query point

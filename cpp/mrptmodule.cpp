@@ -86,29 +86,8 @@ static PyObject* ann(mrptIndex* self, PyObject* args) {
     return l;
 }
 
-static PyObject* old_ann(mrptIndex* self, PyObject* args) { 
-    PyObject* v;
-    int k, dim;
-    if (!PyArg_ParseTuple(args, "Oi", &v, &k))
-        return NULL;
-    dim = PyList_Size(v);
-    arma::fvec w(dim);
-    for (int i = 0; i < dim; i++){
-        PyObject* elem = PyList_GetItem(v, i);
-        w[i] = PyFloat_AsDouble(elem);
-    }
-    arma::uvec neighbors = self->ptr->query(w, k);
-    
-    PyObject* l = PyList_New(k);
-    for (size_t i = 0; i < k; i++)
-        PyList_SetItem(l, i, PyInt_FromLong(neighbors[i]));
-    return l;
-}
-
 static PyMethodDef MrptMethods[] = {
     {"ann", (PyCFunction) ann, METH_VARARGS, 
-            "Return approximate nearest neighbors"},
-    {"old_ann", (PyCFunction) old_ann, METH_VARARGS, 
             "Return approximate nearest neighbors"},
     {NULL, NULL, 0, NULL} /* Sentinel */
 };

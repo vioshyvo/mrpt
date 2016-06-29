@@ -21,7 +21,7 @@ class MRPTIndex(object):
         """
         self.index = mrptlib.MrptIndex(X.tolist(), depth, n_trees)
 
-    def ann(self, q, k, n_extra_branches=0, votes_required=0):
+    def ann(self, q, k, n_extra_branches=0, votes_required=1):
         """
         The MRPT approximate nearest neighbor query.
         :param q: The query object, ie. the vector whose nearest neighbors are searched for
@@ -30,6 +30,4 @@ class MRPTIndex(object):
         :param votes_required: The number of votes an object has to get to be included in the linear search part of the query.
         :return: The indices of the approximate nearest neighbors in the original input data given to the constructor.
         """
-        if votes_required == 0 and n_extra_branches == 0:
-            return self.index.old_ann(q.tolist(), k)  # <--- Avoids some overhead in case voting is not employed
         return self.index.ann(q.tolist(), k, votes_required, n_extra_branches)

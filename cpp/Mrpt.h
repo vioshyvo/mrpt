@@ -19,7 +19,6 @@ public:
     ~Mrpt() {}
     void grow();
     uvec query(const fvec& q, int k, int votes_required, int branches);
-    uvec query(const fvec& q, int k); // the old query
 
 private:
     std::vector<uvec> grow_subtree(const uvec &indices, int tree_level, int i, uword n_tree);
