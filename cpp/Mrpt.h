@@ -292,7 +292,7 @@ class Mrpt {
             int non_zeros = sparse_random_matrix.nonZeros();
             fwrite(&non_zeros, sizeof(non_zeros), 1, fd);
             for (int k = 0; k < sparse_random_matrix.outerSize(); ++k) {
-                for (SparseMatrix<float>::InnerIterator it(sparse_random_matrix, k); it; ++it) {
+                for (SparseMatrix<float, RowMajor>::InnerIterator it(sparse_random_matrix, k); it; ++it) {
                     float val = it.value();
                     int row = it.row(), col = it.col();
                     fwrite(&row, sizeof(row), 1, fd);
@@ -429,7 +429,7 @@ class Mrpt {
     * where s = 1 / density.
     */
     void build_sparse_random_matrix() {
-        sparse_random_matrix = SparseMatrix<float>(n_pool, dim);
+        sparse_random_matrix = SparseMatrix<float, RowMajor>(n_pool, dim);
 
         std::random_device rd;
         std::mt19937 gen(rd());
@@ -468,7 +468,7 @@ class Mrpt {
     std::vector<std::vector<VectorXi>> tree_leaves; // contains all leaves of all trees,
                                                     // indexed as tree_leaves[tree number][leaf number][index in leaf]
     MatrixXf dense_random_matrix; // random vectors needed for all the RP-trees
-    SparseMatrix<float> sparse_random_matrix; // random vectors needed for all the RP-trees
+    SparseMatrix<float, RowMajor> sparse_random_matrix; // random vectors needed for all the RP-trees
 
     const int n_samples; // sample size of data
     const int dim; // dimension of data
