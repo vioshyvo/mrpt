@@ -35,6 +35,8 @@ using namespace Eigen;
  */
 class Gap {
  public:
+    Gap() { }
+
     Gap(int tree_, int node_, int level_, double gap_width_)
         : tree(tree_), node(node_), level(level_), gap_width(gap_width_) { }
 
@@ -121,11 +123,14 @@ class Mrpt {
     * @return 
     */
     void query(const Map<VectorXf> &q, int k, int votes_required, int branches, int *out) const {
-        std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq;
-        VectorXf projected_query = (density < 1 ? sparse_random_matrix : dense_random_matrix) * q;
+        VectorXf projected_query(n_pool);
+        if (density < 1)
+            projected_query.noalias() = sparse_random_matrix * q;
+        else
+            projected_query.noalias() = dense_random_matrix * q;
 
         int found_leaves[n_trees];
-        const bool threads = omp_get_max_threads() > 1;
+        Gap found_branches[n_trees * depth];
 
         /*
         * The following loops over all trees, and routes the query to exactly one 
@@ -141,12 +146,10 @@ class Mrpt {
                 const float split_point = split_points(idx_tree, n_tree);
                 if (projected_query(j) <= split_point) {
                     idx_tree = idx_left;
-                    if (branches && !threads)
-                        pq.push(Gap(n_tree, idx_right, j + 1, split_point - projected_query(j)));
+                    found_branches[n_tree * depth + d] = Gap(n_tree, idx_right, j + 1, split_point - projected_query(j));
                 } else {
                     idx_tree = idx_right;
-                    if (branches && !threads)
-                        pq.push(Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point));
+                    found_branches[n_tree * depth + d] = Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point);
                 }
             }
             found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
@@ -160,26 +163,28 @@ class Mrpt {
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
             const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
-            for (int i = 0; i < nn; ++i) {
+            for (int i = 0; i < nn; ++i, ++data) {
                 if (++votes(data[i]) == votes_required) {
-                    elected(n_elected++) = data[i];
+                    elected(n_elected++) = *data;
                 }
             }
         }
+
+        std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq(found_branches, found_branches + n_trees * depth);
 
         /*
         * The following loop routes the query to extra leaves in the same trees 
         * handled already once above. The extra branches are popped from the 
         * priority queue and routed down the tree just as new root-to-leaf queries.
         */
-        for (int b = 0; !threads && b < branches; ++b) {
+        for (int b = 0; b < branches; ++b) {
             if (pq.empty()) break;
             Gap gap(pq.top());
             pq.pop();
 
             int j = gap.level;
             int idx_tree = gap.node;
-            while (j % depth) {
+            for (; j % depth; ++j) {
                 const int idx_left = 2 * idx_tree + 1;
                 const int idx_right = idx_left + 1;
                 const float split_point = split_points(idx_tree, gap.tree);
@@ -190,14 +195,13 @@ class Mrpt {
                     idx_tree = idx_right;
                     pq.push(Gap(gap.tree, idx_left, j + 1, projected_query(j) - split_point));
                 }
-                j++;
             }
 
             const VectorXi &idx_one_tree = tree_leaves[gap.tree][idx_tree - (1 << depth) + 1];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
-            for (int i = 0; i < nn; ++i) {
+            for (int i = 0; i < nn; ++i, ++data) {
                 if (++votes(data[i]) == votes_required) {
-                    elected(n_elected++) = data[i];
+                    elected(n_elected++) = *data;
                 }
             }
         }
