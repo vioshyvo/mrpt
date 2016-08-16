@@ -69,7 +69,7 @@ class Mrpt {
     * @param depth_ - The depth of the trees.
     * @param density_ - Expected ratio of non-zero components in a projection matrix.
     */
-    Mrpt(const Map<MatrixXf> *X_, int n_trees_, int depth_, float density_) :
+    Mrpt(const Map<const MatrixXf> *X_, int n_trees_, int depth_, float density_) :
         X(X_),
         n_samples(X_->cols()),
         dim(X_->rows()),
@@ -98,7 +98,7 @@ class Mrpt {
         tree_leaves = std::vector<std::vector<VectorXi>>(n_trees);
 
         #pragma omp parallel for
-        for (int n_tree = 0; n_tree < n_trees; n_tree++) {
+        for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
             MatrixXf tree_projections;
 
             if (density < 1)
@@ -178,13 +178,15 @@ class Mrpt {
             }
         }
 
-        std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>> pq(found_branches, found_branches + n_trees * depth);
-
         /*
         * The following loop routes the query to extra leaves in the same trees 
         * handled already once above. The extra branches are popped from the 
         * priority queue and routed down the tree just as new root-to-leaf queries.
         */
+
+        std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>>
+            pq(found_branches, found_branches + n_trees * depth);
+
         for (int b = 0; b < branches; ++b) {
             if (pq.empty()) break;
             Gap gap(pq.top());
@@ -275,12 +277,12 @@ class Mrpt {
     /**
     * Saves the index to a file.
     * @param path - Filepath to the output file.
+    * @return True if saving succeeded, false otherwise.
     */
     bool save(const char *path) const {
         FILE *fd;
-        if ((fd = fopen(path, "wb")) == NULL) {
+        if ((fd = fopen(path, "wb")) == NULL)
             return false;
-        }
 
         fwrite(split_points.data(), sizeof(float), n_array * n_trees, fd);
 
@@ -319,6 +321,7 @@ class Mrpt {
     /**
     * Loads the index from a file.
     * @param path - Filepath to the index file.
+    * @return True if loading succeeded, false otherwise.
     */
     bool load(const char *path) {
         FILE *fd;
@@ -470,7 +473,7 @@ class Mrpt {
                       [&normal_dist, &gen] { return normal_dist(gen); });
     }
 
-    const Map<MatrixXf> *X; // the data matrix
+    const Map<const MatrixXf> *X; // the data matrix
     MatrixXf split_points; // all split points in all trees
     std::vector<std::vector<VectorXi>> tree_leaves; // contains all leaves of all trees,
                                                     // indexed as tree_leaves[tree number][leaf number][index in leaf]

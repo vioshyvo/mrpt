@@ -26,9 +26,9 @@ class MRPTIndex(object):
         """
         if isinstance(data, np.ndarray):
             if len(data) == 0 or len(data.shape) != 2:
-                raise ValueError("Data matrix should be non-empty and two-dimensional")
+                raise ValueError("The data matrix should be non-empty and two-dimensional")
             if data.dtype != np.float32:
-                raise ValueError("Data matrix should have type float32")
+                raise ValueError("The data matrix should have type float32")
             if not data.flags['C_CONTIGUOUS'] or not data.flags['ALIGNED']:
                 raise ValueError("The data matrix has to be C_CONTIGUOUS and ALIGNED")
             n_samples, dim = data.shape
