@@ -69,17 +69,23 @@ class Mrpt {
     * @param depth_ - The depth of the trees.
     * @param density_ - Expected ratio of non-zero components in a projection matrix.
     */
-    Mrpt(const Map<MatrixXf> *X_, int n_trees_, int depth_, float density_)
-         : X(X_), n_samples(X_->cols()), dim(X_->rows()), n_trees(n_trees_), depth(depth_),
-           density(density_), n_pool(n_trees_ * depth_), n_array(1 << (depth_ + 1)) { }
+    Mrpt(const Map<MatrixXf> *X_, int n_trees_, int depth_, float density_) :
+        X(X_),
+        n_samples(X_->cols()),
+        dim(X_->rows()),
+        n_trees(n_trees_),
+        depth(depth_),
+        density(density_),
+        n_pool(n_trees_ * depth_),
+        n_array(1 << (depth_ + 1))
+    { }
 
     ~Mrpt() {}
 
     /**
     * The function whose call starts the actual index construction. Initializes 
     * arrays to store the tree structures and computes all the projections needed
-    * later. Then repeatedly calls method grow_subtree that builds a single 
-    * RP-tree.
+    * later. Then repeatedly calls method grow_subtree that builds a single RP-tree.
     */
     void grow() {
         // generate the random matrix
@@ -146,10 +152,12 @@ class Mrpt {
                 const float split_point = split_points(idx_tree, n_tree);
                 if (projected_query(j) <= split_point) {
                     idx_tree = idx_left;
-                    found_branches[n_tree * depth + d] = Gap(n_tree, idx_right, j + 1, split_point - projected_query(j));
+                    found_branches[n_tree * depth + d] =
+                        Gap(n_tree, idx_right, j + 1, split_point - projected_query(j));
                 } else {
                     idx_tree = idx_right;
-                    found_branches[n_tree * depth + d] = Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point);
+                    found_branches[n_tree * depth + d] =
+                        Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point);
                 }
             }
             found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
@@ -279,10 +287,10 @@ class Mrpt {
         // save tree leaves
         for (int i = 0; i < n_trees; ++i) {
             int sz = tree_leaves[i].size();
-            fwrite(&sz, sizeof(sz), 1, fd);
+            fwrite(&sz, sizeof(int), 1, fd);
             for (int j = 0; j < sz; ++j) {
                 int lsz = tree_leaves[i][j].size();
-                fwrite(&lsz, sizeof(lsz), 1, fd);
+                fwrite(&lsz, sizeof(int), 1, fd);
                 fwrite(tree_leaves[i][j].data(), sizeof(int), lsz, fd);
             }
         }
@@ -290,14 +298,14 @@ class Mrpt {
         // save random matrix
         if (density < 1) {
             int non_zeros = sparse_random_matrix.nonZeros();
-            fwrite(&non_zeros, sizeof(non_zeros), 1, fd);
+            fwrite(&non_zeros, sizeof(int), 1, fd);
             for (int k = 0; k < sparse_random_matrix.outerSize(); ++k) {
                 for (SparseMatrix<float, RowMajor>::InnerIterator it(sparse_random_matrix, k); it; ++it) {
                     float val = it.value();
                     int row = it.row(), col = it.col();
-                    fwrite(&row, sizeof(row), 1, fd);
-                    fwrite(&col, sizeof(col), 1, fd);
-                    fwrite(&val, sizeof(val), 1, fd);
+                    fwrite(&row, sizeof(int), 1, fd);
+                    fwrite(&col, sizeof(int), 1, fd);
+                    fwrite(&val, sizeof(float), 1, fd);
                 }
             }
         } else {
@@ -348,7 +356,7 @@ class Mrpt {
                 float val;
                 fread(&row, sizeof(int), 1, fd);
                 fread(&col, sizeof(int), 1, fd);
-                fread(&val, sizeof(int), 1, fd);
+                fread(&val, sizeof(float), 1, fd);
                 triplets.push_back(Triplet<float>(row, col, val));
             }
 

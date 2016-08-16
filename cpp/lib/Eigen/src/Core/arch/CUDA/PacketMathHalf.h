@@ -28,11 +28,14 @@ template<> struct packet_traits<Eigen::half> : default_packet_traits
     AlignedOnScalar = 1,
     size=2,
     HasHalfPacket = 0,
+    HasAdd    = 1,
+    HasMul    = 1,
     HasDiv    = 1,
     HasSqrt   = 1,
     HasRsqrt  = 1,
     HasExp    = 1,
-    HasLog = 1
+    HasLog    = 1,
+    HasLog1p  = 1
   };
 };
 
@@ -226,7 +229,7 @@ template<> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE Eigen::half predux<half2>(const
 #else
   float a1 = __low2float(a);
   float a2 = __high2float(a);
-  return Eigen::half(internal::raw_uint16_to_half(__float2half_rn(a1 + a2)));
+  return Eigen::half(half_impl::raw_uint16_to_half(__float2half_rn(a1 + a2)));
 #endif
 }
 
@@ -260,8 +263,16 @@ template<> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE Eigen::half predux_mul<half2>(c
 #else
   float a1 = __low2float(a);
   float a2 = __high2float(a);
-  return Eigen::half(internal::raw_uint16_to_half(__float2half_rn(a1 * a2)));
+  return Eigen::half(half_impl::raw_uint16_to_half(__float2half_rn(a1 * a2)));
 #endif
+}
+
+template<> EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE half2 plog1p<half2>(const half2& a) {
+  float a1 = __low2float(a);
+  float a2 = __high2float(a);
+  float r1 = log1pf(a1);
+  float r2 = log1pf(a2);
+  return __floats2half2_rn(r1, r2);
 }
 
 #if defined __CUDACC_VER__ && __CUDACC_VER__ >= 80000 && defined __CUDA_ARCH__ && __CUDA_ARCH__ >= 530
@@ -370,7 +381,7 @@ template<> EIGEN_STRONG_INLINE Packet8h pset1<Packet8h>(const Eigen::half& from)
 }
 
 template<> EIGEN_STRONG_INLINE Eigen::half pfirst<Packet8h>(const Packet8h& from) {
-  return raw_uint16_to_half(static_cast<unsigned short>(_mm_extract_epi16(from.x, 0)));
+  return half_impl::raw_uint16_to_half(static_cast<unsigned short>(_mm_extract_epi16(from.x, 0)));
 }
 
 template<> EIGEN_STRONG_INLINE Packet8h pload<Packet8h>(const Eigen::half* from) {
@@ -605,7 +616,7 @@ template<> EIGEN_STRONG_INLINE Packet4h pset1<Packet4h>(const Eigen::half& from)
 }
 
 template<> EIGEN_STRONG_INLINE Eigen::half pfirst<Packet4h>(const Packet4h& from) {
-  return raw_uint16_to_half(static_cast<unsigned short>(_mm_cvtsi64_si32(from.x)));
+  return half_impl::raw_uint16_to_half(static_cast<unsigned short>(_mm_cvtsi64_si32(from.x)));
 }
 
 template<> EIGEN_STRONG_INLINE Packet4h pconj(const Packet4h& a) { return a; }
@@ -616,17 +627,17 @@ template<> EIGEN_STRONG_INLINE Packet4h padd<Packet4h>(const Packet4h& a, const 
 
   Eigen::half h[4];
 
-  Eigen::half ha = raw_uint16_to_half(static_cast<unsigned short>(a64));
-  Eigen::half hb = raw_uint16_to_half(static_cast<unsigned short>(b64));
+  Eigen::half ha = half_impl::raw_uint16_to_half(static_cast<unsigned short>(a64));
+  Eigen::half hb = half_impl::raw_uint16_to_half(static_cast<unsigned short>(b64));
   h[0] = ha + hb;
-  ha = raw_uint16_to_half(static_cast<unsigned short>(a64 >> 16));
-  hb = raw_uint16_to_half(static_cast<unsigned short>(b64 >> 16));
+  ha = half_impl::raw_uint16_to_half(static_cast<unsigned short>(a64 >> 16));
+  hb = half_impl::raw_uint16_to_half(static_cast<unsigned short>(b64 >> 16));
   h[1] = ha + hb;
-  ha = raw_uint16_to_half(static_cast<unsigned short>(a64 >> 32));
-  hb = raw_uint16_to_half(static_cast<unsigned short>(b64 >> 32));
+  ha = half_impl::raw_uint16_to_half(static_cast<unsigned short>(a64 >> 32));
+  hb = half_impl::raw_uint16_to_half(static_cast<unsigned short>(b64 >> 32));
   h[2] = ha + hb;
-  ha = raw_uint16_to_half(static_cast<unsigned short>(a64 >> 48));
-  hb = raw_uint16_to_half(static_cast<unsigned short>(b64 >> 48));
+  ha = half_impl::raw_uint16_to_half(static_cast<unsigned short>(a64 >> 48));
+  hb = half_impl::raw_uint16_to_half(static_cast<unsigned short>(b64 >> 48));
   h[3] = ha + hb;
   Packet4h result;
   result.x = _mm_set_pi16(h[3].x, h[2].x, h[1].x, h[0].x);
@@ -639,17 +650,17 @@ template<> EIGEN_STRONG_INLINE Packet4h pmul<Packet4h>(const Packet4h& a, const 
 
   Eigen::half h[4];
 
-  Eigen::half ha = raw_uint16_to_half(static_cast<unsigned short>(a64));
-  Eigen::half hb = raw_uint16_to_half(static_cast<unsigned short>(b64));
+  Eigen::half ha = half_impl::raw_uint16_to_half(static_cast<unsigned short>(a64));
+  Eigen::half hb = half_impl::raw_uint16_to_half(static_cast<unsigned short>(b64));
   h[0] = ha * hb;
-  ha = raw_uint16_to_half(static_cast<unsigned short>(a64 >> 16));
-  hb = raw_uint16_to_half(static_cast<unsigned short>(b64 >> 16));
+  ha = half_impl::raw_uint16_to_half(static_cast<unsigned short>(a64 >> 16));
+  hb = half_impl::raw_uint16_to_half(static_cast<unsigned short>(b64 >> 16));
   h[1] = ha * hb;
-  ha = raw_uint16_to_half(static_cast<unsigned short>(a64 >> 32));
-  hb = raw_uint16_to_half(static_cast<unsigned short>(b64 >> 32));
+  ha = half_impl::raw_uint16_to_half(static_cast<unsigned short>(a64 >> 32));
+  hb = half_impl::raw_uint16_to_half(static_cast<unsigned short>(b64 >> 32));
   h[2] = ha * hb;
-  ha = raw_uint16_to_half(static_cast<unsigned short>(a64 >> 48));
-  hb = raw_uint16_to_half(static_cast<unsigned short>(b64 >> 48));
+  ha = half_impl::raw_uint16_to_half(static_cast<unsigned short>(a64 >> 48));
+  hb = half_impl::raw_uint16_to_half(static_cast<unsigned short>(b64 >> 48));
   h[3] = ha * hb;
   Packet4h result;
   result.x = _mm_set_pi16(h[3].x, h[2].x, h[1].x, h[0].x);
