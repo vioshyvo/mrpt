@@ -326,11 +326,11 @@ class Mrpt {
         tree_leaves = std::vector<std::vector<VectorXi>>(n_trees);
         for (int i = 0; i < n_trees; ++i) {
             int sz;
-            fread(&sz, sizeof(sz), 1, fd);
+            fread(&sz, sizeof(int), 1, fd);
             std::vector<VectorXi> leaves(sz);
             for (int j = 0; j < sz; ++j) {
                 int leaf_size;
-                fread(&leaf_size, sizeof(leaf_size), 1, fd);
+                fread(&leaf_size, sizeof(int), 1, fd);
                 VectorXi samples(leaf_size);
                 fread(samples.data(), sizeof(int), leaf_size, fd);
                 leaves[j] = samples;
@@ -341,16 +341,16 @@ class Mrpt {
         // load random matrix
         if (density < 1) {
             int non_zeros;
-            fread(&non_zeros, sizeof(non_zeros), 1, fd);
+            fread(&non_zeros, sizeof(int), 1, fd);
 
             sparse_random_matrix = SparseMatrix<float>(n_pool, dim);
             std::vector<Triplet<float>> triplets;
             for (int k = 0; k < non_zeros; ++k) {
                 int row, col;
                 float val;
-                fread(&row, sizeof(&row), 1, fd);
-                fread(&col, sizeof(&col), 1, fd);
-                fread(&val, sizeof(&val), 1, fd);
+                fread(&row, sizeof(int), 1, fd);
+                fread(&col, sizeof(int), 1, fd);
+                fread(&val, sizeof(int), 1, fd);
                 triplets.push_back(Triplet<float>(row, col, val));
             }
 

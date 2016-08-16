@@ -16,15 +16,14 @@ if sys.platform == 'darwin':
 
 module1 = Extension('mrptlib',
                     sources=['mrptmodule.cpp'],
-                    extra_compile_args=['-std=c++11', '-Wall', '-O3', '-march=native', '-ffast-math',
-                                        '-s', '-mavx', '-mfma', '-Wno-deprecated-declarations',
-                                        '-Wno-ignored-attributes', '-Wno-cpp', '-fopenmp',
-                                        '-fno-rtti', '-fno-stack-protector', '-fno-exceptions',
-                                        '-DNDEBUG', '-I./lib'],
+                    extra_compile_args=['-std=c++11', '-Wall', '-O3', '-march=native', '-ffast-math', '-s',
+                                        '-Wno-deprecated-declarations', '-Wno-ignored-attributes', '-Wno-cpp',
+                                        '-Wno-unused-result', '-fopenmp', '-fno-rtti', '-fno-stack-protector',
+                                        '-fno-exceptions', '-DNDEBUG', '-I./lib'],
                     extra_link_args=['-lgomp', '-lpython2.7'],
                     include_dirs=[numpy.get_include()])
 
 setup(name='mrpt',
       version='1.0',
-      description='This is a module for mrpt approximate nearest neighbor search',
+      description='This is a module for MRPT approximate nearest neighbor search',
       ext_modules=[module1])
