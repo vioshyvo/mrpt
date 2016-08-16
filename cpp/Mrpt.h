@@ -172,7 +172,7 @@ class Mrpt {
             const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
             for (int i = 0; i < nn; ++i, ++data) {
-                if (++votes(data[i]) == votes_required) {
+                if (++votes(*data) == votes_required) {
                     elected(n_elected++) = *data;
                 }
             }
@@ -208,7 +208,7 @@ class Mrpt {
             const VectorXi &idx_one_tree = tree_leaves[gap.tree][idx_tree - (1 << depth) + 1];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
             for (int i = 0; i < nn; ++i, ++data) {
-                if (++votes(data[i]) == votes_required) {
+                if (++votes(*data) == votes_required) {
                     elected(n_elected++) = *data;
                 }
             }
@@ -363,7 +363,7 @@ class Mrpt {
             sparse_random_matrix.setFromTriplets(triplets.begin(), triplets.end());
             sparse_random_matrix.makeCompressed();
         } else {
-            dense_random_matrix = MatrixXf(n_pool, dim);
+            dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_pool, dim);
             fread(dense_random_matrix.data(), sizeof(float), n_pool * dim, fd);
         }
 
@@ -460,7 +460,7 @@ class Mrpt {
     * the matrix are drawn from the standard normal distribution.
     */
     void build_dense_random_matrix() {
-        dense_random_matrix = MatrixXf(n_pool, dim);
+        dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_pool, dim);
 
         std::random_device rd;
         std::mt19937 gen(rd());
@@ -474,7 +474,7 @@ class Mrpt {
     MatrixXf split_points; // all split points in all trees
     std::vector<std::vector<VectorXi>> tree_leaves; // contains all leaves of all trees,
                                                     // indexed as tree_leaves[tree number][leaf number][index in leaf]
-    MatrixXf dense_random_matrix; // random vectors needed for all the RP-trees
+    Matrix<float, Dynamic, Dynamic, RowMajor> dense_random_matrix; // random vectors needed for all the RP-trees
     SparseMatrix<float, RowMajor> sparse_random_matrix; // random vectors needed for all the RP-trees
 
     const int n_samples; // sample size of data
