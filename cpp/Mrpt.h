@@ -422,11 +422,10 @@ class Mrpt {
     * Builds a random sparse matrix for use in random projection. The components of
     * the matrix are drawn from the distribution
     *
-    * -1  w.p. 1 / 2s
-    *  0  w.p. 1 - 1 / s
-    * +1  w.p. 1 / 2s
+    *       0 w.p. 1 - a
+    * N(0, 1) w.p. a
     *
-    * where s = 1 / density.
+    * where a = density.
     */
     void build_sparse_random_matrix() {
         sparse_random_matrix = SparseMatrix<float, RowMajor>(n_pool, dim);
@@ -434,13 +433,13 @@ class Mrpt {
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_real_distribution<float> uni_dist(0, 1);
+        std::normal_distribution<float> norm_dist(0, 1);
 
         std::vector<Triplet<float>> triplets;
         for (int j = 0; j < n_pool; ++j) {
             for (int i = 0; i < dim; ++i) {
                 if (uni_dist(gen) > density) continue;
-                float value = uni_dist(gen) <= 0.5 ? -1 : 1;
-                triplets.push_back(Triplet<float>(j, i, value));
+                triplets.push_back(Triplet<float>(j, i, norm_dist(gen)));
             }
         }
 
