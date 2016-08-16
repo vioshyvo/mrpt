@@ -13,7 +13,7 @@ class MRPTIndex(object):
     """
     Wraps the extension module written in C++
     """
-    def __init__(self, data, depth, n_trees, projection_sparsity=None, shape=None, mmap=False):
+    def __init__(self, data, depth, n_trees, projection_sparsity='auto', shape=None, mmap=False):
         """
         Initializes an MRPT index object.
         :param data: Input data either as a NxDim numpy ndarray or as a filepath to a binary file containing the data
