@@ -80,8 +80,6 @@ class Mrpt {
     * RP-tree.
     */
     void grow() {
-        X_norms = X->colwise().squaredNorm();
-
         // generate the random matrix
         density < 1 ? build_sparse_random_matrix() : build_dense_random_matrix();
 
@@ -245,7 +243,7 @@ class Mrpt {
 
         #pragma omp parallel for
         for (int i = 0; i < n_elected; ++i)
-            distances(i) = X_norms(indices(i)) - 2 * X->col(indices(i)).dot(q);
+            distances(i) = (X->col(indices(i)) - q).squaredNorm();
 
         if (k == 1) {
             MatrixXf::Index index;
@@ -272,7 +270,6 @@ class Mrpt {
             return false;
         }
 
-        fwrite(X_norms.data(), sizeof(float), n_samples, fd);
         fwrite(split_points.data(), sizeof(float), n_array * n_trees, fd);
 
         // save tree leaves
@@ -315,9 +312,6 @@ class Mrpt {
         FILE *fd;
         if ((fd = fopen(path, "rb")) == NULL)
             return false;
-
-        X_norms = VectorXf(n_samples);
-        fread(X_norms.data(), sizeof(float), n_samples, fd);
 
         split_points = MatrixXf(n_array, n_trees);
         fread(split_points.data(), sizeof(float), n_array * n_trees, fd);
@@ -466,7 +460,6 @@ class Mrpt {
     }
 
     const Map<MatrixXf> *X; // the data matrix
-    VectorXf X_norms; // cache norms of the observations in X for distance calculations
     MatrixXf split_points; // all split points in all trees
     std::vector<std::vector<VectorXi>> tree_leaves; // contains all leaves of all trees,
                                                     // indexed as tree_leaves[tree number][leaf number][index in leaf]
