@@ -1,5 +1,5 @@
 # MRPT - fast nearest neighbor search with random projection
-![NN search in 3 RP-trees](mrpt-image.jpg)
+![NN search in 3 RP-trees](mrpt-image.png)
 
 
 MRPT is a library for approximate nearest neighbor search written in C++11. According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MRPT is currently the *fastest* alternative to reach high recall levels in common benchmark data sets.
