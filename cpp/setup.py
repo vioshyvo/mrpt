@@ -5,14 +5,7 @@
 #
 
 from distutils.core import setup, Extension
-import os
 import numpy
-import sys
-
-if sys.platform == 'darwin':
-    # A quick fix to make this work on my mac -Teemu
-    os.environ["CC"] = "g++-6"
-    os.environ["CXX"] = "g++-6"
 
 module1 = Extension('mrptlib',
                     sources=['mrptmodule.cpp'],
