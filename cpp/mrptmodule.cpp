@@ -95,8 +95,13 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
         return -1;
 
     float *data;
+#if PY_MAJOR_VERSION >= 3
+    if (PyUnicode_Check(py_data)) {
+        char *file = PyBytes_AsString(py_data);
+#else
     if (PyString_Check(py_data)) {
         char *file = PyString_AsString(py_data);
+#endif
 
         struct stat sb;
         if (stat(file, &sb) != 0) {
@@ -144,7 +149,7 @@ static void mrpt_dealloc(mrptIndex *self) {
     }
     if (self->ptr)
         delete self->ptr;
-    self->ob_type->tp_free(reinterpret_cast<PyObject *>(self));
+    Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
 }
 
 static PyObject *ann(mrptIndex *self, PyObject *args) {
@@ -259,10 +264,9 @@ static PyMethodDef MrptMethods[] = {
 };
 
 static PyTypeObject MrptIndexType = {
-    PyObject_HEAD_INIT(NULL)
-    0, /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "mrpt.MrptIndex", /*tp_name*/
-    sizeof (mrptIndex), /*tp_basicsize*/
+    sizeof(mrptIndex), /*tp_basicsize*/
     0, /*tp_itemsize*/
     (destructor) mrpt_dealloc, /*tp_dealloc*/
     0, /*tp_print*/
@@ -300,11 +304,49 @@ static PyTypeObject MrptIndexType = {
     Mrpt_new, /* tp_new */
 };
 
+static PyMethodDef module_methods[] = {
+  {NULL}	/* Sentinel */
+};
+  
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "mrptlib",          /* m_name */
+    "",                  /* m_doc */
+    -1,                  /* m_size */
+    module_methods,      /* m_methods */
+    NULL,                /* m_reload */
+    NULL,                /* m_traverse */
+    NULL,                /* m_clear */
+    NULL,                /* m_free */
+  };
+  
+PyMODINIT_FUNC PyInit_mrptlib(void) {
+    PyObject *m;
+    if (PyType_Ready(&MrptIndexType) < 0)
+        return NULL;
+    
+    m = PyModule_Create(&moduledef);
+    
+
+    if (m == NULL)
+        return NULL;
+
+    import_array();
+
+    Py_INCREF(&MrptIndexType);
+    PyModule_AddObject(m, "MrptIndex", reinterpret_cast<PyObject *>(&MrptIndexType));
+
+    return m;
+}
+#else
 PyMODINIT_FUNC initmrptlib(void) {
     PyObject *m;
     if (PyType_Ready(&MrptIndexType) < 0)
         return;
-    m = Py_InitModule("mrptlib", MrptMethods);
+
+    m = Py_InitModule("mrptlib", module_methods);
+
 
     if (m == NULL)
         return;
@@ -314,3 +356,4 @@ PyMODINIT_FUNC initmrptlib(void) {
     Py_INCREF(&MrptIndexType);
     PyModule_AddObject(m, "MrptIndex", reinterpret_cast<PyObject *>(&MrptIndexType));
 }
+#endif
