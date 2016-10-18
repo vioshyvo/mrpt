@@ -23,35 +23,32 @@
 using namespace Eigen;
 
 /**
- * This class defines the elements that are stored in the priority queue for
- * the extra branch / priority queue trick. An instance of the class describes a
- * single node in a rp-tree in a single query. The most important field
- * gap_width tells the difference of the split value used in this node and the
- * projection of the query vector in this node. This is used as a criterion to
- * choose extra branches -- a small distance indicates that some neighbors may
- * easily end up on the other side of split. The rest of the fields are needed
- * to start a tree traversal from the node "on the other side of the split",
- * and the methods are needed for sorting in the priority queue.
+ * An entry in the priority queue required for priority search. Each 
+ * entry represents a subtree in an RP tree. The priority value is the 
+ * guaranteed minimum (squared) distance between the query point and 
+ * any object in the subtree. Strictly this works only if the columns
+ * of the random matrix are orthonormal but approximate orthogonality
+ * holds for sufficiently high-dimensional spaces.
  */
-class Gap {
+class PqEntry {
  public:
-    Gap() { }
+    PqEntry() { }
 
-    Gap(int tree_, int node_, int level_, double gap_width_)
-        : tree(tree_), node(node_), level(level_), gap_width(gap_width_) { }
+    PqEntry(int tree_, int node_, int level_, double priority_)
+        : tree(tree_), node(node_), level(level_), priority(priority_) { }
 
-    friend bool operator<(const Gap &a, const Gap &b) {
-        return a.gap_width < b.gap_width;
+    friend bool operator<(const PqEntry &a, const PqEntry &b) {
+        return a.priority < b.priority;
     }
 
-    friend bool operator>(const Gap &a, const Gap &b) {
-        return a.gap_width > b.gap_width;
+    friend bool operator>(const PqEntry &a, const PqEntry &b) {
+        return a.priority > b.priority;
     }
 
-    int tree; // The ordinal of the tree
-    int node; // The node corresponding to the other side of the split
-    int level; // The level in the tree where node lies
-    double gap_width; // The gap between the query projection and split value at the parent of node
+    int tree; // Identifies which tree within the index
+    int node; // Identifies the subtree within the tree together with 'level'
+    int level; // -''-
+    double priority; // The squared distance from the query point
 };
 
 class Mrpt {
@@ -136,7 +133,7 @@ class Mrpt {
             projected_query.noalias() = dense_random_matrix * q;
 
         int found_leaves[n_trees];
-        Gap found_branches[n_trees * depth];
+        PqEntry found_branches[n_trees * depth];
 
         /*
         * The following loops over all trees, and routes the query to exactly one 
@@ -144,23 +141,21 @@ class Mrpt {
         */
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            int idx_tree = 0;
+            int idx_node = 0;
             for (int d = 0; d < depth; ++d) {
                 const int j = n_tree * depth + d;
-                const int idx_left = 2 * idx_tree + 1;
-                const int idx_right = idx_left + 1;
-                const float split_point = split_points(idx_tree, n_tree);
-                if (projected_query(j) <= split_point) {
-                    idx_tree = idx_left;
+                const float epsilon = split_points(idx_node, n_tree) - projected_query(j);
+                if (epsilon <= 0) {
+                    idx_node = 2 * idx_node + 1;
                     found_branches[n_tree * depth + d] =
-                        Gap(n_tree, idx_right, j + 1, split_point - projected_query(j));
+                        PqEntry(n_tree, idx_node + 1, j + 1, pow(epsilon, 2));
                 } else {
-                    idx_tree = idx_right;
+                    idx_node = 2 * idx_node + 2;
                     found_branches[n_tree * depth + d] =
-                        Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point);
+                        PqEntry(n_tree, idx_node - 1, j + 1, pow(epsilon, 2));
                 }
             }
-            found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
+            found_leaves[n_tree] = idx_node - (1 << depth) + 1;
         }
 
         int n_elected = 0, max_leaf_size = n_samples / (1 << depth) + 1;
@@ -179,35 +174,31 @@ class Mrpt {
         }
 
         /*
-        * The following loop routes the query to extra leaves in the same trees 
-        * handled already once above. The extra branches are popped from the 
-        * priority queue and routed down the tree just as new root-to-leaf queries.
+        * Priority search
         */
 
-        std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>>
+        std::priority_queue<PqEntry, std::vector<PqEntry>, std::greater<PqEntry>>
             pq(found_branches, found_branches + n_trees * depth);
 
         for (int b = 0; b < branches; ++b) {
             if (pq.empty()) break;
-            Gap gap(pq.top());
+            PqEntry entry(pq.top());
             pq.pop();
 
-            int j = gap.level;
-            int idx_tree = gap.node;
+            int j = entry.level;
+            int idx_node = entry.node;
             for (; j % depth; ++j) {
-                const int idx_left = 2 * idx_tree + 1;
-                const int idx_right = idx_left + 1;
-                const float split_point = split_points(idx_tree, gap.tree);
-                if (projected_query(j) <= split_point) {
-                    idx_tree = idx_left;
-                    pq.push(Gap(gap.tree, idx_right, j + 1, split_point - projected_query(j)));
+                const float epsilon = split_points(idx_node, entry.tree) - projected_query(j);
+                if (epsilon <= 0) {
+                    idx_node = 2 * idx_node + 1;
+                    pq.push(PqEntry(entry.tree, idx_node + 1, j + 1, entry.priority + pow(epsilon, 2)));
                 } else {
-                    idx_tree = idx_right;
-                    pq.push(Gap(gap.tree, idx_left, j + 1, projected_query(j) - split_point));
+                    idx_node = 2 * idx_node + 2;
+                    pq.push(PqEntry(entry.tree, idx_node - 1, j + 1, entry.priority + pow(epsilon, 2)));
                 }
             }
 
-            const VectorXi &idx_one_tree = tree_leaves[gap.tree][idx_tree - (1 << depth) + 1];
+            const VectorXi &idx_one_tree = tree_leaves[entry.tree][idx_node - (1 << depth) + 1];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
             for (int i = 0; i < nn; ++i, ++data) {
                 if (++votes(*data) == votes_required) {
