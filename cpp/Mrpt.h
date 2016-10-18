@@ -447,6 +447,7 @@ class Mrpt {
 
         sparse_random_matrix.setFromTriplets(triplets.begin(), triplets.end());
         sparse_random_matrix.makeCompressed();
+        // sparse_random_matrix.rowwise().normalize(); #<- does not work this easily
     }
 
     /*
@@ -462,6 +463,7 @@ class Mrpt {
 
         std::generate(dense_random_matrix.data(), dense_random_matrix.data() + n_pool * dim,
                       [&normal_dist, &gen] { return normal_dist(gen); });
+        dense_random_matrix.rowwise().normalize();
     }
 
     const Map<const MatrixXf> *X; // the data matrix
