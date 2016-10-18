@@ -144,7 +144,7 @@ class Mrpt {
             int idx_node = 0;
             for (int d = 0; d < depth; ++d) {
                 const int j = n_tree * depth + d;
-                const float epsilon = split_points(idx_node, n_tree) - projected_query(j);
+                const float epsilon = projected_query(j) - split_points(idx_node, n_tree);
                 if (epsilon <= 0) {
                     idx_node = 2 * idx_node + 1;
                     found_branches[n_tree * depth + d] =
@@ -188,7 +188,7 @@ class Mrpt {
             int j = entry.level;
             int idx_node = entry.node;
             for (; j % depth; ++j) {
-                const float epsilon = split_points(idx_node, entry.tree) - projected_query(j);
+                const float epsilon = projected_query(j) - split_points(idx_node, entry.tree);
                 if (epsilon <= 0) {
                     idx_node = 2 * idx_node + 1;
                     pq.push(PqEntry(entry.tree, idx_node + 1, j + 1, entry.priority + pow(epsilon, 2)));
@@ -439,9 +439,17 @@ class Mrpt {
 
         std::vector<Triplet<float>> triplets;
         for (int j = 0; j < n_pool; ++j) {
+            std::vector<float> values;
+            float squarednorm = 0;
             for (int i = 0; i < dim; ++i) {
-                if (uni_dist(gen) > density) continue;
-                triplets.push_back(Triplet<float>(j, i, norm_dist(gen)));
+                if (uni_dist(gen) > density) values.push_back(0);
+                else{
+                    values.push_back(norm_dist(gen));
+                    squarednorm += pow(values.back(),2);
+                }
+            }
+            for (int i = 0; i < dim; ++i) {
+                if(values[i] > 1.0e-10 or values[i] < -1.0e-10) triplets.push_back(Triplet<float>(j, i, values[i]/sqrt(squarednorm)));
             }
         }
 
