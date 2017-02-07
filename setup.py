@@ -19,8 +19,7 @@ setuptools.setup(
                 'cpp/mrptmodule.cpp',
             ],
             extra_compile_args=['-std=c++11', '-O3', '-march=native', '-ffast-math', '-s',
-                                '-Wno-ignored-attributes', '-Wno-cpp',
-                                '-Wno-unused-result', '-fno-rtti', '-fopenmp', '-DNDEBUG'],
+                                '-fno-rtti', '-fopenmp', '-DNDEBUG'],
             extra_link_args=['-lgomp'],
             libraries = ['stdc++'],
             include_dirs = ['cpp/lib', numpy.get_include()]
