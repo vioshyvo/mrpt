@@ -154,9 +154,9 @@ static void mrpt_dealloc(mrptIndex *self) {
 
 static PyObject *ann(mrptIndex *self, PyObject *args) {
     PyObject *v;
-    int k, elect, branches, dim, n;
+    int k, elect, dim, n;
 
-    if (!PyArg_ParseTuple(args, "Oiii", &v, &k, &elect, &branches))
+    if (!PyArg_ParseTuple(args, "Oii", &v, &k, &elect))
         return NULL;
 
     float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
@@ -169,7 +169,7 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
         ret = PyArray_SimpleNew(1, dims, NPY_INT);
         int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-        self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, branches, outdata);
+        self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, outdata);
     } else {
         n = PyArray_DIM(v, 0);
         dim = PyArray_DIM(v, 1);
@@ -179,7 +179,7 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
         int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
         for (int i = 0; i < n; ++i)
-            self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, branches, outdata + i * k);
+            self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, outdata + i * k);
     }
 
     return ret;

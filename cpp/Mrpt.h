@@ -22,38 +22,6 @@
 
 using namespace Eigen;
 
-/**
- * This class defines the elements that are stored in the priority queue for
- * the extra branch / priority queue trick. An instance of the class describes a
- * single node in a rp-tree in a single query. The most important field
- * gap_width tells the difference of the split value used in this node and the
- * projection of the query vector in this node. This is used as a criterion to
- * choose extra branches -- a small distance indicates that some neighbors may
- * easily end up on the other side of split. The rest of the fields are needed
- * to start a tree traversal from the node "on the other side of the split",
- * and the methods are needed for sorting in the priority queue.
- */
-class Gap {
- public:
-    Gap() { }
-
-    Gap(int tree_, int node_, int level_, double gap_width_)
-        : tree(tree_), node(node_), level(level_), gap_width(gap_width_) { }
-
-    friend bool operator<(const Gap &a, const Gap &b) {
-        return a.gap_width < b.gap_width;
-    }
-
-    friend bool operator>(const Gap &a, const Gap &b) {
-        return a.gap_width > b.gap_width;
-    }
-
-    int tree; // The ordinal of the tree
-    int node; // The node corresponding to the other side of the split
-    int level; // The level in the tree where node lies
-    double gap_width; // The gap between the query projection and split value at the parent of node
-};
-
 class Mrpt {
  public:
     /**
@@ -124,11 +92,10 @@ class Mrpt {
     * @param q - The query object whose neighbors the function finds
     * @param k - The number of neighbors the user wants the function to return
     * @param votes_required - The number of votes required for an object to be included in the linear search step
-    * @param branches - The number of extra branches explored in the priority queue trick
     * @param out - The output buffer
     * @return 
     */
-    void query(const Map<VectorXf> &q, int k, int votes_required, int branches, int *out) const {
+    void query(const Map<VectorXf> &q, int k, int votes_required, int *out) const {
         VectorXf projected_query(n_pool);
         if (density < 1)
             projected_query.noalias() = sparse_random_matrix * q;
@@ -136,7 +103,6 @@ class Mrpt {
             projected_query.noalias() = dense_random_matrix * q;
 
         int found_leaves[n_trees];
-        Gap found_branches[n_trees * depth];
 
         /*
         * The following loops over all trees, and routes the query to exactly one 
@@ -152,12 +118,8 @@ class Mrpt {
                 const float split_point = split_points(idx_tree, n_tree);
                 if (projected_query(j) <= split_point) {
                     idx_tree = idx_left;
-                    found_branches[n_tree * depth + d] =
-                        Gap(n_tree, idx_right, j + 1, split_point - projected_query(j));
                 } else {
                     idx_tree = idx_right;
-                    found_branches[n_tree * depth + d] =
-                        Gap(n_tree, idx_left, j + 1, projected_query(j) - split_point);
                 }
             }
             found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
@@ -170,44 +132,6 @@ class Mrpt {
         // count votes
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
             const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
-            const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
-            for (int i = 0; i < nn; ++i, ++data) {
-                if (++votes(*data) == votes_required) {
-                    elected(n_elected++) = *data;
-                }
-            }
-        }
-
-        /*
-        * The following loop routes the query to extra leaves in the same trees 
-        * handled already once above. The extra branches are popped from the 
-        * priority queue and routed down the tree just as new root-to-leaf queries.
-        */
-
-        std::priority_queue<Gap, std::vector<Gap>, std::greater<Gap>>
-            pq(found_branches, found_branches + n_trees * depth);
-
-        for (int b = 0; b < branches; ++b) {
-            if (pq.empty()) break;
-            Gap gap(pq.top());
-            pq.pop();
-
-            int j = gap.level;
-            int idx_tree = gap.node;
-            for (; j % depth; ++j) {
-                const int idx_left = 2 * idx_tree + 1;
-                const int idx_right = idx_left + 1;
-                const float split_point = split_points(idx_tree, gap.tree);
-                if (projected_query(j) <= split_point) {
-                    idx_tree = idx_left;
-                    pq.push(Gap(gap.tree, idx_right, j + 1, split_point - projected_query(j)));
-                } else {
-                    idx_tree = idx_right;
-                    pq.push(Gap(gap.tree, idx_left, j + 1, projected_query(j) - split_point));
-                }
-            }
-
-            const VectorXi &idx_one_tree = tree_leaves[gap.tree][idx_tree - (1 << depth) + 1];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
             for (int i = 0; i < nn; ++i, ++data) {
                 if (++votes(*data) == votes_required) {

@@ -84,18 +84,17 @@ class MRPTIndex(object):
         self.index.load(path)
         self.built = True
 
-    def ann(self, q, k, n_extra_branches=0, votes_required=1):
+    def ann(self, q, k, votes_required=1):
         """
         The MRPT approximate nearest neighbor query.
         :param q: The query object, i.e. the vector whose nearest neighbors are searched for
         :param k: The number of neighbors the user wants the query to return
-        :param n_extra_branches: The number of extra branches to be explored by the priority queue trick
         :param votes_required: The number of votes an object has to get to be included in the linear search part of the query.
         :return: The indices of the approximate nearest neighbors in the original input data given to the constructor.
         """
         if not self.built:
             raise RuntimeError("Cannot query before building index")
-        return self.index.ann(q, k, votes_required, n_extra_branches)
+        return self.index.ann(q, k, votes_required)
 
     def exact_search(self, Q, k):
         """
