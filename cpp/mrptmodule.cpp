@@ -25,8 +25,10 @@
 #include "numpy/arrayobject.h"
 
 #include <Eigen/Dense>
+#include <Eigen/SparseCore>
 
 using Eigen::MatrixXf;
+using Eigen::SparseMatrix;
 using Eigen::VectorXf;
 using Eigen::VectorXi;
 
@@ -37,6 +39,7 @@ typedef struct {
     bool mmap;
     int n;
     int dim;
+    bool sparse;
 } mrptIndex;
 
 static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
@@ -88,10 +91,10 @@ float *read_mmap(char *file, int n, int dim) {
 
 static int Mrpt_init(mrptIndex *self, PyObject *args) {
     PyObject *py_data;
-    int depth, n_trees, n, dim, mmap;
+    int depth, n_trees, n, dim, mmap, sparse;
     float density;
 
-    if (!PyArg_ParseTuple(args, "Oiiiifi", &py_data, &n, &dim, &depth, &n_trees, &density, &mmap))
+    if (!PyArg_ParseTuple(args, "Oiiiifii", &py_data, &n, &dim, &depth, &n_trees, &density, &mmap, &sparse))
         return -1;
 
     float *data;
@@ -128,9 +131,27 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
 
     self->n = n;
     self->dim = dim;
+    self->sparse = sparse;
 
-    const Eigen::Map<const MatrixXf> *X = new Eigen::Map<const MatrixXf>(data, dim, n);
-    self->ptr = new Mrpt(X, n_trees, depth, density);
+    if (sparse) {
+        SparseMatrix<float> *X = new SparseMatrix<float>(dim, n);
+        std::vector<Eigen::Triplet<float> > triplets;
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < dim; ++j) {
+                float val = data[i * dim + j];
+                if (val != 0) {
+                    triplets.push_back(Eigen::Triplet<float>(j, i, val));
+                }
+            }
+        }
+
+        X->setFromTriplets(triplets.begin(), triplets.end());
+        X->makeCompressed();
+        self->ptr = new Mrpt(X, n_trees, depth, density);
+    } else {
+        const Eigen::Map<const MatrixXf> *X = new Eigen::Map<const MatrixXf>(data, dim, n);
+        self->ptr = new Mrpt(X, n_trees, depth, density);
+    }
 
     return 0;
 }
@@ -169,7 +190,16 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
         ret = PyArray_SimpleNew(1, dims, NPY_INT);
         int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-        self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, outdata);
+        if (self->sparse) {
+            Eigen::SparseMatrix<float> sparse_hack(dim, 1);
+            std::vector<Eigen::Triplet<float>> triplets;
+            for (int j = 0; j < dim; ++j)
+                if (indata[j]) triplets.push_back(Eigen::Triplet<float>(j, 0, indata[j]));
+            sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
+            self->ptr->sparse_query(sparse_hack.col(0), k, elect, outdata);
+        } else {
+            self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, outdata);
+        }
     } else {
         n = PyArray_DIM(v, 0);
         dim = PyArray_DIM(v, 1);
@@ -178,8 +208,20 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
         ret = PyArray_SimpleNew(2, dims, NPY_INT);
         int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-        for (int i = 0; i < n; ++i)
-            self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, outdata + i * k);
+        if (self->sparse) {
+            for (int i = 0; i < n; ++i) {
+                Eigen::SparseMatrix<float> sparse_hack(dim, 1);
+                std::vector<Eigen::Triplet<float>> triplets;
+                for (int j = 0; j < dim; ++j)
+                    if (indata[i * dim + j])
+                        triplets.push_back(Eigen::Triplet<float>(j, 0, indata[i * dim + j]));
+                sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
+                self->ptr->sparse_query(sparse_hack.col(0), k, elect, outdata + i * k);
+            }
+        } else {
+            for (int i = 0; i < n; ++i)
+                self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, outdata + i * k);
+        }
     }
 
     return ret;
@@ -205,7 +247,16 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
         ret = PyArray_SimpleNew(1, dims, NPY_INT);
         int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-        self->ptr->exact_knn(Eigen::Map<VectorXf>(indata, dim), k, idx, self->n, outdata);
+        if (self->sparse) {
+            Eigen::SparseMatrix<float> sparse_hack(dim, 1);
+            std::vector<Eigen::Triplet<float>> triplets;
+            for (int j = 0; j < dim; ++j)
+                if (indata[j]) triplets.push_back(Eigen::Triplet<float>(j, 0, indata[j]));
+            sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
+            self->ptr->sparse_exact_knn(sparse_hack.col(0), k, idx, idx.size(), outdata);
+        } else {
+            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata, dim), k, idx, idx.size(), outdata);
+        }
     } else {
         n = PyArray_DIM(v, 0);
         dim = PyArray_DIM(v, 1);
@@ -214,8 +265,20 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
         ret = PyArray_SimpleNew(2, dims, NPY_INT);
         int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
 
-        for (int i = 0; i < n; ++i)
-            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim), k, idx, self->n, outdata + i * k);
+        if (self->sparse) {
+            for (int i = 0; i < n; ++i) {
+                Eigen::SparseMatrix<float> sparse_hack(dim, 1);
+                std::vector<Eigen::Triplet<float>> triplets;
+                for (int j = 0; j < dim; ++j)
+                    if (indata[i * dim + j])
+                        triplets.push_back(Eigen::Triplet<float>(j, 0, indata[i * dim + j]));
+                sparse_hack.setFromTriplets(triplets.begin(), triplets.end());
+                self->ptr->sparse_exact_knn(sparse_hack.col(0), k, idx, idx.size(), outdata + i * k);
+            }
+        } else {
+            for (int i = 0; i < n; ++i)
+                self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim), k, idx, idx.size(), outdata + i * k);
+        }
     }
 
     return ret;

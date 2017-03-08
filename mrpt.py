@@ -13,7 +13,7 @@ class MRPTIndex(object):
     """
     Wraps the extension module written in C++
     """
-    def __init__(self, data, depth, n_trees, projection_sparsity='auto', shape=None, mmap=False):
+    def __init__(self, data, depth, n_trees, projection_sparsity='auto', shape=None, mmap=False, sparse=False):
         """
         Initializes an MRPT index object.
         :param data: Input data either as a NxDim numpy ndarray or as a filepath to a binary file containing the data
@@ -22,6 +22,7 @@ class MRPTIndex(object):
         :param projection_sparsity: Expected ratio of non-zero components in a projection matrix
         :param shape: Shape of the data as a tuple (N, dim). Needs to be specified only if loading the data from a file.
         :param mmap: If true, the data is mapped into memory. Has effect only if the data is loaded from a file.
+        :param sparse: Set to True if the data should be treated as sparse
         :return:
         """
         if isinstance(data, np.ndarray):
@@ -54,7 +55,10 @@ class MRPTIndex(object):
         elif not 0 < projection_sparsity <= 1:
             raise ValueError("Sparsity should be in (0, 1]")
 
-        self.index = mrptlib.MrptIndex(data, n_samples, dim, depth, n_trees, projection_sparsity, mmap)
+        if projection_sparsity < 1 and sparse:
+            raise ValueError("Combining sparse data and sparse projections is unsupported")
+
+        self.index = mrptlib.MrptIndex(data, n_samples, dim, depth, n_trees, projection_sparsity, mmap, sparse)
         self.built = False
 
     def build(self):
