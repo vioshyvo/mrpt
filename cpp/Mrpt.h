@@ -37,7 +37,9 @@ class Mrpt {
     * @param depth_ - The depth of the trees.
     * @param density_ - Expected ratio of non-zero components in a projection matrix.
     */
-    Mrpt(const Map<const MatrixXf> *X_, int n_trees_, int depth_, float density_) :
+
+
+    Mrpt(const Map<const MatrixXf> *X_, int n_trees_, int depth_, float density_, bool test_ = true) :
         X(X_),
         Y(NULL),
         n_samples(X_->cols()),
@@ -47,10 +49,11 @@ class Mrpt {
         density(density_),
         n_pool(n_trees_ * depth_),
         n_array(1 << (depth_ + 1)),
-        sparse(false)
+        sparse(false),
+        test(test_)
     { }
 
-    Mrpt(const SparseMatrix<float> *Y_, int n_trees_, int depth_, float density_) :
+    Mrpt(const SparseMatrix<float> *Y_, int n_trees_, int depth_, float density_, bool test_ = true) :
         X(NULL),
         Y(Y_),
         n_samples(Y_->cols()),
@@ -60,13 +63,14 @@ class Mrpt {
         density(density_),
         n_pool(n_trees_ * depth_),
         n_array(1 << (depth_ + 1)),
-        sparse(true)
+        sparse(true),
+        test(test_)
     { }
 
     ~Mrpt() {}
 
     /**
-    * The function whose call starts the actual index construction. Initializes 
+    * The function whose call starts the actual index construction. Initializes
     * arrays to store the tree structures and computes all the projections needed
     * later. Then repeatedly calls method grow_subtree that builds a single RP-tree.
     */
@@ -91,38 +95,66 @@ class Mrpt {
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+            SparseMatrix<float> tree_projections_sparse;
             MatrixXf tree_projections;
+            std::vector<VectorXi> t;
 
             if (sparse) {
-                tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *Y;
+                    if(density < 1) {
+                        tree_projections_sparse = sparse_random_matrix.middleRows(n_tree * depth, depth) * *Y;
+                        t = grow_subtree(indices, 0, 0, n_tree, tree_projections_sparse);
+                    } else {
+                        tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *Y;
+                        t = grow_subtree(indices, 0, 0, n_tree, tree_projections);
+                    }
+
+
             } else {
                 if (density < 1)
-                    tree_projections.noalias() =
-                        sparse_random_matrix.middleRows(n_tree * depth, depth) * *X;
+                    tree_projections.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth) * *X;
                 else
-                    tree_projections.noalias() =
-                        dense_random_matrix.middleRows(n_tree * depth, depth) * *X;
+                    tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *X;
+
+                t = grow_subtree(indices, 0, 0, n_tree, tree_projections);
             }
 
-            std::vector<VectorXi> t = grow_subtree(indices, 0, 0, n_tree, tree_projections);
             tree_leaves[n_tree] = t;
         }
+
     }
 
-    void sparse_query(const SparseMatrix<float>::ColXpr &q, int k, int votes_required, int *out) const {
+    int sparse_query(const SparseMatrix<float>::ColXpr &q, int k, int votes_required, int *out) const {
         int max_leaf_size = n_samples / (1 << depth) + 1;
         VectorXi elected(n_trees * max_leaf_size);
-        int n_elected = elect(dense_random_matrix * q, k, votes_required, elected.data());
-        sparse_exact_knn(q, k, elected, n_elected, out);
+
+        SparseVector<float> projected_query_sparse;
+        VectorXf projected_query(n_pool);
+        VectorXf dense_projected_query;
+        int n_elected;
+
+        if(density < 1) {
+            projected_query_sparse = sparse_random_matrix * q;
+            dense_projected_query = VectorXf::Zero(projected_query.rows());
+
+            for (SparseVector<float>::InnerIterator it(projected_query_sparse); it; ++it)
+                dense_projected_query[it.index()] = it.value();
+
+            n_elected = sparse_elect(dense_projected_query, k, votes_required, elected.data()); // dense --> sparse
+        } else {
+            projected_query = dense_random_matrix * q;
+            n_elected = sparse_elect(projected_query, k, votes_required, elected.data()); // dense --> sparse
+        }
+
+        return sparse_exact_knn(q, k, elected, n_elected, out);
     }
 
     /**
-    * This function finds the k approximate nearest neighbors of the query object 
-    * q. The accuracy of the query depends on both the parameters used for index 
-    * construction and additional parameters given to this function. This 
-    * function implements two tricks to improve performance. The voting trick 
+    * This function finds the k approximate nearest neighbors of the query object
+    * q. The accuracy of the query depends on both the parameters used for index
+    * construction and additional parameters given to this function. This
+    * function implements two tricks to improve performance. The voting trick
     * interprets each index object in leaves returned by tree traversals as votes,
-    * and only performs the final linear search with the 'elect' most voted 
+    * and only performs the final linear search with the 'elect' most voted
     * objects. The priority queue trick keeps track of nodes where the split value
     * was close to the projection so that we can split the tree traversal to both
     * subtrees if we want.
@@ -130,9 +162,9 @@ class Mrpt {
     * @param k - The number of neighbors the user wants the function to return
     * @param votes_required - The number of votes required for an object to be included in the linear search step
     * @param out - The output buffer
-    * @return 
+    * @return
     */
-    void query(const Map<VectorXf> &q, int k, int votes_required, int *out) const {
+    int query(const Map<VectorXf> &q, int k, int votes_required, int *out) const {
         int max_leaf_size = n_samples / (1 << depth) + 1;
         VectorXi elected(n_trees * max_leaf_size);
 
@@ -143,14 +175,14 @@ class Mrpt {
             projected_query.noalias() = dense_random_matrix * q;
 
         int n_elected = elect(projected_query, k, votes_required, elected.data());
-        exact_knn(q, k, elected, n_elected, out);
+        return exact_knn(q, k, elected, n_elected, out);
     }
 
     int elect(const VectorXf &projected_query, int k, int votes_required, int *out) const {
         int found_leaves[n_trees];
 
         /*
-        * The following loops over all trees, and routes the query to exactly one 
+        * The following loops over all trees, and routes the query to exactly one
         * leaf in each.
         */
         #pragma omp parallel for
@@ -184,28 +216,99 @@ class Mrpt {
             }
         }
 
-        if (n_elected < k) {
-            /*
-            * If not enough samples had at least votes_required
-            * votes, find the maximum amount of votes needed such
-            * that the final search set size has at least k samples
-            */
-            VectorXf::Index max_index;
-            votes.maxCoeff(&max_index);
-            int max_votes = votes(max_index);
+        if(!test) {
+            if (n_elected < k) {
+               /*
+                * If not enough samples had at least votes_required
+                * votes, find the maximum amount of votes needed such
+                * that the final search set size has at least k samples
+                */
+                VectorXf::Index max_index;
+                votes.maxCoeff(&max_index);
+                int max_votes = votes(max_index);
 
-            VectorXi vote_count = VectorXi::Zero(max_votes + 1);
-            for (int i = 0; i < n_samples; ++i)
-                vote_count(votes(i))++;
+                VectorXi vote_count = VectorXi::Zero(max_votes + 1);
+                for (int i = 0; i < n_samples; ++i)
+                    vote_count(votes(i))++;
 
-            for (int would_elect = 0; max_votes; --max_votes) {
-                would_elect += vote_count(max_votes);
-                if (would_elect >= k) break;
+                for (int would_elect = 0; max_votes; --max_votes) {
+                    would_elect += vote_count(max_votes);
+                    if (would_elect >= k) break;
+                }
+
+                for (int i = 0; i < n_samples; ++i) {
+                    if (votes(i) >= max_votes && votes(i) < votes_required)
+                        out[n_elected++] = i;
+                }
             }
+        }
 
-            for (int i = 0; i < n_samples; ++i) {
-                if (votes(i) >= max_votes && votes(i) < votes_required)
-                    out[n_elected++] = i;
+        return n_elected;
+    }
+
+
+int sparse_elect(VectorXf &projected_query, int k, int votes_required, int *out) const { // SparseVector<float> --> VectorXf
+        int found_leaves[n_trees];
+
+        /*
+        * The following loops over all trees, and routes the query to exactly one
+        * leaf in each.
+        */
+        #pragma omp parallel for
+        for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+            int idx_tree = 0;
+            for (int d = 0; d < depth; ++d) {
+                const int j = n_tree * depth + d;
+                const int idx_left = 2 * idx_tree + 1;
+                const int idx_right = idx_left + 1;
+                const float split_point = split_points(idx_tree, n_tree);
+                if (projected_query(j) <= split_point) { // projected_query.coeffRef() <-- projected_query(j)
+                    idx_tree = idx_left;
+                } else {
+                    idx_tree = idx_right;
+                }
+            }
+            found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
+        }
+
+        int n_elected = 0;
+        VectorXi votes = VectorXi::Zero(n_samples);
+
+        // count votes
+        for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+            const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
+            const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
+            for (int i = 0; i < nn; ++i, ++data) {
+                if (++votes(*data) == votes_required) {
+                    out[n_elected++] = *data;
+                }
+            }
+        }
+
+        if(!test) {
+            if (n_elected < k) {
+                /*
+                * If not enough samples had at least votes_required
+                * votes, find the maximum amount of votes needed such
+                * that the final search set size has at least k samples
+                */
+                VectorXf::Index max_index;
+                votes.maxCoeff(&max_index);
+                int max_votes = votes(max_index);
+
+                VectorXi vote_count = VectorXi::Zero(max_votes + 1);
+                for (int i = 0; i < n_samples; ++i)
+                    vote_count(votes(i))++;
+
+                for (int would_elect = 0; max_votes; --max_votes) {
+                    would_elect += vote_count(max_votes);
+                    if (would_elect >= k) break;
+                }
+
+                for (int i = 0; i < n_samples; ++i) {
+                    if (votes(i) >= max_votes && votes(i) < votes_required)
+                        out[n_elected++] = i;
+                }
             }
         }
 
@@ -220,7 +323,7 @@ class Mrpt {
     * @param out - output buffer
     * @return
     */
-    void exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices, int n_elected, int *out) const {
+    int exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices, int n_elected, int *out) const {
         VectorXf distances(n_elected);
 
         if (sparse) {
@@ -239,18 +342,21 @@ class Mrpt {
             MatrixXf::Index index;
             distances.minCoeff(&index);
             out[0] = indices(index);
-            return;
+            return 1;
         }
+
+        int mmin = std::min(k, n_elected);
 
         VectorXi idx(n_elected);
         std::iota(idx.data(), idx.data() + n_elected, 0);
-        std::nth_element(idx.data(), idx.data() + k, idx.data() + n_elected,
+        std::nth_element(idx.data(), idx.data() + mmin, idx.data() + n_elected,
                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
-        for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
+        for (int i = 0; i < mmin; ++i) out[i] = indices(idx(i));
+        return mmin;
     }
 
-    void sparse_exact_knn(const SparseMatrix<float>::ColXpr &q,
+    int sparse_exact_knn(const SparseMatrix<float>::ColXpr &q,
                           int k, const VectorXi &indices, int n_elected, int *out) const {
         VectorXf distances(n_elected);
 
@@ -263,14 +369,19 @@ class Mrpt {
             MatrixXf::Index index;
             distances.minCoeff(&index);
             out[0] = indices(index);
+            return 1;
         }
+
+        int mmin = std::min(k, n_elected);
+
 
         VectorXi idx(n_elected);
         std::iota(idx.data(), idx.data() + n_elected, 0);
-        std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_elected,
+        std::partial_sort(idx.data(), idx.data() + mmin, idx.data() + n_elected,
                           [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
-        for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
+        for (int i = 0; i < mmin; ++i) out[i] = indices(idx(i));
+        return mmin;
 }
 
     /**
@@ -489,6 +600,8 @@ class Mrpt {
     const int n_pool; // amount of random vectors needed for all the RP-trees
     const int n_array; // length of the one RP-tree as array
     const bool sparse; // whether the data is sparse or not
+    const bool test; // false: if the voting returns less than k nn-canditates, drop number of votes and try again
+                     // true: do nothing, this leads to error, unless you handle the input properly
 };
 
 #endif // CPP_MRPT_H_
