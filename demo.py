@@ -5,7 +5,7 @@ import mrpt
 
 # Generate synthetic test data
 k = 10; n_queries = 100
-data = np.dot(np.random.rand(1e5,5), np.random.rand(5,100)).astype('float32')
+data = np.dot(np.random.rand(int(1e5),5), np.random.rand(5,100)).astype('float32')
 queries = np.dot(np.random.rand(n_queries,5), np.random.rand(5,100)).astype('float32')
 
 # Solve exact nearest neighbors with standard methods from scipy and numpy for reference
