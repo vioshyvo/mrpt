@@ -156,7 +156,7 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
     PyObject *v;
     int k, elect, dim, n;
 
-    if (!PyArg_ParseTuple(args, "Oiii", &v, &k, &elect))
+    if (!PyArg_ParseTuple(args, "Oii", &v, &k, &elect))
         return NULL;
 
     float *indata = reinterpret_cast<float *>(PyArray_DATA(v));

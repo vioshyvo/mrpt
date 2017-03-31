@@ -138,7 +138,7 @@ class CompleteOrthogonalDecomposition {
    * problem \f[\mathrm{minimize} \|A X - B\|, \f] where \b A is the matrix of
    * which \c *this is the complete orthogonal decomposition.
    *
-   * \param B the right-hand sides of the problem to solve.
+   * \param b the right-hand sides of the problem to solve.
    *
    * \returns a solution.
    *
@@ -547,7 +547,6 @@ CompleteOrthogonalDecomposition<MatrixType>::householderQ() const {
   return m_cpqr.householderQ();
 }
 
-#ifndef __CUDACC__
 /** \return the complete orthogonal decomposition of \c *this.
   *
   * \sa class CompleteOrthogonalDecomposition
@@ -557,7 +556,6 @@ const CompleteOrthogonalDecomposition<typename MatrixBase<Derived>::PlainObject>
 MatrixBase<Derived>::completeOrthogonalDecomposition() const {
   return CompleteOrthogonalDecomposition<PlainObject>(eval());
 }
-#endif  // __CUDACC__
 
 }  // end namespace Eigen
 

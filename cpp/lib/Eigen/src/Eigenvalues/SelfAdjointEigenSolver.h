@@ -414,7 +414,8 @@ SelfAdjointEigenSolver<MatrixType>& SelfAdjointEigenSolver<MatrixType>
 
   if(n==1)
   {
-    m_eivalues.coeffRef(0,0) = numext::real(matrix.diagonal()[0]);
+    m_eivec = matrix;
+    m_eivalues.coeffRef(0,0) = numext::real(m_eivec.coeff(0,0));
     if(computeEigenvectors)
       m_eivec.setOnes(n,n);
     m_info = Success;
@@ -501,7 +502,7 @@ ComputationInfo computeFromTridiagonal_impl(DiagType& diag, SubDiagType& subdiag
         subdiag[i] = 0;
 
     // find the largest unreduced block
-    while (end>0 && subdiag[end-1]==0)
+    while (end>0 && subdiag[end-1]==RealScalar(0))
     {
       end--;
     }
@@ -569,8 +570,8 @@ template<typename SolverType> struct direct_selfadjoint_eigenvalues<SolverType,3
     EIGEN_USING_STD_MATH(atan2)
     EIGEN_USING_STD_MATH(cos)
     EIGEN_USING_STD_MATH(sin)
-    const Scalar s_inv3 = Scalar(1.0)/Scalar(3.0);
-    const Scalar s_sqrt3 = sqrt(Scalar(3.0));
+    const Scalar s_inv3 = Scalar(1)/Scalar(3);
+    const Scalar s_sqrt3 = sqrt(Scalar(3));
 
     // The characteristic equation is x^3 - c2*x^2 + c1*x - c0 = 0.  The
     // eigenvalues are the roots to this equation, all guaranteed to be
@@ -815,14 +816,14 @@ static void tridiagonal_qr_step(RealScalar* diag, RealScalar* subdiag, Index sta
 //   RealScalar mu = diag[end] - e2 / (td + (td>0 ? 1 : -1) * sqrt(td*td + e2));
   // This explain the following, somewhat more complicated, version:
   RealScalar mu = diag[end];
-  if(td==0)
+  if(td==RealScalar(0))
     mu -= abs(e);
   else
   {
     RealScalar e2 = numext::abs2(subdiag[end-1]);
     RealScalar h = numext::hypot(td,e);
-    if(e2==0)  mu -= (e / (td + (td>0 ? 1 : -1))) * (e / h);
-    else       mu -= e2 / (td + (td>0 ? h : -h));
+    if(e2==RealScalar(0)) mu -= (e / (td + (td>RealScalar(0) ? RealScalar(1) : RealScalar(-1)))) * (e / h);
+    else                  mu -= e2 / (td + (td>RealScalar(0) ? h : -h));
   }
   
   RealScalar x = diag[start] - mu;
