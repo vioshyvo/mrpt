@@ -17,3 +17,19 @@ Indexing time: 5.993 seconds
 100 exact queries time: 11.776 seconds
 Average recall: 0.97
 ~~~~
+
+## License
+
+MRPT is available under the MIT License (see LICENSE.txt). Note that third-party libraries in the cpp/lib folder may be distributed under other open source licenses. The Eigen library is licensed under the MPL2.
+
+## Citation
+~~~~
+@inproceedings{Hyvonen2016,
+  title={Fast nearest neighbor search through sparse random projections and voting},
+  author={Hyv{\"o}nen, Ville and Pitk{\"a}nen, Teemu and Tasoulis, Sotiris and J{\"a}{\"a}saari, Elias and Tuomainen, Risto and Wang, Liang and Corander, Jukka and Roos, Teemu},
+  booktitle={Big Data (Big Data), 2016 IEEE International Conference on},
+  pages={881--888},
+  year={2016},
+  organization={IEEE}
+}
+~~~~
