@@ -152,9 +152,11 @@ static PyObject *build(mrptIndex *self) {
 
 static void mrpt_dealloc(mrptIndex *self) {
     if (self->data) {
+#ifndef _WIN32
         if (self->mmap)
             munmap(self->data, self->n * self->dim * sizeof(float));
         else
+#endif
             delete[] self->data;
     }
     if (self->ptr)
