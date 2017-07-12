@@ -1,11 +1,3 @@
-/********************************************************
- * Ville Hyvönen & Teemu Pitkänen                       *
- * HIIT / University of Helsinki                        *
- * ville.o.hyvonen<at>helsinki.fi                       *
- * teemu.pitkanen<at>cs.helsinki.fi                     *
- * 2016                                                 *
- ********************************************************/
-
 #ifndef CPP_MRPT_H_
 #define CPP_MRPT_H_
 
