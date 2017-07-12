@@ -99,7 +99,7 @@ class Mrpt {
         else
             projected_query.noalias() = dense_random_matrix * q;
 
-        int found_leaves[n_trees];
+        VectorXi found_leaves(n_trees);
 
         /*
         * The following loops over all trees, and routes the query to exactly one 
@@ -119,7 +119,7 @@ class Mrpt {
                     idx_tree = idx_right;
                 }
             }
-            found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
+            found_leaves(n_tree) = idx_tree - (1 << depth) + 1;
         }
 
         int n_elected = 0, max_leaf_size = n_samples / (1 << depth) + 1;
@@ -128,7 +128,7 @@ class Mrpt {
 
         // count votes
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
+            const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves(n_tree)];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
             for (int i = 0; i < nn; ++i, ++data) {
                 if (++votes(*data) == votes_required) {

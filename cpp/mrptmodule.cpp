@@ -11,17 +11,20 @@
  */
 
 #include "Python.h"
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <cstdio>
 #include <cstdlib>
 #include <numeric>
 #include <string>
 #include <vector>
 #include <memory>
-#include "Mrpt.h"
+#include <sys/types.h>
+#include <sys/stat.h>
 
+#ifndef _WIN32
+#include <sys/mman.h>
+#endif
+
+#include "Mrpt.h"
 #include "numpy/arrayobject.h"
 
 #include <Eigen/Dense>
@@ -64,6 +67,7 @@ float *read_memory(char *file, int n, int dim) {
     return data;
 }
 
+#ifndef _WIN32
 float *read_mmap(char *file, int n, int dim) {
     FILE *fd;
     if ((fd = fopen(file, "rb")) == NULL)
@@ -85,6 +89,7 @@ float *read_mmap(char *file, int n, int dim) {
     fclose(fd);
     return data;
 }
+#endif
 
 static int Mrpt_init(mrptIndex *self, PyObject *args) {
     PyObject *py_data;
@@ -114,7 +119,12 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
             return -1;
         }
 
+#ifndef _WIN32
         data = mmap ? read_mmap(file, n, dim) : read_memory(file, n, dim);
+#else
+        data = read_memory(file, n, dim);
+#endif
+
         if (data == NULL) {
             PyErr_SetString(PyExc_IOError, "Unable to read data from file or allocate memory for it");
             return -1;
@@ -142,9 +152,11 @@ static PyObject *build(mrptIndex *self) {
 
 static void mrpt_dealloc(mrptIndex *self) {
     if (self->data) {
+#ifndef _WIN32
         if (self->mmap)
             munmap(self->data, self->n * self->dim * sizeof(float));
         else
+#endif
             delete[] self->data;
     }
     if (self->ptr)
