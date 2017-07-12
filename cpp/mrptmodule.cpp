@@ -17,12 +17,11 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifndef _WIN32
 #include <sys/mman.h>
-#include <sys/stat.h>
-#else
-#include <dirent.h>
 #endif
 
 #include "Mrpt.h"
