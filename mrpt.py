@@ -4,6 +4,7 @@
 # University of Helsinki / Helsinki Institute for Information Technology 2016
 #
 
+import os
 import numpy as np
 
 import mrptlib
@@ -53,6 +54,9 @@ class MRPTIndex(object):
             projection_sparsity = 1
         elif not 0 < projection_sparsity <= 1:
             raise ValueError("Sparsity should be in (0, 1]")
+
+        if mmap and os.name == 'nt':
+            raise ValueError("Memory mapping is not available on Windows")
 
         self.index = mrptlib.MrptIndex(data, n_samples, dim, depth, n_trees, projection_sparsity, mmap)
         self.built = False
