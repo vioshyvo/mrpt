@@ -11,8 +11,6 @@
  */
 
 #include "Python.h"
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <cstdio>
 #include <cstdlib>
 #include <numeric>
@@ -22,6 +20,9 @@
 
 #ifndef _WIN32
 #include <sys/mman.h>
+#include <sys/stat.h>
+#else
+#include <dirent.h>
 #endif
 
 #include "Mrpt.h"
