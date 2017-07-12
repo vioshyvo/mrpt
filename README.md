@@ -10,7 +10,11 @@ In the offline phase of the algorithm MRPT indexes the data with a collection of
 
 ## Python installation
 
-Install the module with `pip install git+https://github.com/teemupitkanen/mrpt/`. You can now run the demo (runs in less than a minute): `python demo.py`. An example output:
+Install the module with `pip install git+https://github.com/teemupitkanen/mrpt/`
+
+On MacOS, LLVM is needed for compiling: `brew install llvm`
+
+You can now run the demo (runs in less than a minute): `python demo.py`. An example output:
 ~~~~
 Indexing time: 5.993 seconds
 100 approximate queries time: 0.230 seconds
