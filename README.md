@@ -7,7 +7,6 @@ MRPT is a library for approximate nearest neighbor search written in C++11. Acco
 
 In the offline phase of the algorithm MRPT indexes the data with a collection of *random projection trees*. In the online phase the index structure allows us to answer queries in superior time. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found on [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) that was published on IEEE International Conference on Big Data 2016.
 
-
 ## Python installation
 
 Install the module with `pip install git+https://github.com/teemupitkanen/mrpt/`
@@ -21,6 +20,10 @@ Indexing time: 5.993 seconds
 100 exact queries time: 11.776 seconds
 Average recall: 0.97
 ~~~~
+
+## MRPT for other languages
+
+- [Go](https://github.com/rikonor/go-ann)
 
 ## License
 
