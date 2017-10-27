@@ -42,7 +42,7 @@ class Mrpt {
     ~Mrpt() {}
 
     /**
-    * The function whose call starts the actual index construction. Initializes 
+    * The function whose call starts the actual index construction. Initializes
     * arrays to store the tree structures and computes all the projections needed
     * later. Then repeatedly calls method grow_subtree that builds a single RP-tree.
     */
@@ -71,20 +71,20 @@ class Mrpt {
     }
 
     /**
-    * This function finds the k approximate nearest neighbors of the query object 
-    * q. The accuracy of the query depends on both the parameters used for index 
-    * construction and additional parameters given to this function. This 
-    * function implements two tricks to improve performance. The voting trick 
+    * This function finds the k approximate nearest neighbors of the query object
+    * q. The accuracy of the query depends on both the parameters used for index
+    * construction and additional parameters given to this function. This
+    * function implements two tricks to improve performance. The voting trick
     * interprets each index object in leaves returned by tree traversals as votes,
-    * and only performs the final linear search with the 'elect' most voted 
-    * objects. 
+    * and only performs the final linear search with the 'elect' most voted
+    * objects.
     * @param q - The query object whose neighbors the function finds
     * @param k - The number of neighbors the user wants the function to return
     * @param votes_required - The number of votes required for an object to be included in the linear search step
     * @param out - The output buffer
-    * @return 
+    * @return
     */
-    void query(const Map<VectorXf> &q, int k, int votes_required, int *out) const {
+    int query(const Map<VectorXf> &q, int k, int votes_required, int *out) const {
         VectorXf projected_query(n_pool);
         if (density < 1)
             projected_query.noalias() = sparse_random_matrix * q;
@@ -94,7 +94,7 @@ class Mrpt {
         VectorXi found_leaves(n_trees);
 
         /*
-        * The following loops over all trees, and routes the query to exactly one 
+        * The following loops over all trees, and routes the query to exactly one
         * leaf in each.
         */
         #pragma omp parallel for
@@ -129,32 +129,32 @@ class Mrpt {
             }
         }
 
-        if (n_elected < k) {
-            /*
-            * If not enough samples had at least votes_required
-            * votes, find the maximum amount of votes needed such
-            * that the final search set size has at least k samples
-            */
-            VectorXf::Index max_index;
-            votes.maxCoeff(&max_index);
-            int max_votes = votes(max_index);
+        // if (n_elected < k) {
+        //     /*
+        //     * If not enough samples had at least votes_required
+        //     * votes, find the maximum amount of votes needed such
+        //     * that the final search set size has at least k samples
+        //     */
+        //     VectorXf::Index max_index;
+        //     votes.maxCoeff(&max_index);
+        //     int max_votes = votes(max_index);
+        //
+        //     VectorXi vote_count = VectorXi::Zero(max_votes + 1);
+        //     for (int i = 0; i < n_samples; ++i)
+        //         vote_count(votes(i))++;
+        //
+        //     for (int would_elect = 0; max_votes; --max_votes) {
+        //         would_elect += vote_count(max_votes);
+        //         if (would_elect >= k) break;
+        //     }
+        //
+        //     for (int i = 0; i < n_samples; ++i) {
+        //         if (votes(i) >= max_votes && votes(i) < votes_required)
+        //             elected(n_elected++) = i;
+        //     }
+        // }
 
-            VectorXi vote_count = VectorXi::Zero(max_votes + 1);
-            for (int i = 0; i < n_samples; ++i)
-                vote_count(votes(i))++;
-
-            for (int would_elect = 0; max_votes; --max_votes) {
-                would_elect += vote_count(max_votes);
-                if (would_elect >= k) break;
-            }
-
-            for (int i = 0; i < n_samples; ++i) {
-                if (votes(i) >= max_votes && votes(i) < votes_required)
-                    elected(n_elected++) = i;
-            }
-        }
-
-        exact_knn(q, k, elected, n_elected, out);
+        return exact_knn(q, k, elected, n_elected, out);
     }
 
     /**
@@ -165,7 +165,7 @@ class Mrpt {
     * @param out - output buffer
     * @return
     */
-    void exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices, int n_elected, int *out) const {
+    int exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices, int n_elected, int *out) const {
         VectorXf distances(n_elected);
 
         #pragma omp parallel for
@@ -176,15 +176,18 @@ class Mrpt {
             MatrixXf::Index index;
             distances.minCoeff(&index);
             out[0] = indices(index);
-            return;
+            return 1;
         }
+
+        int mmin = std::min(k, n_elected);
 
         VectorXi idx(n_elected);
         std::iota(idx.data(), idx.data() + n_elected, 0);
         std::nth_element(idx.data(), idx.data() + k, idx.data() + n_elected,
                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
-        for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
+        for (int i = 0; i < mmin; ++i) out[i] = indices(idx(i));
+        return mmin;
     }
 
     /**
