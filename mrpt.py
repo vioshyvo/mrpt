@@ -92,6 +92,9 @@ class MRPTIndex(object):
         """
         if not self.built:
             raise RuntimeError("Cannot query before building index")
+        if q.dtype != np.float32:
+            raise ValueError("The query matrix should have type float32")
+
         return self.index.ann(q, k, votes_required)
 
     def exact_search(self, Q, k):
@@ -103,4 +106,7 @@ class MRPTIndex(object):
         :return: Matrix of indices where each row contains the indices of the nearest neighbors in the original
                  input data for the corresponding query.
         """
+        if Q.dtype != np.float32:
+            raise ValueError("The query matrix should have type float32")
+
         return self.index.exact_search(Q, k)
