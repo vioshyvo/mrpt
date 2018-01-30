@@ -82,31 +82,38 @@ class MRPTIndex(object):
         self.index.load(path)
         self.built = True
 
-    def ann(self, q, k, votes_required=1):
+    def ann(self, q, k, votes_required=1, return_distances=False):
         """
         The MRPT approximate nearest neighbor query.
         :param q: The query object, i.e. the vector whose nearest neighbors are searched for
         :param k: The number of neighbors the user wants the query to return
         :param votes_required: The number of votes an object has to get to be included in the linear search part of the query.
-        :return: The indices of the approximate nearest neighbors in the original input data given to the constructor.
+        :param return_distances: Whether the distances are also returned
+        :return: If return_distances is false, returns a vector of indices of the approximate
+                 nearest neighbors in the original input data for the corresponding query.
+                 Otherwise, returns a tuple where the first element contains the nearest
+                 neighbors and the second element contains their distances to the query.
         """
         if not self.built:
             raise RuntimeError("Cannot query before building index")
         if q.dtype != np.float32:
             raise ValueError("The query matrix should have type float32")
 
-        return self.index.ann(q, k, votes_required)
+        return self.index.ann(q, k, votes_required, return_distances)
 
-    def exact_search(self, Q, k):
+    def exact_search(self, Q, k, return_distances=False):
         """
         Performs an exact nearest neighbor query for several queries in parallel. The queries are
         given as a numpy matrix where each row contains a query. Useful for measuring accuracy.
-        :param q: The query object, i.e. the vector whose nearest neighbors are searched for
+        :param Q: The query object, i.e. the vector whose nearest neighbors are searched for
         :param k: The number of neighbors the user wants the query to return
-        :return: Matrix of indices where each row contains the indices of the nearest neighbors in the original
-                 input data for the corresponding query.
+        :param return_distances: Whether the distances are also returned
+        :return: If return_distances is false, returns a vector of indices of the exact
+                 nearest neighbors in the original input data for the corresponding query.
+                 Otherwise, returns a tuple where the first element contains the nearest
+                 neighbors and the second element contains their distances to the query.
         """
         if Q.dtype != np.float32:
             raise ValueError("The query matrix should have type float32")
 
-        return self.index.exact_search(Q, k)
+        return self.index.exact_search(Q, k, return_distances)

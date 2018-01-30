@@ -159,46 +159,74 @@ static void mrpt_dealloc(mrptIndex *self) {
 
 static PyObject *ann(mrptIndex *self, PyObject *args) {
     PyObject *v;
-    int k, elect, dim, n;
+    int k, elect, dim, n, return_distances;
 
-    if (!PyArg_ParseTuple(args, "Oii", &v, &k, &elect))
+    if (!PyArg_ParseTuple(args, "Oiii", &v, &k, &elect, &return_distances))
         return NULL;
 
     float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
-    PyObject *ret;
+    PyObject *nearest;
 
     if (PyArray_NDIM(v) == 1) {
         dim = PyArray_DIM(v, 0);
 
         npy_intp dims[1] = {k};
-        ret = PyArray_SimpleNew(1, dims, NPY_INT);
-        int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
+        nearest = PyArray_SimpleNew(1, dims, NPY_INT);
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA(nearest));
 
-        self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, outdata);
+        if (return_distances) {
+            PyObject *distances = PyArray_SimpleNew(1, dims, NPY_FLOAT32);
+            float *out_distances = reinterpret_cast<float *>(PyArray_DATA(distances));
+            self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, outdata, out_distances);
+
+            PyObject *out_tuple = PyTuple_New(2);
+            PyTuple_SetItem(out_tuple, 0, nearest);
+            PyTuple_SetItem(out_tuple, 1, distances);
+            return out_tuple;
+        } else {
+            self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, outdata);
+            return nearest;
+        }
     } else {
         n = PyArray_DIM(v, 0);
         dim = PyArray_DIM(v, 1);
 
         npy_intp dims[2] = {n, k};
-        ret = PyArray_SimpleNew(2, dims, NPY_INT);
-        int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
+        nearest = PyArray_SimpleNew(2, dims, NPY_INT);
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA(nearest));
 
-        for (int i = 0; i < n; ++i)
-            self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim), k, elect, outdata + i * k);
+        if (return_distances) {
+            npy_intp dims[2] = {n, k};
+            PyObject *distances = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
+            float *distances_out = reinterpret_cast<float *>(PyArray_DATA(distances));
+
+            for (int i = 0; i < n; ++i) {
+                self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim),
+                                 k, elect, outdata + i * k, distances_out + i * k);
+            }
+            PyObject *out_tuple = PyTuple_New(2);
+            PyTuple_SetItem(out_tuple, 0, nearest);
+            PyTuple_SetItem(out_tuple, 1, distances);
+            return out_tuple;
+        } else {
+            for (int i = 0; i < n; ++i) {
+                self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim),
+                                 k, elect, outdata + i * k);
+            }
+            return nearest;
+        }
     }
-
-    return ret;
 }
 
 static PyObject *exact_search(mrptIndex *self, PyObject *args) {
     PyObject *v;
-    int k, n, dim;
+    int k, n, dim, return_distances;
 
-    if (!PyArg_ParseTuple(args, "Oi", &v, &k))
+    if (!PyArg_ParseTuple(args, "Oii", &v, &k, &return_distances))
         return NULL;
 
     float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
-    PyObject *ret;
+    PyObject *nearest;
 
     VectorXi idx(self->n);
     std::iota(idx.data(), idx.data() + self->n, 0);
@@ -207,23 +235,51 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
         dim = PyArray_DIM(v, 0);
 
         npy_intp dims[1] = {k};
-        ret = PyArray_SimpleNew(1, dims, NPY_INT);
-        int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
+        nearest = PyArray_SimpleNew(1, dims, NPY_INT);
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA(nearest));
 
-        self->ptr->exact_knn(Eigen::Map<VectorXf>(indata, dim), k, idx, self->n, outdata);
+        if (return_distances) {
+            PyObject *distances = PyArray_SimpleNew(1, dims, NPY_FLOAT32);
+            float *out_distances = reinterpret_cast<float *>(PyArray_DATA(distances));
+            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata, dim), k, idx, self->n, outdata, out_distances);
+
+            PyObject *out_tuple = PyTuple_New(2);
+            PyTuple_SetItem(out_tuple, 0, nearest);
+            PyTuple_SetItem(out_tuple, 1, distances);
+            return out_tuple;
+        } else {
+            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata, dim), k, idx, self->n, outdata);
+            return nearest;
+        }
     } else {
         n = PyArray_DIM(v, 0);
         dim = PyArray_DIM(v, 1);
 
         npy_intp dims[2] = {n, k};
-        ret = PyArray_SimpleNew(2, dims, NPY_INT);
-        int *outdata = reinterpret_cast<int *>(PyArray_DATA(ret));
+        nearest = PyArray_SimpleNew(2, dims, NPY_INT);
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA(nearest));
 
-        for (int i = 0; i < n; ++i)
-            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim), k, idx, self->n, outdata + i * k);
+        if (return_distances) {
+            npy_intp dims[2] = {n, k};
+            PyObject *distances = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
+            float *distances_out = reinterpret_cast<float *>(PyArray_DATA(distances));
+
+            for (int i = 0; i < n; ++i) {
+                self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim),
+                                     k, idx, self->n, outdata + i * k, distances_out + i * k);
+            }
+            PyObject *out_tuple = PyTuple_New(2);
+            PyTuple_SetItem(out_tuple, 0, nearest);
+            PyTuple_SetItem(out_tuple, 1, distances);
+            return out_tuple;
+        } else {
+            for (int i = 0; i < n; ++i) {
+                self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim),
+                                     k, idx, self->n, outdata + i * k);
+            }
+            return nearest;
+        }
     }
-
-    return ret;
 }
 
 static PyObject *save(mrptIndex *self, PyObject *args) {
