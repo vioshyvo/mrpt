@@ -7,6 +7,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <cmath>
 
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
@@ -42,7 +43,7 @@ class Mrpt {
     ~Mrpt() {}
 
     /**
-    * The function whose call starts the actual index construction. Initializes 
+    * The function whose call starts the actual index construction. Initializes
     * arrays to store the tree structures and computes all the projections needed
     * later. Then repeatedly calls method grow_subtree that builds a single RP-tree.
     */
@@ -71,20 +72,21 @@ class Mrpt {
     }
 
     /**
-    * This function finds the k approximate nearest neighbors of the query object 
-    * q. The accuracy of the query depends on both the parameters used for index 
-    * construction and additional parameters given to this function. This 
-    * function implements two tricks to improve performance. The voting trick 
+    * This function finds the k approximate nearest neighbors of the query object
+    * q. The accuracy of the query depends on both the parameters used for index
+    * construction and additional parameters given to this function. This
+    * function implements two tricks to improve performance. The voting trick
     * interprets each index object in leaves returned by tree traversals as votes,
-    * and only performs the final linear search with the 'elect' most voted 
-    * objects. 
+    * and only performs the final linear search with the 'elect' most voted
+    * objects.
     * @param q - The query object whose neighbors the function finds
     * @param k - The number of neighbors the user wants the function to return
     * @param votes_required - The number of votes required for an object to be included in the linear search step
-    * @param out - The output buffer
-    * @return 
+    * @param out - The output buffer for the indices of the k approximate nearest neighbors
+    * @param out_distances - Output buffer for distances of the k approximate nearest neighbors (optional parameter)
+    * @return
     */
-    void query(const Map<VectorXf> &q, int k, int votes_required, int *out) const {
+    void query(const Map<VectorXf> &q, int k, int votes_required, int *out, float *out_distances = nullptr) const {
         VectorXf projected_query(n_pool);
         if (density < 1)
             projected_query.noalias() = sparse_random_matrix * q;
@@ -94,7 +96,7 @@ class Mrpt {
         VectorXi found_leaves(n_trees);
 
         /*
-        * The following loops over all trees, and routes the query to exactly one 
+        * The following loops over all trees, and routes the query to exactly one
         * leaf in each.
         */
         #pragma omp parallel for
@@ -154,7 +156,7 @@ class Mrpt {
             }
         }
 
-        exact_knn(q, k, elected, n_elected, out);
+        exact_knn(q, k, elected, n_elected, out, out_distances);
     }
 
     /**
@@ -162,10 +164,11 @@ class Mrpt {
     * @param q - query point as a vector
     * @param k - number of neighbors searched for
     * @param indices - indices of the points in the original matrix where the search is made
-    * @param out - output buffer
+    * @param out - output buffer for the indices of the k approximate nearest neighbors
+    * @param out_distances - output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @return
     */
-    void exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices, int n_elected, int *out) const {
+    void exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices, int n_elected, int *out, float *out_distances = nullptr) const {
         VectorXf distances(n_elected);
 
         #pragma omp parallel for
@@ -181,10 +184,15 @@ class Mrpt {
 
         VectorXi idx(n_elected);
         std::iota(idx.data(), idx.data() + n_elected, 0);
-        std::nth_element(idx.data(), idx.data() + k, idx.data() + n_elected,
+        std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_elected,
                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
         for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
+
+        if(out_distances) {
+          std::partial_sort(distances.data(), distances.data() + k, distances.data() + n_elected);
+          for(int i = 0; i < k; ++i) out_distances[i] = std::sqrt(distances(i));
+        }
     }
 
     /**
