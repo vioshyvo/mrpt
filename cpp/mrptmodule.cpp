@@ -1,15 +1,3 @@
-/********************************************************************
- * Author: Teemu Henrikki Pitkänen                                  *
- * Email: teemu.pitkanen@cs.helsinki.fi                             *
- * Helsinki Institute for Information Technology (HIIT) 2016        *
- * University of Helsinki, Finland                                  *
- ********************************************************************/
-
-/*
- * This file wraps the C++11 Mrpt code to an extension module compatible with
- * Python 2.7.
- */
-
 #include "Python.h"
 #include <sys/mman.h>
 #include <sys/stat.h>
