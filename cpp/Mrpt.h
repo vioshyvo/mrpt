@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <functional>
 #include <numeric>
-#include <queue>
 #include <random>
 #include <string>
 #include <vector>
@@ -147,9 +146,7 @@ class Mrpt {
     * function implements two tricks to improve performance. The voting trick
     * interprets each index object in leaves returned by tree traversals as votes,
     * and only performs the final linear search with the 'elect' most voted
-    * objects. The priority queue trick keeps track of nodes where the split value
-    * was close to the projection so that we can split the tree traversal to both
-    * subtrees if we want.
+    * objects.
     * @param q - The query object whose neighbors the function finds
     * @param k - The number of neighbors the user wants the function to return
     * @param votes_required - The number of votes required for an object to be included in the linear search step
@@ -171,7 +168,7 @@ class Mrpt {
     }
 
     int elect(const VectorXf &projected_query, int k, int votes_required, int *out) const {
-        int found_leaves[n_trees];
+        VectorXi found_leaves(n_trees);
 
         /*
         * The following loops over all trees, and routes the query to exactly one
@@ -191,7 +188,7 @@ class Mrpt {
                     idx_tree = idx_right;
                 }
             }
-            found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
+            found_leaves(n_tree) = idx_tree - (1 << depth) + 1;
         }
 
         int n_elected = 0;
@@ -199,7 +196,7 @@ class Mrpt {
 
         // count votes
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
+            const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves(n_tree)];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
             for (int i = 0; i < nn; ++i, ++data) {
                 if (++votes(*data) == votes_required) {
@@ -240,7 +237,7 @@ class Mrpt {
 
 
 int sparse_elect(VectorXf &projected_query, int k, int votes_required, int *out) const { // SparseVector<float> --> VectorXf
-        int found_leaves[n_trees];
+        VectorXi found_leaves(n_trees);
 
         /*
         * The following loops over all trees, and routes the query to exactly one
@@ -260,7 +257,7 @@ int sparse_elect(VectorXf &projected_query, int k, int votes_required, int *out)
                     idx_tree = idx_right;
                 }
             }
-            found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
+            found_leaves(n_tree) = idx_tree - (1 << depth) + 1;
         }
 
         int n_elected = 0;
@@ -268,7 +265,7 @@ int sparse_elect(VectorXf &projected_query, int k, int votes_required, int *out)
 
         // count votes
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
+            const VectorXi &idx_one_tree = tree_leaves[n_tree][found_leaves(n_tree)];
             const int nn = idx_one_tree.size(), *data = idx_one_tree.data();
             for (int i = 0; i < nn; ++i, ++data) {
                 if (++votes(*data) == votes_required) {

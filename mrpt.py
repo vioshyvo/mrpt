@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 import mrptlib
@@ -48,6 +49,9 @@ class MRPTIndex(object):
             projection_sparsity = 1
         elif not 0 < projection_sparsity <= 1:
             raise ValueError("Sparsity should be in (0, 1]")
+
+        if mmap and os.name == 'nt':
+            raise ValueError("Memory mapping is not available on Windows")
 
         if projection_sparsity < 1 and sparse:
             raise ValueError("Combining sparse data and sparse projections is unsupported")
