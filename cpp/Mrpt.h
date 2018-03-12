@@ -123,7 +123,7 @@ class Mrpt {
         VectorXf dense_projected_query;
         int n_elected;
 
-        if(density < 1) {
+        if (density < 1) {
             projected_query_sparse = sparse_random_matrix * q;
             dense_projected_query = VectorXf::Zero(projected_query.rows());
 
@@ -362,7 +362,6 @@ int sparse_elect(VectorXf &projected_query, int k, int votes_required, int *out)
         }
 
         int mmin = std::min(k, n_elected);
-
 
         VectorXi idx(n_elected);
         std::iota(idx.data(), idx.data() + n_elected, 0);

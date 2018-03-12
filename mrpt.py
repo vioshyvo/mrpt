@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import scipy.sparse
 
 import mrptlib
 
@@ -8,7 +9,7 @@ class MRPTIndex(object):
     """
     Wraps the extension module written in C++
     """
-    def __init__(self, data, depth, n_trees, projection_sparsity='auto', shape=None, mmap=False, sparse=False):
+    def __init__(self, data, depth, n_trees, projection_sparsity='auto', shape=None, mmap=False):
         """
         Initializes an MRPT index object.
         :param data: Input data either as a NxDim numpy ndarray or as a filepath to a binary file containing the data
@@ -17,9 +18,9 @@ class MRPTIndex(object):
         :param projection_sparsity: Expected ratio of non-zero components in a projection matrix
         :param shape: Shape of the data as a tuple (N, dim). Needs to be specified only if loading the data from a file.
         :param mmap: If true, the data is mapped into memory. Has effect only if the data is loaded from a file.
-        :param sparse: Set to True if the data should be treated as sparse
         :return:
         """
+
         if isinstance(data, np.ndarray):
             if len(data) == 0 or len(data.shape) != 2:
                 raise ValueError("The data matrix should be non-empty and two-dimensional")
@@ -33,6 +34,12 @@ class MRPTIndex(object):
                 raise ValueError("You must specify the shape of the data as a tuple (N, dim) "
                                  "when loading data from a binary file")
             n_samples, dim = shape
+        elif isinstance(data, scipy.sparse.spmatrix):
+            n_samples, dim = data.shape
+            data = list(data.todok().items())
+            if projection_sparsity != 1 and projection_sparsity is not None:
+                raise ValueError("Combining sparse data and sparse projections is unsupported - " +
+                                 "set projection_sparsity to None")
         else:
             raise ValueError("Data must be either an ndarray or a filepath")
 
@@ -53,10 +60,7 @@ class MRPTIndex(object):
         if mmap and os.name == 'nt':
             raise ValueError("Memory mapping is not available on Windows")
 
-        if projection_sparsity < 1 and sparse:
-            raise ValueError("Combining sparse data and sparse projections is unsupported")
-
-        self.index = mrptlib.MrptIndex(data, n_samples, dim, depth, n_trees, projection_sparsity, mmap, sparse)
+        self.index = mrptlib.MrptIndex(data, n_samples, dim, depth, n_trees, projection_sparsity, mmap)
         self.built = False
 
     def build(self):
@@ -96,6 +100,10 @@ class MRPTIndex(object):
         """
         if not self.built:
             raise RuntimeError("Cannot query before building index")
+
+        if isinstance(q, scipy.sparse.spmatrix):
+            q = list(q.todok().items())
+
         return self.index.ann(q, k, votes_required)
 
     def exact_search(self, Q, k):
@@ -107,4 +115,7 @@ class MRPTIndex(object):
         :return: Matrix of indices where each row contains the indices of the nearest neighbors in the original
                  input data for the corresponding query.
         """
+        if isinstance(Q, scipy.sparse.spmatrix):
+            Q = list(Q.todok().items())
+
         return self.index.exact_search(Q, k)
