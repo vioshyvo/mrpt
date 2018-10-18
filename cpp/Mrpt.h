@@ -47,9 +47,9 @@ class Mrpt {
     * arrays to store the tree structures and computes all the projections needed
     * later. Then repeatedly calls method grow_subtree that builds a single RP-tree.
     */
-    void grow() {
+    void grow(int seed = 0) {
         // generate the random matrix
-        density < 1 ? build_sparse_random_matrix() : build_dense_random_matrix();
+        density < 1 ? build_sparse_random_matrix(seed) : build_dense_random_matrix(seed);
 
         split_points = MatrixXf(n_array, n_trees);
         VectorXi indices(n_samples);
@@ -359,11 +359,12 @@ class Mrpt {
     *
     * where a = density.
     */
-    void build_sparse_random_matrix() {
+    void build_sparse_random_matrix(int seed = 0) {
         sparse_random_matrix = SparseMatrix<float, RowMajor>(n_pool, dim);
 
         std::random_device rd;
-        std::mt19937 gen(rd());
+        int s = seed ? seed : rd();
+        std::mt19937 gen(s);
         std::uniform_real_distribution<float> uni_dist(0, 1);
         std::normal_distribution<float> norm_dist(0, 1);
 
@@ -383,11 +384,12 @@ class Mrpt {
     * Builds a random dense matrix for use in random projection. The components of
     * the matrix are drawn from the standard normal distribution.
     */
-    void build_dense_random_matrix() {
+    void build_dense_random_matrix(int seed = 0) {
         dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_pool, dim);
 
         std::random_device rd;
-        std::mt19937 gen(rd());
+        int s = seed ? seed : rd();
+        std::mt19937 gen(s);
         std::normal_distribution<float> normal_dist(0, 1);
 
         std::generate(dense_random_matrix.data(), dense_random_matrix.data() + n_pool * dim,
