@@ -46,6 +46,8 @@ class Mrpt {
     * The function whose call starts the actual index construction. Initializes
     * arrays to store the tree structures and computes all the projections needed
     * later. Then repeatedly calls method grow_subtree that builds a single RP-tree.
+    * @param seed - A seed given to a rng when generating random vectors;
+    * a default value 0 initializes the rng randomly with rd()
     */
     void grow(int seed = 0) {
         // generate the random matrix
@@ -179,6 +181,10 @@ class Mrpt {
             MatrixXf::Index index;
             distances.minCoeff(&index);
             out[0] = indices(index);
+
+            if(out_distances) {
+              out_distances[0] = std::sqrt(distances(index));
+            }
             return;
         }
 
@@ -190,8 +196,7 @@ class Mrpt {
         for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
 
         if(out_distances) {
-          std::partial_sort(distances.data(), distances.data() + k, distances.data() + n_elected);
-          for(int i = 0; i < k; ++i) out_distances[i] = std::sqrt(distances(i));
+          for(int i = 0; i < k; ++i) out_distances[i] = std::sqrt(distances(idx(i)));
         }
     }
 
@@ -358,6 +363,9 @@ class Mrpt {
     * N(0, 1) w.p. a
     *
     * where a = density.
+    *
+    * @param seed - A seed given to a rng when generating random vectors;
+    * a default value 0 initializes the rng randomly with rd()
     */
     void build_sparse_random_matrix(int seed = 0) {
         sparse_random_matrix = SparseMatrix<float, RowMajor>(n_pool, dim);
@@ -383,6 +391,8 @@ class Mrpt {
     /*
     * Builds a random dense matrix for use in random projection. The components of
     * the matrix are drawn from the standard normal distribution.
+    * @param seed - A seed given to a rng when generating random vectors;
+    * a default value 0 initializes the rng randomly with rd()
     */
     void build_dense_random_matrix(int seed = 0) {
         dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_pool, dim);
