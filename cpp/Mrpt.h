@@ -37,7 +37,7 @@ class Mrpt {
         depth(depth_),
         density(density_),
         n_pool(n_trees_ * depth_),
-        n_array(1 << (depth_ + 1))
+        n_array((1 << depth_) - 1)
     { }
 
     ~Mrpt() {}
@@ -300,10 +300,26 @@ class Mrpt {
         return true;
     }
 
+    /**
+    * Accessor for split points of trees (for testing purposes)
+    * @param tree - index of tree in (0, ... , T-1)
+    * @param index - the index of branch in (0, ... , (2^depth) - 1):
+    * 0 = root
+    * 1 = first branch of first level
+    * 2 = second branch of first level
+    * 3 = first branch of second level etc.
+    * @return split point of index:th branch of tree:th tree
+    */
     float get_split_point(int tree, int index) const {
       return split_points(index, tree);
     }
 
+    /**
+    * Accessor for leaves of trees (for testing purposes)
+    * @param tree - index of tree in (0, ... T-1)
+    * @param leaf - index of leaf in (0, ... , 2^depth)
+    * @return indices of data points in leaf:th leaf of tree:th tree
+    */
     VectorXi get_leaf(int tree, int leaf) const {
       return tree_leaves[tree][leaf];
     }
