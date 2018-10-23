@@ -54,8 +54,6 @@ class Mrpt {
         density < 1 ? build_sparse_random_matrix(seed) : build_dense_random_matrix(seed);
 
         split_points = MatrixXf(n_array, n_trees);
-        VectorXi indices(n_samples);
-        std::iota(indices.data(), indices.data() + n_samples, 0);
 
         tree_leaves = std::vector<std::vector<VectorXi>>(n_trees);
 
@@ -68,6 +66,9 @@ class Mrpt {
             else
                 tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *X;
 
+            VectorXi indices(n_samples);
+            std::iota(indices.data(), indices.data() + n_samples, 0);
+    
             std::vector<VectorXi> t = grow_subtree(indices, 0, 0, n_tree, tree_projections);
             tree_leaves[n_tree] = t;
         }
@@ -335,7 +336,7 @@ class Mrpt {
     * @param tree_projections - Precalculated projection values for the current tree
     * @return The leaves as a vector of VectorXis
     */
-    std::vector<VectorXi> grow_subtree(const VectorXi &indices, int tree_level, int i, int n_tree, const MatrixXf &tree_projections) {
+    std::vector<VectorXi> grow_subtree(VectorXi &indices, int tree_level, int i, int n_tree, const MatrixXf &tree_projections) {
         int n = indices.size();
         int idx_left = 2 * i + 1;
         int idx_right = idx_left + 1;
@@ -346,32 +347,25 @@ class Mrpt {
             return v;
         }
 
-        VectorXf projections(n);
-        for (int i = 0; i < n; ++i)
-            projections(i) = tree_projections(tree_level, indices(i));
+        std::nth_element(indices.data(), indices.data() + n/2, indices.data() + n,
+            [&tree_projections, tree_level] (int i1, int i2) {
+              return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
+            });
+        int idx_split = (n % 2) ? n / 2 + 1 : n / 2;
+        VectorXi left_elems = indices.head(idx_split);
+        VectorXi right_elems = indices.tail(n - idx_split);
 
-        // sort indices of the projections based on their values
-        VectorXi ordered(n);
-        std::iota(ordered.data(), ordered.data() + n, 0);
-        std::sort(ordered.data(), ordered.data() + ordered.size(),
-                [&projections](int i1, int i2) {return projections(i1) < projections(i2);});
-
-        int split_point = (n % 2) ? n / 2 : n / 2 - 1; // median split
-        int idx_split_point = ordered(split_point);
-        int idx_split_point2 = ordered(split_point + 1);
-
-        split_points(i, n_tree) = (n % 2) ? projections(idx_split_point) :
-                                  (projections(idx_split_point) + projections(idx_split_point2)) / 2;
-        VectorXi left_indices = ordered.head(split_point + 1);
-        VectorXi right_indices = ordered.tail(n - split_point - 1);
-
-        VectorXi left_elems = VectorXi(left_indices.size());
-        VectorXi right_elems = VectorXi(right_indices.size());
-
-        for (int i = 0; i < left_indices.size(); ++i)
-            left_elems(i) = indices(left_indices(i));
-        for (int i = 0; i < right_indices.size(); ++i)
-            right_elems(i) = indices(right_indices(i));
+        if(n % 2) {
+          split_points(i, n_tree) = tree_projections(tree_level, indices(n/2));
+        } else {
+          auto left_it = std::max_element(left_elems.data(),
+              left_elems.data() + left_elems.size(),
+              [&tree_projections, tree_level] (int i1, int i2) {
+                return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
+              });
+          split_points(i, n_tree) = (tree_projections(tree_level, indices(n/2)) +
+            tree_projections(tree_level, *left_it)) / 2.0;
+        }
 
         std::vector<VectorXi> v = grow_subtree(left_elems, tree_level + 1, idx_left, n_tree, tree_projections);
         std::vector<VectorXi> w = grow_subtree(right_elems, tree_level + 1, idx_right, n_tree, tree_projections);
