@@ -54,7 +54,6 @@ class Mrpt {
         density < 1 ? build_sparse_random_matrix(seed) : build_dense_random_matrix(seed);
 
         split_points = MatrixXf(n_array, n_trees);
-
         tree_leaves = std::vector<std::vector<VectorXi>>(n_trees);
 
         #pragma omp parallel for
@@ -68,7 +67,7 @@ class Mrpt {
 
             VectorXi indices(n_samples);
             std::iota(indices.data(), indices.data() + n_samples, 0);
-    
+
             std::vector<VectorXi> t = grow_subtree(indices, 0, 0, n_tree, tree_projections);
             tree_leaves[n_tree] = t;
         }
@@ -316,13 +315,24 @@ class Mrpt {
     }
 
     /**
-    * Accessor for leaves of trees (for testing purposes)
+    * Accessor for point stored in leaves of trees (for testing purposes)
     * @param tree - index of tree in (0, ... T-1)
     * @param leaf - index of leaf in (0, ... , 2^depth)
-    * @return indices of data points in leaf:th leaf of tree:th tree
+    * @param index - index of a data point in a leaf
+    * @return index of index:th data point in leaf:th leaf of tree:th tree
     */
-    VectorXi get_leaf(int tree, int leaf) const {
-      return tree_leaves[tree][leaf];
+    int get_leaf_point(int tree, int leaf, int index) const {
+      return tree_leaves[tree][leaf](index);
+    }
+
+    /**
+    * Accessor for the number of points in a leaf of a tree
+    * @param tree - index of tree in (0, ... T-1)
+    * @param leaf - index of leaf in (0, ... , 2^depth)
+    * @return number of data points in leaf:th leaf of tree:th tree
+    */
+    int get_leaf_size(int tree, int leaf) {
+      return tree_leaves[tree][leaf].size();
     }
 
  private:
