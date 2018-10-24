@@ -326,14 +326,40 @@ class Mrpt {
     }
 
     /**
-    * Accessor for the number of points in a leaf of a tree
+    * Accessor for the number of points in a leaf of a tree (for test purposes)
     * @param tree - index of tree in (0, ... T-1)
     * @param leaf - index of leaf in (0, ... , 2^depth)
-    * @return number of data points in leaf:th leaf of tree:th tree
+    * @return - number of data points in leaf:th leaf of tree:th tree
     */
-    int get_leaf_size(int tree, int leaf) {
+    int get_leaf_size(int tree, int leaf) const {
       return tree_leaves[tree][leaf].size();
     }
+
+    /**
+    * @return - number of trees in the index
+    */
+    int get_n_trees() const {
+      return split_points.cols();
+    }
+
+    /**
+    * @return - depth of trees of index
+    */
+    int get_depth() const {
+      if(sparse_random_matrix.rows() > 0) {
+        return sparse_random_matrix.rows() / get_n_trees();
+      } else {
+        return dense_random_matrix.rows() / get_n_trees();
+      }
+    }
+
+    /**
+    * @return - number of points of the data set from which the index is built
+    */
+    int get_n_points() const {
+      return n_samples;
+    }
+    
 
  private:
     /**
