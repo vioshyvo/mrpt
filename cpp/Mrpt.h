@@ -68,8 +68,8 @@ class Mrpt {
             std::vector<int> indices(n_samples);
             std::iota(indices.begin(), indices.end(), 0);
 
-            std::vector<std::vector<int>> t = grow_subtree(indices, 0, 0, n_tree, tree_projections);
-            tree_leaves[n_tree] = t;
+            tree_leaves[n_tree] = std::vector<std::vector<int>>();
+            grow_subtree(indices.begin(), indices.end(), 0, 0, n_tree, tree_projections);
         }
     }
 
@@ -372,40 +372,36 @@ class Mrpt {
     * @param tree_projections - Precalculated projection values for the current tree
     * @return The indices of data points at each leaf of a tree
     */
-    std::vector<std::vector<int>> grow_subtree(std::vector<int> &indices, int tree_level, int i, int n_tree, const MatrixXf &tree_projections) {
-        int n = indices.size();
+    void grow_subtree(std::vector<int>::iterator begin, std::vector<int>::iterator end,
+          int tree_level, int i, int n_tree, const MatrixXf &tree_projections) {
+        int n = end - begin;
         int idx_left = 2 * i + 1;
         int idx_right = idx_left + 1;
 
         if (tree_level == depth) {
-            std::vector<std::vector<int>> v;
-            v.push_back(indices);
-            return v;
+            tree_leaves[n_tree].push_back(std::vector<int>(begin, end));
+            return;
         }
 
-        std::nth_element(indices.begin(), indices.begin() + n/2, indices.end(),
+        std::nth_element(begin, begin + n/2, end,
             [&tree_projections, tree_level] (int i1, int i2) {
               return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
             });
-        auto mid = (n % 2) ? indices.begin() + n/2 + 1 : indices.begin() + n/2;
-        std::vector<int> left_elems(indices.begin(), mid);
-        std::vector<int> right_elems(mid, indices.end());
+        auto mid = (n % 2) ? begin + n/2 + 1 : begin + n/2;
 
         if(n % 2) {
-          split_points(i, n_tree) = tree_projections(tree_level, indices[n/2]);
+          split_points(i, n_tree) = tree_projections(tree_level, *(mid - 1));
         } else {
-          auto left_it = std::max_element(left_elems.begin(),left_elems.end(),
+          auto left_it = std::max_element(begin, mid,
               [&tree_projections, tree_level] (int i1, int i2) {
                 return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
               });
-          split_points(i, n_tree) = (tree_projections(tree_level, indices[n/2]) +
+          split_points(i, n_tree) = (tree_projections(tree_level, *mid) +
             tree_projections(tree_level, *left_it)) / 2.0;
         }
 
-        std::vector<std::vector<int>> v = grow_subtree(left_elems, tree_level + 1, idx_left, n_tree, tree_projections);
-        std::vector<std::vector<int>> w = grow_subtree(right_elems, tree_level + 1, idx_right, n_tree, tree_projections);
-        v.insert(v.end(), w.begin(), w.end());
-        return v;
+        grow_subtree(begin, mid, tree_level + 1, idx_left, n_tree, tree_projections);
+        grow_subtree(mid, end, tree_level + 1, idx_right, n_tree, tree_projections);
     }
 
     /**
