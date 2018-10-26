@@ -37,8 +37,9 @@ class Mrpt {
         depth(depth_),
         density(density_),
         n_pool(n_trees_ * depth_),
-        n_array((1 << depth_) - 1)
-    { }
+        n_array((1 << depth_) - 1) {
+          count_first_leaf_indices();
+        }
 
     ~Mrpt() {}
 
@@ -54,7 +55,7 @@ class Mrpt {
         density < 1 ? build_sparse_random_matrix(seed) : build_dense_random_matrix(seed);
 
         split_points = MatrixXf(n_array, n_trees);
-        tree_leaves = std::vector<std::vector<std::vector<int>>>(n_trees);
+        tree_leaves = std::vector<std::vector<int>>(n_trees);
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
@@ -65,10 +66,10 @@ class Mrpt {
             else
                 tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *X;
 
-            std::vector<int> indices(n_samples);
+            tree_leaves[n_tree] = std::vector<int>(n_samples);
+            std::vector<int> &indices = tree_leaves[n_tree];
             std::iota(indices.begin(), indices.end(), 0);
 
-            tree_leaves[n_tree] = std::vector<std::vector<int>>();
             grow_subtree(indices.begin(), indices.end(), 0, 0, n_tree, tree_projections);
         }
     }
@@ -124,12 +125,13 @@ class Mrpt {
 
         // count votes
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            const std::vector<int> &idx_one_tree = tree_leaves[n_tree][found_leaves[n_tree]];
-            const int nn = idx_one_tree.size(), *data = &idx_one_tree[0];
-            for (int i = 0; i < nn; ++i, ++data) {
-                if (++votes(*data) == votes_required) {
-                    elected(n_elected++) = *data;
-                }
+            int leaf_begin = leaf_first_indices[found_leaves[n_tree]];
+            int leaf_end = leaf_first_indices[found_leaves[n_tree] + 1];
+            const std::vector<int> &indices = tree_leaves[n_tree];
+            for (int i = leaf_begin; i < leaf_end; ++i) {
+                int idx = indices[i];
+                if (++votes(idx) == votes_required)
+                    elected(n_elected++) = idx;
             }
         }
 
@@ -216,11 +218,7 @@ class Mrpt {
         for (int i = 0; i < n_trees; ++i) {
             int sz = tree_leaves[i].size();
             fwrite(&sz, sizeof(int), 1, fd);
-            for (int j = 0; j < sz; ++j) {
-                int lsz = tree_leaves[i][j].size();
-                fwrite(&lsz, sizeof(int), 1, fd);
-                fwrite(&tree_leaves[i][j][0], sizeof(int), lsz, fd);
-            }
+            fwrite(&tree_leaves[i][0], sizeof(int), sz, fd);
         }
 
         // save random matrix
@@ -258,18 +256,12 @@ class Mrpt {
         fread(split_points.data(), sizeof(float), n_array * n_trees, fd);
 
         // load tree leaves
-        tree_leaves = std::vector<std::vector<std::vector<int>>>(n_trees);
+        tree_leaves = std::vector<std::vector<int>>(n_trees);
         for (int i = 0; i < n_trees; ++i) {
             int sz;
             fread(&sz, sizeof(int), 1, fd);
-            std::vector<std::vector<int>> leaves(sz);
-            for (int j = 0; j < sz; ++j) {
-                int leaf_size;
-                fread(&leaf_size, sizeof(int), 1, fd);
-                std::vector<int> samples(leaf_size);
-                fread(&samples[0], sizeof(int), leaf_size, fd);
-                leaves[j] = samples;
-            }
+            std::vector<int> leaves(sz);
+            fread(&leaves[0], sizeof(int), sz, fd);
             tree_leaves[i] = leaves;
         }
 
@@ -322,7 +314,8 @@ class Mrpt {
     * @return index of index:th data point in leaf:th leaf of tree:th tree
     */
     int get_leaf_point(int tree, int leaf, int index) const {
-      return tree_leaves[tree][leaf][index];
+      int leaf_begin = leaf_first_indices[leaf];
+      return tree_leaves[tree][leaf_begin + index];
     }
 
     /**
@@ -332,7 +325,7 @@ class Mrpt {
     * @return - number of data points in leaf:th leaf of tree:th tree
     */
     int get_leaf_size(int tree, int leaf) const {
-      return tree_leaves[tree][leaf].size();
+      return leaf_first_indices[leaf + 1] - leaf_first_indices[leaf];
     }
 
     /**
@@ -365,12 +358,12 @@ class Mrpt {
     /**
     * Builds a single random projection tree. The tree is constructed by recursively
     * projecting the data on a random vector and splitting into two by the median.
-    * @param indices - The indices left in this branch
+    * @param begin - iterator to the index of the first data point of this branch
+    * @param end - iterator to the index of the last data point of this branch
     * @param tree_level - The level in tree where the recursion is at
     * @param i - The index within the tree where we are at
     * @param n_tree - The index of the tree within the index
     * @param tree_projections - Precalculated projection values for the current tree
-    * @return The indices of data points at each leaf of a tree
     */
     void grow_subtree(std::vector<int>::iterator begin, std::vector<int>::iterator end,
           int tree_level, int i, int n_tree, const MatrixXf &tree_projections) {
@@ -378,16 +371,13 @@ class Mrpt {
         int idx_left = 2 * i + 1;
         int idx_right = idx_left + 1;
 
-        if (tree_level == depth) {
-            tree_leaves[n_tree].push_back(std::vector<int>(begin, end));
-            return;
-        }
+        if (tree_level == depth) return;
 
         std::nth_element(begin, begin + n/2, end,
             [&tree_projections, tree_level] (int i1, int i2) {
               return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
             });
-        auto mid = (n % 2) ? begin + n/2 + 1 : begin + n/2;
+        auto mid = end - n/2;
 
         if(n % 2) {
           split_points(i, n_tree) = tree_projections(tree_level, *(mid - 1));
@@ -455,12 +445,32 @@ class Mrpt {
                       [&normal_dist, &gen] { return normal_dist(gen); });
     }
 
+    void count_leaf_sizes(int n, int level, std::vector<int> &leaf_sizes) {
+      if(level == 0) {
+        leaf_sizes.push_back(n);
+        return;
+      }
+      count_leaf_sizes(n - n/2, level - 1, leaf_sizes);
+      count_leaf_sizes(n/2, level - 1, leaf_sizes);
+    }
+
+    void count_first_leaf_indices() {
+      std::vector<int> leaf_sizes;
+      count_leaf_sizes(n_samples, depth, leaf_sizes);
+
+      leaf_first_indices = std::vector<int>(leaf_sizes.size() + 1);
+      leaf_first_indices[0] = 0;
+      for(int i = 0; i < leaf_sizes.size(); ++i)
+        leaf_first_indices[i+1] = leaf_first_indices[i] + leaf_sizes[i];
+    }
+
+
     const Map<const MatrixXf> *X; // the data matrix
     MatrixXf split_points; // all split points in all trees
-    std::vector<std::vector<std::vector<int>>> tree_leaves; // contains all leaves of all trees,
-                                                    // indexed as tree_leaves[tree number][leaf number][index in leaf]
+    std::vector<std::vector<int>> tree_leaves; // contains all leaves of all trees
     Matrix<float, Dynamic, Dynamic, RowMajor> dense_random_matrix; // random vectors needed for all the RP-trees
     SparseMatrix<float, RowMajor> sparse_random_matrix; // random vectors needed for all the RP-trees
+    std::vector<int> leaf_first_indices; // first indices of each leaf of tree in tree_leaves
 
     const int n_samples; // sample size of data
     const int dim; // dimension of data
