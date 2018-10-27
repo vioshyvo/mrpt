@@ -445,18 +445,34 @@ class Mrpt {
                       [&normal_dist, &gen] { return normal_dist(gen); });
     }
 
-    void count_leaf_sizes(int n, int level, std::vector<int> &leaf_sizes) {
-      if(level == 0) {
-        leaf_sizes.push_back(n);
+    /**
+    * Computes the leaf sizes of a tree assuming a median split and that
+    * when the number points is odd, the extra point is always assigned to
+    * to the left branch.
+    * @param n - number data points
+    * @param level - current level of the tree
+    * @param tree_depth - depth of the whole tree
+    * @param out_leaf_sizes - vector for the output; after completing
+    * the function is a vector of length n containing the leaf sizes
+    */
+    void count_leaf_sizes(int n, int level, int tree_depth, std::vector<int> &out_leaf_sizes) {
+      if(level == tree_depth) {
+        out_leaf_sizes.push_back(n);
         return;
       }
-      count_leaf_sizes(n - n/2, level - 1, leaf_sizes);
-      count_leaf_sizes(n/2, level - 1, leaf_sizes);
+      count_leaf_sizes(n - n/2, level + 1, tree_depth, out_leaf_sizes);
+      count_leaf_sizes(n/2, level + 1, tree_depth, out_leaf_sizes);
     }
 
+    /**
+    * Computes indices of the first elements of leaves in a vector containing
+    * all the leaves of a tree concatenated. Assumes that median split is used
+    * and when the number points is odd, the extra point is always assigned to
+    * to the left branch.
+    */
     void count_first_leaf_indices() {
       std::vector<int> leaf_sizes;
-      count_leaf_sizes(n_samples, depth, leaf_sizes);
+      count_leaf_sizes(n_samples, 0, depth, leaf_sizes);
 
       leaf_first_indices = std::vector<int>(leaf_sizes.size() + 1);
       leaf_first_indices[0] = 0;
