@@ -17,29 +17,15 @@ using namespace Eigen;
 class Mrpt {
  public:
     /**
-    * The constructor of the index. The inputs are the data for which the index
-    * will be built and additional parameters that affect the accuracy of the NN
-    * approximation. Concisely, larger n_trees_ or smaller depth values improve
-    * accuracy but slow down the queries. A general rule for the right balance is
-    * not known. The constructor does not actually build the trees, but that is
-    * done by a separate function 'grow' that has to be called before queries can
-    * be made.
-    * @param X_ - Pointer to a matrix containing the data.
-    * @param n_trees_ - The number of trees to be used in the index.
-    * @param depth_ - The depth of the trees.
-    * @param density_ - Expected ratio of non-zero components in a projection matrix.
+    * The constructor of the index.The constructor does not actually build
+    * the index but that is done by the function 'grow' which has to be called
+    * before queries can be made.
+    * @param X_ - Pointer to the Eigen::Map which refers to the data matrix.
     */
-    Mrpt(const Map<const MatrixXf> *X_, int n_trees_, int depth_, float density_) :
+    Mrpt(const Map<const MatrixXf> *X_) :
         X(X_),
         n_samples(X_->cols()),
-        dim(X_->rows()),
-        n_trees(n_trees_),
-        depth(depth_),
-        density(density_),
-        n_pool(n_trees_ * depth_),
-        n_array((1 << depth_) - 1) {
-          count_first_leaf_indices();
-        }
+        dim(X_->rows()) {}
 
     ~Mrpt() {}
 
@@ -47,15 +33,25 @@ class Mrpt {
     * The function whose call starts the actual index construction. Initializes
     * arrays to store the tree structures and computes all the projections needed
     * later. Then repeatedly calls method grow_subtree that builds a single RP-tree.
+    * @param n_trees_ - The number of trees to be used in the index.
+    * @param depth_ - The depth of the trees.
+    * @param density_ - Expected ratio of non-zero components in a projection matrix.
     * @param seed - A seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with rd()
     */
-    void grow(int seed = 0) {
-        // generate the random matrix
+    void grow(int n_trees_, int depth_, float density_, int seed = 0) {
+        n_trees = n_trees_;
+        depth = depth_;
+        density = density_;
+        n_pool = n_trees_ * depth_;
+        n_array = 1 << (depth_ + 1);
+
         density < 1 ? build_sparse_random_matrix(seed) : build_dense_random_matrix(seed);
 
         split_points = MatrixXf(n_array, n_trees);
         tree_leaves = std::vector<std::vector<int>>(n_trees);
+
+        count_first_leaf_indices();
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
@@ -212,6 +208,10 @@ class Mrpt {
         if ((fd = fopen(path, "wb")) == NULL)
             return false;
 
+        fwrite(&n_trees, sizeof(int), 1, fd);
+        fwrite(&depth, sizeof(int), 1, fd);
+        fwrite(&density, sizeof(float), 1, fd);
+
         fwrite(split_points.data(), sizeof(float), n_array * n_trees, fd);
 
         // save tree leaves
@@ -251,6 +251,15 @@ class Mrpt {
         FILE *fd;
         if ((fd = fopen(path, "rb")) == NULL)
             return false;
+
+        fread(&n_trees, sizeof(int), 1, fd);
+        fread(&depth, sizeof(int), 1, fd);
+        fread(&density, sizeof(float), 1, fd);
+
+        n_pool = n_trees * depth;
+        n_array = 1 << (depth + 1);
+
+        count_first_leaf_indices();
 
         split_points = MatrixXf(n_array, n_trees);
         fread(split_points.data(), sizeof(float), n_array * n_trees, fd);
@@ -490,11 +499,11 @@ class Mrpt {
 
     const int n_samples; // sample size of data
     const int dim; // dimension of data
-    const int n_trees; // number of RP-trees
-    const int depth; // depth of an RP-tree with median split
-    const float density; // expected ratio of non-zero components in a projection matrix
-    const int n_pool; // amount of random vectors needed for all the RP-trees
-    const int n_array; // length of the one RP-tree as array
+    int n_trees; // number of RP-trees
+    int depth; // depth of an RP-tree with median split
+    float density; // expected ratio of non-zero components in a projection matrix
+    int n_pool; // amount of random vectors needed for all the RP-trees
+    int n_array; // length of the one RP-tree as array
 };
 
 #endif // CPP_MRPT_H_
