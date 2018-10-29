@@ -85,7 +85,8 @@ class Mrpt {
     * @param out_distances - Output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @return
     */
-    void query(const Map<VectorXf> &q, int k, int votes_required, int *out, float *out_distances = nullptr) const {
+    void query(const Map<VectorXf> &q, int k, int votes_required, int *out,
+       float *out_distances = nullptr, int *out_n_elected = nullptr) const {
         VectorXf projected_query(n_pool);
         if (density < 1)
             projected_query.noalias() = sparse_random_matrix * q;
@@ -131,6 +132,7 @@ class Mrpt {
             }
         }
 
+        if(out_n_elected) *out_n_elected += n_elected;
         exact_knn(q, k, elected, n_elected, out, out_distances);
     }
 
@@ -601,8 +603,7 @@ class Autotuning {
     }
 
     float get_candidate_set_size(int n_trees, int depth, int v) {
-      // return candidate_set_size(v - 1, n_trees - 1);
-      return 0;
+      return candidate_set_size(v - 1, n_trees - 1);
     }
 
   private:
