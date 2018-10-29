@@ -349,6 +349,12 @@ class Mrpt {
       return n_samples;
     }
 
+    /**
+    * @return - dimension of the data set from which the index is built
+    */
+    int get_dim() const {
+      return dim;
+    }
 
  private:
     /**
@@ -495,19 +501,71 @@ class Mrpt {
 
 class Autotuning {
   public:
+    Autotuning(const Map<const MatrixXf> *X_, Map<MatrixXf> *Q_) :
+      X(X_),
+      Q(Q_) {}
 
-  void tune(int trees_max_, int min_depth_, int max_depth_, int votes_max_, float density_, int k) {
-    trees_max = trees_max_;
-    votes_max = votes_max_;
-  }
+    ~Autotuning() {}
 
-  int get_recall(int n_trees, int depth, int vote_threshold) {
-    return 0;
-  }
+    void tune(int trees_max, int min_depth, int max_depth, int votes_max,
+       float density, int k, int seed_mrpt = 0) {
+      int depth = min_depth;
+      int n_test = Q->cols();
+      int d = X->rows();
+      recall_matrix = MatrixXd::Zero(votes_max, trees_max);
+
+      MatrixXi exact(k, n_test);
+      Mrpt index_exact(X);
+      compute_exact(index_exact, exact);
+
+      for(int t = 1; t <= trees_max; ++t) {
+        Mrpt index(X);
+        index.grow(t, depth, density, seed_mrpt);
+
+        int votes_index = votes_max < t ? votes_max : t;
+        for(int v = 1; v <= votes_index; ++v) {
+          for(int i = 0; i < n_test; ++i) {
+            std::vector<int> result(k);
+            index.query(Map<VectorXf>(Q->data() + i * d, d), k, v, &result[0]);
+            std::sort(result.begin(), result.end());
+
+            std::set<int> intersect;
+            std::set_intersection(exact.data() + i * k, exact.data() + i * k + k, result.begin(), result.end(),
+                             std::inserter(intersect, intersect.begin()));
+
+            recall_matrix(v - 1, t - 1) += intersect.size();
+          }
+        }
+      }
+
+      recall_matrix /= (k * n_test);
+      std::cout << recall_matrix << "\n\n";
+
+    }
+
+    float get_recall(int n_trees, int depth, int v) {
+      return recall_matrix(v - 1, n_trees - 1);
+    }
 
   private:
-    int trees_max;
-    int votes_max;
+
+    void compute_exact(Mrpt &index, MatrixXi &out_exact) {
+      int k = out_exact.rows();
+      int nt = out_exact.cols();
+      int n = index.get_n_points();
+      int d = index.get_dim();
+      for(int i = 0; i < nt; ++i) {
+        VectorXi idx(n);
+        std::iota(idx.data(), idx.data() + n, 0);
+
+        index.exact_knn(Map<VectorXf>(Q->data() + i * d, d), k, idx, n, out_exact.data() + i * k);
+        std::sort(out_exact.data() + i * k, out_exact.data() + i * k + k);
+      }
+    }
+
+    const Map<const MatrixXf> *X;
+    Map<MatrixXf> *Q;
+    MatrixXd recall_matrix;
 };
 
 #endif // CPP_MRPT_H_
