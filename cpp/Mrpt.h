@@ -131,31 +131,6 @@ class Mrpt {
             }
         }
 
-        if (n_elected < k) {
-            /*
-            * If not enough samples had at least votes_required
-            * votes, find the maximum amount of votes needed such
-            * that the final search set size has at least k samples
-            */
-            VectorXf::Index max_index;
-            votes.maxCoeff(&max_index);
-            int max_votes = votes(max_index);
-
-            VectorXi vote_count = VectorXi::Zero(max_votes + 1);
-            for (int i = 0; i < n_samples; ++i)
-                vote_count(votes(i))++;
-
-            for (int would_elect = 0; max_votes; --max_votes) {
-                would_elect += vote_count(max_votes);
-                if (would_elect >= k) break;
-            }
-
-            for (int i = 0; i < n_samples; ++i) {
-                if (votes(i) >= max_votes && votes(i) < votes_required)
-                    elected(n_elected++) = i;
-            }
-        }
-
         exact_knn(q, k, elected, n_elected, out, out_distances);
     }
 
@@ -169,6 +144,15 @@ class Mrpt {
     * @return
     */
     void exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices, int n_elected, int *out, float *out_distances = nullptr) const {
+
+        if(!n_elected) {
+          for(int i = 0; i < k; ++i) out[i] = -1;
+          if(out_distances) {
+            for(int i = 0; i < k; ++i) out_distances[i] = -1;
+          }
+          return;
+        }
+
         VectorXf distances(n_elected);
 
         #pragma omp parallel for
@@ -178,23 +162,26 @@ class Mrpt {
         if (k == 1) {
             MatrixXf::Index index;
             distances.minCoeff(&index);
-            out[0] = indices(index);
+            out[0] = n_elected ? indices(index) : -1;
 
-            if(out_distances) {
-              out_distances[0] = std::sqrt(distances(index));
-            }
+            if(out_distances)
+              out_distances[0] = n_elected ? std::sqrt(distances(index)) : -1;
+
             return;
         }
 
+        int n_to_sort = n_elected > k ? k : n_elected;
         VectorXi idx(n_elected);
         std::iota(idx.data(), idx.data() + n_elected, 0);
-        std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_elected,
+        std::partial_sort(idx.data(), idx.data() + n_to_sort, idx.data() + n_elected,
                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
-        for (int i = 0; i < k; ++i) out[i] = indices(idx(i));
+        for (int i = 0; i < k; ++i)
+          out[i] = i < n_elected ? indices(idx(i)) : -1;
 
         if(out_distances) {
-          for(int i = 0; i < k; ++i) out_distances[i] = std::sqrt(distances(idx(i)));
+          for(int i = 0; i < k; ++i)
+            out_distances[i] = i < n_elected ? std::sqrt(distances(idx(i))) : -1;
         }
     }
 
