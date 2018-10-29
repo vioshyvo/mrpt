@@ -356,6 +356,8 @@ class Mrpt {
       return dim;
     }
 
+    friend class Autotuning;
+
  private:
     /**
     * Builds a single random projection tree. The tree is constructed by recursively
@@ -482,6 +484,63 @@ class Mrpt {
         leaf_first_indices[i+1] = leaf_first_indices[i] + leaf_sizes[i];
     }
 
+    void count_elected(const Map<VectorXf> &q, const Map<VectorXi> &exact, int votes_max,
+      MatrixXd &recall, MatrixXd &candidate_set_size) const {
+        VectorXf projected_query(n_pool);
+        if (density < 1)
+            projected_query.noalias() = sparse_random_matrix * q;
+        else
+            projected_query.noalias() = dense_random_matrix * q;
+
+        std::vector<int> found_leaves(n_trees);
+
+        #pragma omp parallel for
+        for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+            int idx_tree = 0;
+            for (int d = 0; d < depth; ++d) {
+                const int j = n_tree * depth + d;
+                const int idx_left = 2 * idx_tree + 1;
+                const int idx_right = idx_left + 1;
+                const float split_point = split_points(idx_tree, n_tree);
+                if (projected_query(j) <= split_point) {
+                    idx_tree = idx_left;
+                } else {
+                    idx_tree = idx_right;
+                }
+            }
+            found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
+        }
+
+        VectorXi votes = VectorXi::Zero(n_samples);
+
+        recall.col(0) = VectorXd::Zero(votes_max);
+        candidate_set_size.col(0) = VectorXd::Zero(votes_max);
+
+        // count votes
+        const int *exact_begin = exact.data();
+        const int *exact_end = exact.data() + exact.size();
+        for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+            if(n_tree) {
+              recall.col(n_tree) = recall.col(n_tree - 1);
+              candidate_set_size.col(n_tree) = candidate_set_size.col(n_tree - 1);
+            }
+
+            int leaf_begin = leaf_first_indices[found_leaves[n_tree]];
+            int leaf_end = leaf_first_indices[found_leaves[n_tree] + 1];
+            const std::vector<int> &indices = tree_leaves[n_tree];
+            for (int i = leaf_begin; i < leaf_end; ++i) {
+                int idx = indices[i];
+                int v = ++votes(idx);
+                if (v <= votes_max) {
+                  candidate_set_size(v-1, n_tree)++;
+                  if(std::find(exact_begin, exact_end, idx) != exact_end) // is there a faster way to find from the sorted range?
+                    recall(v-1, n_tree)++;
+                }
+            }
+        }
+    }
+
+
 
     const Map<const MatrixXf> *X; // the data matrix
     MatrixXf split_points; // all split points in all trees
@@ -512,39 +571,38 @@ class Autotuning {
       int depth = min_depth;
       int n_test = Q->cols();
       int d = X->rows();
-      recall_matrix = MatrixXd::Zero(votes_max, trees_max);
+      recall = MatrixXd::Zero(votes_max, trees_max);
+      candidate_set_size = MatrixXd::Zero(votes_max, trees_max);
+
+      Mrpt index(X);
+      index.grow(trees_max, depth, density, seed_mrpt);
 
       MatrixXi exact(k, n_test);
-      Mrpt index_exact(X);
-      compute_exact(index_exact, exact);
+      compute_exact(index, exact);
 
-      for(int t = 1; t <= trees_max; ++t) {
-        Mrpt index(X);
-        index.grow(t, depth, density, seed_mrpt);
+      for(int i = 0; i < n_test; ++i) {
+        MatrixXd recall_tmp(votes_max, trees_max);
+        MatrixXd candidate_set_size_tmp = MatrixXd::Zero(votes_max, trees_max);
 
-        int votes_index = votes_max < t ? votes_max : t;
-        for(int v = 1; v <= votes_index; ++v) {
-          for(int i = 0; i < n_test; ++i) {
-            std::vector<int> result(k);
-            index.query(Map<VectorXf>(Q->data() + i * d, d), k, v, &result[0]);
-            std::sort(result.begin(), result.end());
+        index.count_elected(Map<VectorXf>(Q->data() + i * d, d), Map<VectorXi>(exact.data() + i * k, k), votes_max, recall_tmp, candidate_set_size_tmp);
 
-            std::set<int> intersect;
-            std::set_intersection(exact.data() + i * k, exact.data() + i * k + k, result.begin(), result.end(),
-                             std::inserter(intersect, intersect.begin()));
-
-            recall_matrix(v - 1, t - 1) += intersect.size();
-          }
-        }
+        recall += recall_tmp;
+        candidate_set_size += candidate_set_size_tmp;
       }
 
-      recall_matrix /= (k * n_test);
-      std::cout << recall_matrix << "\n\n";
+      recall /= (k * n_test);
+      candidate_set_size /= n_test;
+      std::cout << recall << "\n\n";
 
     }
 
     float get_recall(int n_trees, int depth, int v) {
-      return recall_matrix(v - 1, n_trees - 1);
+      return recall(v - 1, n_trees - 1);
+    }
+
+    float get_candidate_set_size(int n_trees, int depth, int v) {
+      // return candidate_set_size(v - 1, n_trees - 1);
+      return 0;
     }
 
   private:
@@ -565,7 +623,7 @@ class Autotuning {
 
     const Map<const MatrixXf> *X;
     Map<MatrixXf> *Q;
-    MatrixXd recall_matrix;
+    MatrixXd recall, candidate_set_size;
 };
 
 #endif // CPP_MRPT_H_
