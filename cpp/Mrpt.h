@@ -17,7 +17,7 @@ using namespace Eigen;
 class Mrpt {
  public:
     /**
-    * The constructor of the index.The constructor does not actually build
+    * The constructor of the index. The constructor does not actually build
     * the index but that is done by the function 'grow' which has to be called
     * before queries can be made.
     * @param X_ - Pointer to the Eigen::Map which refers to the data matrix.
@@ -491,6 +491,23 @@ class Mrpt {
     float density; // expected ratio of non-zero components in a projection matrix
     int n_pool; // amount of random vectors needed for all the RP-trees
     int n_array; // length of the one RP-tree as array
+};
+
+class Autotuning {
+  public:
+
+  void tune(int trees_max_, int min_depth_, int max_depth_, int votes_max_, float density_, int k) {
+    trees_max = trees_max_;
+    votes_max = votes_max_;
+  }
+
+  int get_recall(int n_trees, int depth, int vote_threshold) {
+    return 0;
+  }
+
+  private:
+    int trees_max;
+    int votes_max;
 };
 
 #endif // CPP_MRPT_H_
