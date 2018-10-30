@@ -487,7 +487,7 @@ class Mrpt {
     }
 
     void count_elected(const Map<VectorXf> &q, const Map<VectorXi> &exact, int votes_max,
-      MatrixXd &recall, MatrixXd &candidate_set_size) const {
+      std::vector<MatrixXd> &recalls, std::vector<MatrixXd> &cs_sizes) const {
         VectorXf projected_query(n_pool);
         if (density < 1)
             projected_query.noalias() = sparse_random_matrix * q;
@@ -496,10 +496,19 @@ class Mrpt {
 
         std::vector<int> found_leaves(n_trees);
 
+        int depth_min = depth - recalls.size() + 1;
+        std::vector<std::vector<int>> start_indices(n_trees);
+
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+            start_indices[n_tree] = std::vector<int>(depth - depth_min);
             int idx_tree = 0;
             for (int d = 0; d < depth; ++d) {
+                if(d >= depth_min) {
+                  int diff = depth - d;
+                  start_indices[n_tree][d - depth_min] = (1 << diff) * (idx_tree + 1) - 1 - (1 << depth) + 1;
+                }
+
                 const int j = n_tree * depth + d;
                 const int idx_left = 2 * idx_tree + 1;
                 const int idx_right = idx_left + 1;
@@ -513,33 +522,46 @@ class Mrpt {
             found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
         }
 
-        VectorXi votes = VectorXi::Zero(n_samples);
-
-        recall.col(0) = VectorXd::Zero(votes_max);
-        candidate_set_size.col(0) = VectorXd::Zero(votes_max);
-
-        // count votes
         const int *exact_begin = exact.data();
         const int *exact_end = exact.data() + exact.size();
-        for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            if(n_tree) {
-              recall.col(n_tree) = recall.col(n_tree - 1);
-              candidate_set_size.col(n_tree) = candidate_set_size.col(n_tree - 1);
-            }
 
-            int leaf_begin = leaf_first_indices[found_leaves[n_tree]];
-            int leaf_end = leaf_first_indices[found_leaves[n_tree] + 1];
-            const std::vector<int> &indices = tree_leaves[n_tree];
-            for (int i = leaf_begin; i < leaf_end; ++i) {
-                int idx = indices[i];
-                int v = ++votes(idx);
-                if (v <= votes_max) {
-                  candidate_set_size(v-1, n_tree)++;
-                  if(std::find(exact_begin, exact_end, idx) != exact_end) // is there a faster way to find from the sorted range?
-                    recall(v-1, n_tree)++;
-                }
-            }
+        for(int depth_crnt = depth_min; depth_crnt <= depth; ++depth_crnt) {
+          // std::cout << "depth: " << depth_crnt << std::endl;
+          VectorXi votes = VectorXi::Zero(n_samples);
+
+          MatrixXd recall(votes_max, n_trees);
+          MatrixXd candidate_set_size(votes_max, n_trees);
+          recall.col(0) = VectorXd::Zero(votes_max);
+          candidate_set_size.col(0) = VectorXd::Zero(votes_max);
+
+          // count votes
+          for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+            // std::cout << "tree: " << n_tree << std::endl;
+              if(n_tree) {
+                recall.col(n_tree) = recall.col(n_tree - 1);
+                candidate_set_size.col(n_tree) = candidate_set_size.col(n_tree - 1);
+              }
+
+              int diff = depth - depth_crnt;
+              int leaf_begin = diff ? leaf_first_indices[start_indices[n_tree][depth_crnt - depth_min]] : leaf_first_indices[found_leaves[n_tree]];
+              int leaf_end = diff ? leaf_first_indices[start_indices[n_tree][depth_crnt - depth_min] + (1 << diff)] : leaf_first_indices[found_leaves[n_tree] + 1];
+              // std::cout << "leaf_begin: " << leaf_begin << std::endl;
+              // std::cout << "leaf_end: " << leaf_end << std::endl;
+              const std::vector<int> &indices = tree_leaves[n_tree];
+              for (int i = leaf_begin; i < leaf_end; ++i) {
+                  int idx = indices[i];
+                  int v = ++votes(idx);
+                  if (v <= votes_max) {
+                    candidate_set_size(v-1, n_tree)++;
+                    if(std::find(exact_begin, exact_end, idx) != exact_end) // is there a faster way to find from the sorted range?
+                      recall(v-1, n_tree)++;
+                  }
+              }
+           }
+           recalls[depth_crnt - depth_min] = recall;
+           cs_sizes[depth_crnt - depth_min] = candidate_set_size;
         }
+
     }
 
 
@@ -568,42 +590,59 @@ class Autotuning {
 
     ~Autotuning() {}
 
-    void tune(int trees_max, int min_depth, int max_depth, int votes_max,
+    void tune(int trees_max_, int depth_min_, int depth_max_, int votes_max_,
        float density, int k, int seed_mrpt = 0) {
-      int depth = min_depth;
+      trees_max = trees_max_;
+      depth_min = depth_min_;
+      depth_max = depth_max_;
+      votes_max = votes_max_;
       int n_test = Q->cols();
       int d = X->rows();
-      recall = MatrixXd::Zero(votes_max, trees_max);
-      candidate_set_size = MatrixXd::Zero(votes_max, trees_max);
+
+      recalls = std::vector<MatrixXd>(depth_max - depth_min + 1);
+      cs_sizes = std::vector<MatrixXd>(depth_max - depth_min + 1);
+
+      for(int depth = depth_min; depth <= depth_max; ++depth) {
+        recalls[depth - depth_min] = MatrixXd::Zero(votes_max, trees_max);
+        cs_sizes[depth - depth_min] = MatrixXd::Zero(votes_max, trees_max);
+      }
 
       Mrpt index(X);
-      index.grow(trees_max, depth, density, seed_mrpt);
+      index.grow(trees_max, depth_max, density, seed_mrpt);
 
       MatrixXi exact(k, n_test);
       compute_exact(index, exact);
 
       for(int i = 0; i < n_test; ++i) {
-        MatrixXd recall_tmp(votes_max, trees_max);
-        MatrixXd candidate_set_size_tmp = MatrixXd::Zero(votes_max, trees_max);
+        // std::cout << "point: " << i << std::endl;
+        std::vector<MatrixXd> recall_tmp(depth_max - depth_min + 1);
+        std::vector<MatrixXd> cs_size_tmp(depth_max - depth_min + 1);
 
-        index.count_elected(Map<VectorXf>(Q->data() + i * d, d), Map<VectorXi>(exact.data() + i * k, k), votes_max, recall_tmp, candidate_set_size_tmp);
+        index.count_elected(Map<VectorXf>(Q->data() + i * d, d), Map<VectorXi>(exact.data() + i * k, k),
+         votes_max, recall_tmp, cs_size_tmp);
 
-        recall += recall_tmp;
-        candidate_set_size += candidate_set_size_tmp;
+        for(int depth = depth_min; depth <= depth_max; ++depth) {
+          recalls[depth - depth_min] += recall_tmp[depth - depth_min];
+          cs_sizes[depth - depth_min] += cs_size_tmp[depth - depth_min];
+        }
+
       }
 
-      recall /= (k * n_test);
-      candidate_set_size /= n_test;
-      std::cout << recall << "\n\n";
+      for(int depth = depth_min; depth <= depth_max; ++depth) {
+        recalls[depth - depth_min] /= (k * n_test);
+        cs_sizes[depth - depth_min] /= n_test;
 
+        // std::cout << recalls[depth - depth_min] << "\n\n";
+        // std::cout << cs_sizes[depth - depth_min] << "\n\n";
+      }
     }
 
     float get_recall(int n_trees, int depth, int v) {
-      return recall(v - 1, n_trees - 1);
+      return recalls[depth - depth_min](v - 1, n_trees - 1);
     }
 
     float get_candidate_set_size(int n_trees, int depth, int v) {
-      return candidate_set_size(v - 1, n_trees - 1);
+      return cs_sizes[depth - depth_min](v - 1, n_trees - 1);
     }
 
   private:
@@ -624,7 +663,8 @@ class Autotuning {
 
     const Map<const MatrixXf> *X;
     Map<MatrixXf> *Q;
-    MatrixXd recall, candidate_set_size;
+    std::vector<MatrixXd> recalls, cs_sizes;
+    int trees_max, depth_min, depth_max, votes_max;
 };
 
 #endif // CPP_MRPT_H_
