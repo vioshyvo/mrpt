@@ -291,6 +291,50 @@ class Mrpt {
         return true;
     }
 
+    void project_query(const Map<VectorXf> &q, VectorXf &projected_query) {
+      if (density < 1)
+          projected_query.noalias() = sparse_random_matrix * q;
+      else
+          projected_query.noalias() = dense_random_matrix * q;
+    }
+
+    void vote(const VectorXf &projected_query, int votes_required, VectorXi &elected, int &n_elected) {
+      std::vector<int> found_leaves(n_trees);
+
+      #pragma omp parallel for
+      for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+        int idx_tree = 0;
+        for (int d = 0; d < depth; ++d) {
+          const int j = n_tree * depth + d;
+          const int idx_left = 2 * idx_tree + 1;
+          const int idx_right = idx_left + 1;
+          const float split_point = split_points(idx_tree, n_tree);
+          if (projected_query(j) <= split_point) {
+              idx_tree = idx_left;
+          } else {
+              idx_tree = idx_right;
+          }
+        }
+        found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
+      }
+
+      int max_leaf_size = n_samples / (1 << depth) + 1;
+      elected = VectorXi(n_trees * max_leaf_size);
+      VectorXi votes = VectorXi::Zero(n_samples);
+
+      // count votes
+      for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+        int leaf_begin = leaf_first_indices[found_leaves[n_tree]];
+        int leaf_end = leaf_first_indices[found_leaves[n_tree] + 1];
+        const std::vector<int> &indices = tree_leaves[n_tree];
+        for (int i = leaf_begin; i < leaf_end; ++i) {
+            int idx = indices[i];
+            if (++votes(idx) == votes_required)
+                elected(n_elected++) = idx;
+        }
+      }
+    }
+
     /**
     * Accessor for split points of trees (for testing purposes)
     * @param tree - index of tree in (0, ... , T-1)
