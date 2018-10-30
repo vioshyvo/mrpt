@@ -298,7 +298,7 @@ class Mrpt {
           projected_query.noalias() = dense_random_matrix * q;
     }
 
-    void vote(const VectorXf &projected_query, int votes_required, VectorXi &elected, int &n_elected) {
+    void vote(const VectorXf &projected_query, int votes_required, VectorXi &elected, int &n_elected, int n_trees) {
       std::vector<int> found_leaves(n_trees);
 
       #pragma omp parallel for
@@ -684,7 +684,7 @@ class Autotuning {
         // std::cout << "Autotuning recall, depth = " << depth << "\n" << recalls[depth - depth_min] << "\n\n";
       }
 
-      fit_times();
+      fit_times(index);
     }
 
     float get_recall(int tree, int depth, int v) {
@@ -699,8 +699,8 @@ class Autotuning {
       return predict_theil_sen(n_trees * depth, beta_projection);
     }
 
-    double get_voting_time(int tree, int depth, int v) {
-      return voting_times[depth - depth_min](v - 1, tree - 1);
+    double get_voting_time(int n_trees, int depth, int v) {
+      return predict_theil_sen(n_trees, beta_voting);
     }
 
     double get_exact_time(int tree, int depth, int v) {
@@ -756,15 +756,15 @@ class Autotuning {
       }
     }
 
-    void fit_times() {
-      voting_times = std::vector<MatrixXd>(depth_max - depth_min + 1);
+    void fit_times(Mrpt &index) {
       exact_times = std::vector<MatrixXd>(depth_max - depth_min + 1);
 
       int n_test = Q->cols();
       int d = Q->rows();
       std::vector<double> projection_times, projection_x;
+      float idx_sum = 0;
+
       for(int depth = depth_min; depth <= depth_max; ++depth) {
-        MatrixXd voting_time = MatrixXd::Zero(votes_max, trees_max);
         MatrixXd exact_time = MatrixXd::Zero(votes_max, trees_max);
 
         for(int t = 1; t <= trees_max; ++t) {
@@ -778,39 +778,57 @@ class Autotuning {
           projected_query.noalias() = sparse_random_matrix * Q->col(0);
           double end_proj = omp_get_wtime();
           projection_times.push_back(end_proj - start_proj);
+          idx_sum += projected_query.norm();
 
-          Mrpt index(X);
+          Mrpt index2(X);
           index.grow(t, depth, density, seed_mrpt);
 
           int votes_index = votes_max < t ? votes_max : t;
           for(int v = 1; v <= votes_index; ++v) {
             for(int i = 0; i < n_test; ++i) {
 
+              // double start_exact = omp_get_wtime();
+              // std::vector<int> res(k);
+              // index2.exact_knn(Map<VectorXf>(Q->data() + i * d, d), k, elected, n_el, &res[0]);
+              // double end_exact = omp_get_wtime();
+              exact_time(v - 1, t - 1) += 0.0;
 
-              double start_voting = omp_get_wtime();
-              int n_el = 0;
-              VectorXi elected;
-              index.vote(projected_query, v, elected, n_el);
-              double end_voting = omp_get_wtime();
-
-              double start_exact = omp_get_wtime();
-              std::vector<int> res(k);
-              index.exact_knn(Map<VectorXf>(Q->data() + i * d, d), k, elected, n_el, &res[0]);
-              double end_exact = omp_get_wtime();
-
-              voting_time(v - 1, t - 1) += end_voting - start_voting;
-              exact_time(v - 1, t - 1) += end_exact - start_exact;
+              // exact_time(v - 1, t - 1) += end_exact - start_exact;
             }
           }
         }
 
-        voting_time /= n_test;
         exact_time /= n_test;
-
-        voting_times[depth - depth_min] = voting_time;
         exact_times[depth - depth_min] = exact_time;
       }
+
+      int v = 3;
+
+      std::vector<double> voting_times, voting_x(votes_max);
+      std::iota(voting_x.begin(), voting_x.end(), 1);
+
+      for(int t = 1; t <= trees_max; ++t) {
+        int n_el = 0;
+        VectorXi elected;
+        std::random_device rd;
+        std::mt19937 rng(rd());
+        std::uniform_int_distribution<int> uni(0, n_test-1);
+        auto ri = uni(rng);
+        VectorXf projected_query = Q->col(ri);
+
+        double start_voting = omp_get_wtime();
+        index.vote(projected_query, v, elected, n_el, t);
+        double end_voting = omp_get_wtime();
+
+        voting_times.push_back(end_voting - start_voting);
+        for(int i = 0; i < n_el; ++i)
+          idx_sum += elected(i);
+      }
+
+      std::cout << "idx_sum: " << idx_sum << "\n";
       beta_projection = fit_theil_sen(projection_x, projection_times);
+      beta_voting = fit_theil_sen(voting_x, voting_times);
+
     }
 
     const Map<const MatrixXf> *X;
@@ -819,7 +837,7 @@ class Autotuning {
     std::vector<MatrixXd> voting_times, exact_times;
     int trees_max, depth_min, depth_max, votes_max, k, seed_mrpt;
     float density;
-    std::pair<double,double> beta_projection;
+    std::pair<double,double> beta_projection, beta_voting, beta_exact;
 };
 
 #endif // CPP_MRPT_H_
