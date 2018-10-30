@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+#include <utility>
 
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
@@ -643,6 +644,29 @@ class Autotuning {
 
     float get_candidate_set_size(int n_trees, int depth, int v) {
       return cs_sizes[depth - depth_min](v - 1, n_trees - 1);
+    }
+
+    static std::pair<float,float> theil_sen(const std::vector<float> &x,
+        const std::vector<float> &y) {
+      int n = x.size();
+      std::vector<float> slopes;
+      for(int i = 0; i < n; ++i)
+        for(int j = 0; j < n; ++j)
+          if(i != j)
+            slopes.push_back((y[j] - y[i]) / (x[j] - x[i]));
+
+      int n_slopes = slopes.size();
+      std::nth_element(slopes.begin(), slopes.begin() + n_slopes / 2, slopes.end());
+      float slope = *(slopes.begin() + n_slopes / 2);
+
+      std::vector<float> residuals(n);
+      for(int i = 0; i < n; ++i)
+        residuals[i] = y[i] - slope * x[i];
+
+      std::nth_element(residuals.begin(), residuals.begin() + n / 2, residuals.end());
+      float intercept = *(residuals.begin() + n / 2);
+
+      return std::make_pair(intercept, slope);
     }
 
   private:
