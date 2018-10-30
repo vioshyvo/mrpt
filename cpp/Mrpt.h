@@ -47,7 +47,7 @@ class Mrpt {
         n_pool = n_trees_ * depth_;
         n_array = 1 << (depth_ + 1);
 
-        density < 1 ? build_sparse_random_matrix(seed) : build_dense_random_matrix(seed);
+        density < 1 ? build_sparse_random_matrix(sparse_random_matrix, n_pool, dim, density, seed) : build_dense_random_matrix(dense_random_matrix, n_pool, dim, seed);
 
         split_points = MatrixXf(n_array, n_trees);
         tree_leaves = std::vector<std::vector<int>>(n_trees);
@@ -457,8 +457,9 @@ class Mrpt {
     * @param seed - A seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with rd()
     */
-    void build_sparse_random_matrix(int seed = 0) {
-        sparse_random_matrix = SparseMatrix<float, RowMajor>(n_pool, dim);
+    static void build_sparse_random_matrix(SparseMatrix<float, RowMajor> &sparse_random_matrix,
+          int n_row, int n_col, float density, int seed = 0) {
+        sparse_random_matrix = SparseMatrix<float, RowMajor>(n_row, n_col);
 
         std::random_device rd;
         int s = seed ? seed : rd();
@@ -467,8 +468,8 @@ class Mrpt {
         std::normal_distribution<float> norm_dist(0, 1);
 
         std::vector<Triplet<float>> triplets;
-        for (int j = 0; j < n_pool; ++j) {
-            for (int i = 0; i < dim; ++i) {
+        for (int j = 0; j < n_row; ++j) {
+            for (int i = 0; i < n_col; ++i) {
                 if (uni_dist(gen) > density) continue;
                 triplets.push_back(Triplet<float>(j, i, norm_dist(gen)));
             }
@@ -484,15 +485,16 @@ class Mrpt {
     * @param seed - A seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with rd()
     */
-    void build_dense_random_matrix(int seed = 0) {
-        dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_pool, dim);
+    static void build_dense_random_matrix(Matrix<float, Dynamic, Dynamic, RowMajor> &dense_random_matrix,
+          int n_row, int n_col, int seed = 0) {
+        dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_row, n_col);
 
         std::random_device rd;
         int s = seed ? seed : rd();
         std::mt19937 gen(s);
         std::normal_distribution<float> normal_dist(0, 1);
 
-        std::generate(dense_random_matrix.data(), dense_random_matrix.data() + n_pool * dim,
+        std::generate(dense_random_matrix.data(), dense_random_matrix.data() + n_row * n_col,
                       [&normal_dist, &gen] { return normal_dist(gen); });
     }
 
@@ -679,7 +681,7 @@ class Autotuning {
       for(int depth = depth_min; depth <= depth_max; ++depth) {
         recalls[depth - depth_min] /= (k * n_test);
         cs_sizes[depth - depth_min] /= n_test;
-        std::cout << "Autotuning recall, depth = " << depth << "\n" << recalls[depth - depth_min] << "\n\n";
+        // std::cout << "Autotuning recall, depth = " << depth << "\n" << recalls[depth - depth_min] << "\n\n";
       }
 
       fit_times();
