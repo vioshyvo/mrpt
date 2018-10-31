@@ -52,7 +52,7 @@ class Mrpt {
         split_points = MatrixXf(n_array, n_trees);
         tree_leaves = std::vector<std::vector<int>>(n_trees);
 
-        count_first_leaf_indices();
+        count_first_leaf_indices(leaf_first_indices, n_samples, depth);
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
@@ -249,7 +249,7 @@ class Mrpt {
         n_pool = n_trees * depth;
         n_array = 1 << (depth + 1);
 
-        count_first_leaf_indices();
+        count_first_leaf_indices(leaf_first_indices, n_samples, depth);
 
         split_points = MatrixXf(n_array, n_trees);
         fread(split_points.data(), sizeof(float), n_array * n_trees, fd);
@@ -403,6 +403,50 @@ class Mrpt {
       return dim;
     }
 
+    /**
+    * Computes the leaf sizes of a tree assuming a median split and that
+    * when the number points is odd, the extra point is always assigned to
+    * to the left branch.
+    * @param n - number data points
+    * @param level - current level of the tree
+    * @param tree_depth - depth of the whole tree
+    * @param out_leaf_sizes - vector for the output; after completing
+    * the function is a vector of length n containing the leaf sizes
+    */
+    static void count_leaf_sizes(int n, int level, int tree_depth, std::vector<int> &out_leaf_sizes) {
+      if(level == tree_depth) {
+        out_leaf_sizes.push_back(n);
+        return;
+      }
+      count_leaf_sizes(n - n/2, level + 1, tree_depth, out_leaf_sizes);
+      count_leaf_sizes(n/2, level + 1, tree_depth, out_leaf_sizes);
+    }
+
+    /**
+    * Computes indices of the first elements of leaves in a vector containing
+    * all the leaves of a tree concatenated. Assumes that median split is used
+    * and when the number points is odd, the extra point is always assigned to
+    * to the left branch.
+    */
+    static void count_first_leaf_indices(std::vector<int> &indices, int n, int depth) {
+      std::vector<int> leaf_sizes;
+      count_leaf_sizes(n, 0, depth, leaf_sizes);
+
+      indices = std::vector<int>(leaf_sizes.size() + 1);
+      indices[0] = 0;
+      for(int i = 0; i < leaf_sizes.size(); ++i)
+        indices[i+1] = indices[i] + leaf_sizes[i];
+    }
+
+    static void count_first_leaf_indices_all(std::vector<std::vector<int>> &indices, int n, int depth_max) {
+      for(int d = 0; d <= depth_max; ++d) {
+        std::vector<int> idx;
+        count_first_leaf_indices(idx, n, d);
+        indices.push_back(idx);
+      }
+    }
+
+
     friend class Autotuning;
 
  private:
@@ -498,40 +542,7 @@ class Mrpt {
                       [&normal_dist, &gen] { return normal_dist(gen); });
     }
 
-    /**
-    * Computes the leaf sizes of a tree assuming a median split and that
-    * when the number points is odd, the extra point is always assigned to
-    * to the left branch.
-    * @param n - number data points
-    * @param level - current level of the tree
-    * @param tree_depth - depth of the whole tree
-    * @param out_leaf_sizes - vector for the output; after completing
-    * the function is a vector of length n containing the leaf sizes
-    */
-    void count_leaf_sizes(int n, int level, int tree_depth, std::vector<int> &out_leaf_sizes) {
-      if(level == tree_depth) {
-        out_leaf_sizes.push_back(n);
-        return;
-      }
-      count_leaf_sizes(n - n/2, level + 1, tree_depth, out_leaf_sizes);
-      count_leaf_sizes(n/2, level + 1, tree_depth, out_leaf_sizes);
-    }
 
-    /**
-    * Computes indices of the first elements of leaves in a vector containing
-    * all the leaves of a tree concatenated. Assumes that median split is used
-    * and when the number points is odd, the extra point is always assigned to
-    * to the left branch.
-    */
-    void count_first_leaf_indices() {
-      std::vector<int> leaf_sizes;
-      count_leaf_sizes(n_samples, 0, depth, leaf_sizes);
-
-      leaf_first_indices = std::vector<int>(leaf_sizes.size() + 1);
-      leaf_first_indices[0] = 0;
-      for(int i = 0; i < leaf_sizes.size(); ++i)
-        leaf_first_indices[i+1] = leaf_first_indices[i] + leaf_sizes[i];
-    }
 
     void count_elected(const Map<VectorXf> &q, const Map<VectorXi> &exact, int votes_max,
       std::vector<MatrixXd> &recalls, std::vector<MatrixXd> &cs_sizes) const {
@@ -619,6 +630,7 @@ class Mrpt {
     Matrix<float, Dynamic, Dynamic, RowMajor> dense_random_matrix; // random vectors needed for all the RP-trees
     SparseMatrix<float, RowMajor> sparse_random_matrix; // random vectors needed for all the RP-trees
     std::vector<int> leaf_first_indices; // first indices of each leaf of tree in tree_leaves
+    std::vector<std::vector<int>> leaf_first_indices_all; // first indices for each level
 
     const int n_samples; // sample size of data
     const int dim; // dimension of data
