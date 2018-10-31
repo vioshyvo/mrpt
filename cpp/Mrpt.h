@@ -850,11 +850,26 @@ class Autotuning {
       std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
       std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
       std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
+
+      query_times = std::vector<MatrixXd>(depth_max - depth_min + 1);
+      for(int depth = depth_min; depth <= depth_max; ++depth) {
+        MatrixXd query_time = MatrixXd::Zero(votes_max, trees_max);
+
+        for(int t = 1; t <= trees_max; ++t) {
+          int votes_index = votes_max < t ? votes_max : t;
+          for(int v = 1; v <= votes_index; ++v) {
+            query_time(v - 1, t - 1) = get_query_time(t, depth, v);
+          }
+        }
+        query_times[depth - depth_min] = query_time;
+        std::cout << "depth: " << depth << " query times (at):\n";
+        std::cout << query_time * 1000 << "\n\n";
+      }
     }
 
     const Map<const MatrixXf> *X;
     Map<MatrixXf> *Q;
-    std::vector<MatrixXd> recalls, cs_sizes;
+    std::vector<MatrixXd> recalls, cs_sizes, query_times;
     int trees_max, depth_min, depth_max, votes_max, k, seed_mrpt;
     float density;
     std::pair<double,double> beta_projection, beta_voting, beta_exact;
