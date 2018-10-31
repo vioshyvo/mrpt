@@ -798,6 +798,7 @@ class Autotuning {
       int d = Q->rows();
       int n = X->cols();
       std::vector<double> projection_times, projection_x;
+      std::vector<int> tested_trees;
       std::vector<double> exact_times;
       std::vector<int> exact_x;
 
@@ -808,8 +809,15 @@ class Autotuning {
       std::uniform_int_distribution<int> uni(0, n_test-1);
       std::uniform_int_distribution<int> uni2(0, n-1);
 
+      int n_tested_trees = 5;
+      n_tested_trees = trees_max > n_tested_trees ? n_tested_trees : trees_max;
+      int incr = trees_max / n_tested_trees;
+      for(int i = 1; i <= n_tested_trees; ++i)
+        tested_trees.push_back(i * incr);
+
       for(int depth = depth_min; depth <= depth_max; ++depth) {
-        for(int t = 1; t <= trees_max; ++t) {
+        for(int i = 0; i < tested_trees.size(); ++i) {
+          int t = tested_trees[i];
           int n_pool = t * depth;
           projection_x.push_back(n_pool);
           SparseMatrix<float, RowMajor> sparse_random_matrix;
@@ -827,15 +835,24 @@ class Autotuning {
             int cs_size = get_candidate_set_size(t, depth, v);
             if(cs_size > 0) exact_x.push_back(cs_size);
           }
-
         }
       }
 
-      int v = 3;
-      std::vector<double> voting_times, voting_x(votes_max);
-      std::iota(voting_x.begin(), voting_x.end(), 1);
+      // int s_min = *std::min_element(exact_x.begin(), exact_x.end());
+      int s_max = *std::max_element(exact_x.begin(), exact_x.end());
 
-      for(int t = 1; t <= trees_max; ++t) {
+      int n_s_tested = 20;
+      std::vector<int> s_tested;
+      std::vector<double> ex;
+      int increment = s_max / n_s_tested;
+      for(int i = 1; i <= n_s_tested; ++i)
+        s_tested.push_back(i * increment);
+
+      int v = 3;
+      std::vector<double> voting_times, voting_x;
+
+      for(int i = 0; i < tested_trees.size(); ++i) {
+        int t = tested_trees[i];
         int n_el = 0;
         VectorXi elected;
         auto ri = uni(rng);
@@ -846,36 +863,34 @@ class Autotuning {
         double end_voting = omp_get_wtime();
 
         voting_times.push_back(end_voting - start_voting);
+        voting_x.push_back(t);
         for(int i = 0; i < n_el; ++i)
           idx_sum += elected(i);
       }
 
-      for(int i = 0; i < exact_x.size(); ++i) {
+      for(int i = 0; i < n_s_tested; ++i) {
         auto ri = uni(rng);
-        VectorXi elected(exact_x[i]);
+        int s_size = s_tested[i];
+        ex.push_back(s_size);
+        VectorXi elected(s_size);
         for(int j = 0; j < elected.size(); ++j)
           elected(j) = uni2(rng);
 
         double start_exact = omp_get_wtime();
         std::vector<int> res(k);
-        index.exact_knn(Map<VectorXf>(Q->data() + ri * d, d), k, elected, exact_x[i], &res[0]);
+        index.exact_knn(Map<VectorXf>(Q->data() + ri * d, d), k, elected, s_size, &res[0]);
         double end_exact = omp_get_wtime();
         exact_times.push_back(end_exact - start_exact);
         for(int l = 0; l < k; ++l)
           idx_sum += res[l];
       }
 
-
-      std::cout << "\nidx_sum: " << idx_sum;
       beta_projection = fit_theil_sen(projection_x, projection_times);
       beta_voting = fit_theil_sen(voting_x, voting_times);
-      std::vector<double> ex(exact_x.size());
-      for(int i = 0; i < ex.size(); ++i) {
-        ex[i] = exact_x[i];
-      }
-      std::cout << std::endl;
-
       beta_exact = fit_theil_sen(ex, exact_times);
+
+      std::cout << std::endl;
+      std::cout << "idx_sum: " << idx_sum << "\n";
       std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
       std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
       std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
@@ -891,8 +906,8 @@ class Autotuning {
           }
         }
         query_times[depth - depth_min] = query_time;
-        std::cout << "depth: " << depth << " query times (at):\n";
-        std::cout << query_time * 1000 << "\n\n";
+        // std::cout << "depth: " << depth << " query times (at):\n";
+        // std::cout << query_time * 1000 << "\n\n";
       }
     }
 
