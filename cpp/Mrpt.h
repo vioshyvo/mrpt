@@ -703,8 +703,8 @@ class Autotuning {
       return predict_theil_sen(n_trees, beta_voting);
     }
 
-    double get_exact_time(int tree, int depth, int v) {
-      return exact_times[depth - depth_min](v - 1, tree - 1);
+    double get_exact_time(int n_trees, int depth, int v) {
+      return predict_theil_sen(get_candidate_set_size(n_trees, depth, v), beta_exact);
     }
 
     double get_query_time(int tree, int depth, int v) {
@@ -757,16 +757,21 @@ class Autotuning {
     }
 
     void fit_times(Mrpt &index) {
-      exact_times = std::vector<MatrixXd>(depth_max - depth_min + 1);
-
       int n_test = Q->cols();
       int d = Q->rows();
+      int n = X->cols();
       std::vector<double> projection_times, projection_x;
+      std::vector<double> exact_times;
+      std::vector<int> exact_x;
+
       float idx_sum = 0;
 
-      for(int depth = depth_min; depth <= depth_max; ++depth) {
-        MatrixXd exact_time = MatrixXd::Zero(votes_max, trees_max);
+      std::random_device rd;
+      std::mt19937 rng(rd());
+      std::uniform_int_distribution<int> uni(0, n_test-1);
+      std::uniform_int_distribution<int> uni2(0, n-1);
 
+      for(int depth = depth_min; depth <= depth_max; ++depth) {
         for(int t = 1; t <= trees_max; ++t) {
           int n_pool = t * depth;
           projection_x.push_back(n_pool);
@@ -780,39 +785,22 @@ class Autotuning {
           projection_times.push_back(end_proj - start_proj);
           idx_sum += projected_query.norm();
 
-          Mrpt index2(X);
-          index.grow(t, depth, density, seed_mrpt);
-
           int votes_index = votes_max < t ? votes_max : t;
           for(int v = 1; v <= votes_index; ++v) {
-            for(int i = 0; i < n_test; ++i) {
-
-              // double start_exact = omp_get_wtime();
-              // std::vector<int> res(k);
-              // index2.exact_knn(Map<VectorXf>(Q->data() + i * d, d), k, elected, n_el, &res[0]);
-              // double end_exact = omp_get_wtime();
-              exact_time(v - 1, t - 1) += 0.0;
-
-              // exact_time(v - 1, t - 1) += end_exact - start_exact;
-            }
+            int cs_size = get_candidate_set_size(t, depth, v);
+            if(cs_size > 0) exact_x.push_back(cs_size);
           }
-        }
 
-        exact_time /= n_test;
-        exact_times[depth - depth_min] = exact_time;
+        }
       }
 
       int v = 3;
-
       std::vector<double> voting_times, voting_x(votes_max);
       std::iota(voting_x.begin(), voting_x.end(), 1);
 
       for(int t = 1; t <= trees_max; ++t) {
         int n_el = 0;
         VectorXi elected;
-        std::random_device rd;
-        std::mt19937 rng(rd());
-        std::uniform_int_distribution<int> uni(0, n_test-1);
         auto ri = uni(rng);
         VectorXf projected_query = Q->col(ri);
 
@@ -825,16 +813,41 @@ class Autotuning {
           idx_sum += elected(i);
       }
 
-      std::cout << "idx_sum: " << idx_sum << "\n";
+      for(int i = 0; i < exact_x.size(); ++i) {
+        std::cout << exact_x[i] << " ";
+        auto ri = uni(rng);
+        VectorXi elected(exact_x[i]);
+        for(int j = 0; j < elected.size(); ++j)
+          elected(j) = uni2(rng);
+
+        double start_exact = omp_get_wtime();
+        std::vector<int> res(k);
+        index.exact_knn(Map<VectorXf>(Q->data() + ri * d, d), k, elected, exact_x[i], &res[0]);
+        double end_exact = omp_get_wtime();
+        exact_times.push_back(end_exact - start_exact);
+        for(int l = 0; l < k; ++l)
+          idx_sum += res[l];
+      }
+
+
+      std::cout << "\nidx_sum: " << idx_sum << "\n";
       beta_projection = fit_theil_sen(projection_x, projection_times);
       beta_voting = fit_theil_sen(voting_x, voting_times);
+      std::vector<double> ex(exact_x.size());
+      for(int i = 0; i < ex.size(); ++i) {
+        ex[i] = exact_x[i];
+      }
+      std::cout << std::endl;
 
+      beta_exact = fit_theil_sen(ex, exact_times);
+      std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
+      std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
+      std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n";
     }
 
     const Map<const MatrixXf> *X;
     Map<MatrixXf> *Q;
     std::vector<MatrixXd> recalls, cs_sizes;
-    std::vector<MatrixXd> voting_times, exact_times;
     int trees_max, depth_min, depth_max, votes_max, k, seed_mrpt;
     float density;
     std::pair<double,double> beta_projection, beta_voting, beta_exact;
