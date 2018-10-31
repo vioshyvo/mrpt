@@ -741,11 +741,40 @@ class Autotuning {
     }
 
     void grow(double recall, int &optimal_votes, Mrpt &index) {
-      std::cout << "Desired recall: " << recall << "\n";
-      std::cout << "Estimated query time: " << 0.05 << "\n\n";
-      optimal_votes = 1;
       int d = X->rows();
-      index.grow(10, 6, std::sqrt(d));
+      int n_trees, depth;
+      double qtime = 9999999, estimated_recall = 0;
+      get_optimal_parameters(recall, n_trees, depth, optimal_votes, qtime, estimated_recall);
+
+      std::cout << "Estimated recall: " << estimated_recall << "\n";
+      std::cout << "Estimated query time: " << qtime * 1000 << " ms.\n";
+      std::cout << "Optimal number of trees: " << n_trees << "\n";
+      std::cout << "Optimal depth of trees: " << depth << "\n";
+      std::cout << "Optimal vote threshold: " << optimal_votes << "\n\n";
+
+      index.grow(n_trees, depth, std::sqrt(d));
+    }
+
+    void get_optimal_parameters(double target_recall, int &opt_n_trees, int &opt_depth, int &opt_v,
+        double &estimated_qtime, double &estimated_recall) {
+      for(int depth = depth_min; depth <= depth_max; ++depth) {
+        for(int t = 1; t <= trees_max; ++t) {
+          int votes_index = votes_max < t ? votes_max : t;
+          for(int v = 1; v <= votes_index; ++v) {
+            double rec = get_recall(t, depth, v);
+            if(rec >= target_recall) {
+              double qt = get_query_time(t, depth, v);
+              if(qt < estimated_qtime) {
+                estimated_qtime = qt;
+                estimated_recall = rec;
+                opt_n_trees = t;
+                opt_depth = depth;
+                opt_v = v;
+              }
+            }
+          }
+        }
+      }
     }
 
   private:
