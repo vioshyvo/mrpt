@@ -740,6 +740,14 @@ class Autotuning {
       return beta.first + beta.second * x;
     }
 
+    void grow(double recall, int &optimal_votes, Mrpt &index) {
+      std::cout << "Desired recall: " << recall << "\n";
+      std::cout << "Estimated query time: " << 0.05 << "\n\n";
+      optimal_votes = 1;
+      int d = X->rows();
+      index.grow(10, 6, std::sqrt(d));
+    }
+
   private:
 
     void compute_exact(Mrpt &index, MatrixXi &out_exact) {
@@ -814,7 +822,6 @@ class Autotuning {
       }
 
       for(int i = 0; i < exact_x.size(); ++i) {
-        std::cout << exact_x[i] << " ";
         auto ri = uni(rng);
         VectorXi elected(exact_x[i]);
         for(int j = 0; j < elected.size(); ++j)
@@ -830,7 +837,7 @@ class Autotuning {
       }
 
 
-      std::cout << "\nidx_sum: " << idx_sum << "\n";
+      std::cout << "\nidx_sum: " << idx_sum;
       beta_projection = fit_theil_sen(projection_x, projection_times);
       beta_voting = fit_theil_sen(voting_x, voting_times);
       std::vector<double> ex(exact_x.size());
@@ -842,7 +849,7 @@ class Autotuning {
       beta_exact = fit_theil_sen(ex, exact_times);
       std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
       std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
-      std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n";
+      std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
     }
 
     const Map<const MatrixXf> *X;
