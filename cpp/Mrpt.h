@@ -17,11 +17,11 @@
 using namespace Eigen;
 
 struct Parameters {
-  int n_trees;
-  int depth;
-  int votes;
-  double estimated_qtime;
-  double estimated_recall;
+  int n_trees = 0;
+  int depth = 0;
+  int votes = 0;
+  double estimated_qtime = 0.0;
+  double estimated_recall = 0.0;
 };
 
 class Mrpt {
@@ -808,6 +808,15 @@ class Autotuning {
       return get_projection_time(tree, depth, v)
            + get_voting_time(tree, depth, v)
            + get_exact_time(tree, depth, v);
+    }
+
+    Parameters get_optimal_parameters(int target_recall) {
+      if(optimal_parameter_table.count(target_recall) == 0) {
+        Parameters par;
+        return par;
+      }
+
+      return optimal_parameter_table[target_recall];
     }
 
     static std::pair<double,double> fit_theil_sen(const std::vector<double> &x,
