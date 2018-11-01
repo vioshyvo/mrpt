@@ -9,6 +9,7 @@
 #include <vector>
 #include <cmath>
 #include <utility>
+#include <map>
 
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
@@ -777,6 +778,10 @@ class Autotuning {
       }
 
       fit_times(index);
+
+      std::vector<int> target_recalls(99);
+      std::iota(target_recalls.begin(), target_recalls.end(), 1);
+      find_optimal_parameters(target_recalls);
     }
 
     float get_recall(int tree, int depth, int v) {
@@ -837,9 +842,13 @@ class Autotuning {
 
       if(recall_level != target_recall) {
         recall_level = target_recall;
-        double drecall = target_recall / 100.0;
 
-        optimal_parameters = find_optimal_parameters(drecall);
+        if(optimal_parameter_table.count(target_recall) == 0) {
+          std::cerr << "Target recall level " << target_recall << "too high." << std::endl;
+          return;
+        }
+
+        optimal_parameters = optimal_parameter_table[target_recall];
 
         std::cout << "Estimated recall: " << optimal_parameters.estimated_recall << "\n";
         std::cout << "Estimated query time: " << optimal_parameters.estimated_qtime * 1000 << " ms.\n";
@@ -852,33 +861,27 @@ class Autotuning {
          optimal_parameters.depth, out_distances, out_n_elected);
     }
 
-    Parameters get_optimal_parameters(double target_recall) {
-      return optimal_parameter_table[target_recall];
-    }
-
-    Parameters find_optimal_parameters(double target_recall) {
-      Parameters par;
-      par.estimated_qtime = 9999999.0;
+    void find_optimal_parameters(const std::vector<int> &target_recalls) {
+      optimal_parameter_table.clear();
 
       for(int depth = depth_min; depth <= depth_max; ++depth) {
         for(int t = 1; t <= trees_max; ++t) {
           int votes_index = votes_max < t ? votes_max : t;
           for(int v = 1; v <= votes_index; ++v) {
-            double rec = get_recall(t, depth, v);
-            if(rec >= target_recall) {
-              double qt = get_query_time(t, depth, v);
-              if(qt < par.estimated_qtime) {
-                par.n_trees = t;
-                par.depth = depth;
-                par.votes = v;
-                par.estimated_qtime = qt;
-                par.estimated_recall = rec;
+            double rec = get_recall(t, depth, v) * 100.0;
+            double qt = get_query_time(t, depth, v);
+            for(int i = 0; i < target_recalls.size(); ++i) {
+              int tr = target_recalls[i];
+              if(rec >= tr) {
+                if(optimal_parameter_table.count(tr) == 0 || qt < optimal_parameter_table[tr].estimated_qtime) {
+                  Parameters par {t, depth, v, qt, rec};
+                  optimal_parameter_table[tr] = par;
+                }
               }
             }
           }
         }
       }
-      return par;
     }
 
   private:
