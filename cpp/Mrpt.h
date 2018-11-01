@@ -15,6 +15,14 @@
 
 using namespace Eigen;
 
+struct Parameters {
+  int n_trees;
+  int depth;
+  int votes;
+  double estimated_qtime;
+  double estimated_recall;
+};
+
 class Mrpt {
  public:
     /**
@@ -717,10 +725,7 @@ class Autotuning {
     Autotuning(const Map<const MatrixXf> *X_, Map<MatrixXf> *Q_) :
       X(X_),
       Q(Q_),
-      recall_level(-1),
-      optimal_n_trees(1),
-      optimal_depth(1),
-      optimal_v(1) {}
+      recall_level(-1) {}
 
     ~Autotuning() {}
 
@@ -832,28 +837,29 @@ class Autotuning {
 
       if(recall_level != target_recall) {
         recall_level = target_recall;
+        double drecall = target_recall / 100.0;
 
-        int n_trees, depth, votes;
-        double estimated_qtime = 9999999, estimated_recall = 0;
-        float frecall = target_recall / 100.0;
+        optimal_parameters = find_optimal_parameters(drecall);
 
-        get_optimal_parameters(frecall, n_trees, depth, votes, estimated_qtime, estimated_recall);
-        optimal_n_trees = n_trees;
-        optimal_depth = depth;
-        optimal_v = votes;
-
-        std::cout << "Estimated recall: " << estimated_recall << "\n";
-        std::cout << "Estimated query time: " << estimated_qtime * 1000 << " ms.\n";
-        std::cout << "Optimal number of trees: " << n_trees << "\n";
-        std::cout << "Optimal depth of trees: " << depth << "\n";
-        std::cout << "Optimal vote threshold: " <<  votes << "\n\n";
+        std::cout << "Estimated recall: " << optimal_parameters.estimated_recall << "\n";
+        std::cout << "Estimated query time: " << optimal_parameters.estimated_qtime * 1000 << " ms.\n";
+        std::cout << "Optimal number of trees: " << optimal_parameters.n_trees << "\n";
+        std::cout << "Optimal depth of trees: " << optimal_parameters.depth << "\n";
+        std::cout << "Optimal vote threshold: " <<  optimal_parameters.votes << "\n\n";
       }
 
-      index.query(q, k, optimal_v, out, optimal_n_trees, optimal_depth, out_distances, out_n_elected);
+      index.query(q, k, optimal_parameters.votes, out, optimal_parameters.n_trees,
+         optimal_parameters.depth, out_distances, out_n_elected);
     }
 
-    void get_optimal_parameters(double target_recall, int &opt_n_trees, int &opt_depth, int &opt_v,
-        double &estimated_qtime, double &estimated_recall) {
+    Parameters get_optimal_parameters(double target_recall) {
+      return optimal_parameter_table[target_recall];
+    }
+
+    Parameters find_optimal_parameters(double target_recall) {
+      Parameters par;
+      par.estimated_qtime = 9999999.0;
+
       for(int depth = depth_min; depth <= depth_max; ++depth) {
         for(int t = 1; t <= trees_max; ++t) {
           int votes_index = votes_max < t ? votes_max : t;
@@ -861,17 +867,18 @@ class Autotuning {
             double rec = get_recall(t, depth, v);
             if(rec >= target_recall) {
               double qt = get_query_time(t, depth, v);
-              if(qt < estimated_qtime) {
-                estimated_qtime = qt;
-                estimated_recall = rec;
-                opt_n_trees = t;
-                opt_depth = depth;
-                opt_v = v;
+              if(qt < par.estimated_qtime) {
+                par.n_trees = t;
+                par.depth = depth;
+                par.votes = v;
+                par.estimated_qtime = qt;
+                par.estimated_recall = rec;
               }
             }
           }
         }
       }
+      return par;
     }
 
   private:
@@ -1014,7 +1021,9 @@ class Autotuning {
     int trees_max, depth_min, depth_max, votes_max, k, seed_mrpt;
     float density;
     std::pair<double,double> beta_projection, beta_voting, beta_exact;
-    int recall_level, optimal_n_trees, optimal_depth, optimal_v;
+    int recall_level;
+    Parameters optimal_parameters;
+    std::map<int,Parameters> optimal_parameter_table;
 };
 
 #endif // CPP_MRPT_H_
