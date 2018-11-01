@@ -52,7 +52,7 @@ class Mrpt {
         split_points = MatrixXf(n_array, n_trees);
         tree_leaves = std::vector<std::vector<int>>(n_trees);
 
-        count_first_leaf_indices(leaf_first_indices, n_samples, depth);
+        count_first_leaf_indices_all(leaf_first_indices_all, n_samples, depth);
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
@@ -84,6 +84,7 @@ class Mrpt {
     * @param votes_required - The number of votes required for an object to be included in the linear search step
     * @param out - The output buffer for the indices of the k approximate nearest neighbors
     * @param out_distances - Output buffer for distances of the k approximate nearest neighbors (optional parameter)
+    * @param out_n_elected - An optional output parameter for the candidate set size
     * @return
     */
     void query(const Map<VectorXf> &q, int k, int votes_required, int *out,
@@ -95,7 +96,7 @@ class Mrpt {
             projected_query.noalias() = dense_random_matrix * q;
 
         std::vector<int> found_leaves(n_trees);
-
+        const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth];
         /*
         * The following loops over all trees, and routes the query to exactly one
         * leaf in each.
@@ -249,7 +250,7 @@ class Mrpt {
         n_pool = n_trees * depth;
         n_array = 1 << (depth + 1);
 
-        count_first_leaf_indices(leaf_first_indices, n_samples, depth);
+        count_first_leaf_indices_all(leaf_first_indices_all, n_samples, depth);
 
         split_points = MatrixXf(n_array, n_trees);
         fread(split_points.data(), sizeof(float), n_array * n_trees, fd);
@@ -300,6 +301,8 @@ class Mrpt {
 
     void vote(const VectorXf &projected_query, int votes_required, VectorXi &elected, int &n_elected, int n_trees) {
       std::vector<int> found_leaves(n_trees);
+      const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth];
+
 
       #pragma omp parallel for
       for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
@@ -357,6 +360,7 @@ class Mrpt {
     * @return index of index:th data point in leaf:th leaf of tree:th tree
     */
     int get_leaf_point(int tree, int leaf, int index) const {
+      const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth];
       int leaf_begin = leaf_first_indices[leaf];
       return tree_leaves[tree][leaf_begin + index];
     }
@@ -368,6 +372,7 @@ class Mrpt {
     * @return - number of data points in leaf:th leaf of tree:th tree
     */
     int get_leaf_size(int tree, int leaf) const {
+      const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth];
       return leaf_first_indices[leaf + 1] - leaf_first_indices[leaf];
     }
 
@@ -552,21 +557,19 @@ class Mrpt {
         else
             projected_query.noalias() = dense_random_matrix * q;
 
-        std::vector<int> found_leaves(n_trees);
-
         int depth_min = depth - recalls.size() + 1;
+        // std::cout << "depth_min: " << depth_min << "\n";
+        // std::cout << "depth: " << depth << "\n";
+        // std::cout << "depth - depth_min + 1: " << depth - depth_min + 1 << "\n";
+
         std::vector<std::vector<int>> start_indices(n_trees);
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            start_indices[n_tree] = std::vector<int>(depth - depth_min);
+            // std::cout << "\n\n tree number: " << n_tree << "\n";
+            start_indices[n_tree] = std::vector<int>(depth - depth_min + 1);
             int idx_tree = 0;
             for (int d = 0; d < depth; ++d) {
-                if(d >= depth_min) {
-                  int diff = depth - d;
-                  start_indices[n_tree][d - depth_min] = (1 << diff) * (idx_tree + 1) - 1 - (1 << depth) + 1;
-                }
-
                 const int j = n_tree * depth + d;
                 const int idx_left = 2 * idx_tree + 1;
                 const int idx_right = idx_left + 1;
@@ -576,16 +579,18 @@ class Mrpt {
                 } else {
                     idx_tree = idx_right;
                 }
+                if(d >= depth_min - 1)
+                  start_indices[n_tree][d - depth_min + 1] = idx_tree - (1 << (d + 1)) + 1;
             }
-            found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
+            // found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
         }
 
         const int *exact_begin = exact.data();
         const int *exact_end = exact.data() + exact.size();
 
         for(int depth_crnt = depth_min; depth_crnt <= depth; ++depth_crnt) {
-          // std::cout << "depth: " << depth_crnt << std::endl;
           VectorXi votes = VectorXi::Zero(n_samples);
+          const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth_crnt];
 
           MatrixXd recall(votes_max, n_trees);
           MatrixXd candidate_set_size(votes_max, n_trees);
@@ -594,15 +599,15 @@ class Mrpt {
 
           // count votes
           for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            // std::cout << "tree: " << n_tree << std::endl;
+              std::vector<int> &found_leaves = start_indices[n_tree];
+
               if(n_tree) {
                 recall.col(n_tree) = recall.col(n_tree - 1);
                 candidate_set_size.col(n_tree) = candidate_set_size.col(n_tree - 1);
               }
 
-              int diff = depth - depth_crnt;
-              int leaf_begin = diff ? leaf_first_indices[start_indices[n_tree][depth_crnt - depth_min]] : leaf_first_indices[found_leaves[n_tree]];
-              int leaf_end = diff ? leaf_first_indices[start_indices[n_tree][depth_crnt - depth_min] + (1 << diff)] : leaf_first_indices[found_leaves[n_tree] + 1];
+              int leaf_begin = leaf_first_indices[found_leaves[depth_crnt - depth_min]];
+              int leaf_end = leaf_first_indices[found_leaves[depth_crnt - depth_min] + 1];
               // std::cout << "leaf_begin: " << leaf_begin << std::endl;
               // std::cout << "leaf_end: " << leaf_end << std::endl;
               const std::vector<int> &indices = tree_leaves[n_tree];
@@ -629,7 +634,7 @@ class Mrpt {
     std::vector<std::vector<int>> tree_leaves; // contains all leaves of all trees
     Matrix<float, Dynamic, Dynamic, RowMajor> dense_random_matrix; // random vectors needed for all the RP-trees
     SparseMatrix<float, RowMajor> sparse_random_matrix; // random vectors needed for all the RP-trees
-    std::vector<int> leaf_first_indices; // first indices of each leaf of tree in tree_leaves
+    // std::vector<int> leaf_first_indices; // first indices of each leaf of tree in tree_leaves
     std::vector<std::vector<int>> leaf_first_indices_all; // first indices for each level
 
     const int n_samples; // sample size of data
@@ -771,13 +776,13 @@ class Autotuning {
         optimal_depth = depth;
         optimal_v = votes;
 
-        index.grow(optimal_n_trees, optimal_depth, density);
-
         std::cout << "Estimated recall: " << estimated_recall << "\n";
         std::cout << "Estimated query time: " << estimated_qtime * 1000 << " ms.\n";
         std::cout << "Optimal number of trees: " << n_trees << "\n";
         std::cout << "Optimal depth of trees: " << depth << "\n";
         std::cout << "Optimal vote threshold: " <<  votes << "\n\n";
+
+        index.grow(optimal_n_trees, optimal_depth, density);
       }
 
       index.query(q, k, optimal_v, out, out_distances, out_n_elected);
