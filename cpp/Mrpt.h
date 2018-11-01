@@ -162,33 +162,31 @@ class Mrpt {
     */
     void query(const Map<VectorXf> &q, int k, int votes_required, int *out, int n_trees_crnt, int depth_crnt,
           float *out_distances = nullptr, int *out_n_elected = nullptr) const {
-        VectorXf projected_query(n_trees_crnt * depth);
-        if (density < 1)
-            projected_query.noalias() = sparse_random_matrix.topRows(n_trees_crnt * depth) * q;
-        else
-            projected_query.noalias() = dense_random_matrix.topRows(n_trees_crnt * depth) * q;
 
         std::vector<int> found_leaves(n_trees_crnt);
         const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth_crnt];
-        /*
-        * The following loops over all trees, and routes the query to exactly one
-        * leaf in each.
-        */
+
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees_crnt; ++n_tree) {
-            int idx_tree = 0;
-            for (int d = 0; d < depth_crnt; ++d) {
-                const int j = n_tree * depth + d;
-                const int idx_left = 2 * idx_tree + 1;
-                const int idx_right = idx_left + 1;
-                const float split_point = split_points(idx_tree, n_tree);
-                if (projected_query(j) <= split_point) {
-                    idx_tree = idx_left;
-                } else {
-                    idx_tree = idx_right;
-                }
-            }
-            found_leaves[n_tree] = idx_tree - (1 << depth_crnt) + 1;
+          VectorXf projected_query;
+
+          if (density < 1)
+              projected_query.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth_crnt) * q;
+          else
+              projected_query.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth_crnt) * q;
+
+          int idx_tree = 0;
+          for (int d = 0; d < depth_crnt; ++d) {
+              const int idx_left = 2 * idx_tree + 1;
+              const int idx_right = idx_left + 1;
+              const float split_point = split_points(idx_tree, n_tree);
+              if (projected_query(d) <= split_point) {
+                  idx_tree = idx_left;
+              } else {
+                  idx_tree = idx_right;
+              }
+          }
+          found_leaves[n_tree] = idx_tree - (1 << depth_crnt) + 1;
         }
 
         int n_elected = 0, max_leaf_size = n_samples / (1 << depth_crnt) + 1;
