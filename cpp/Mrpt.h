@@ -844,7 +844,8 @@ class Autotuning {
         recall_level = target_recall;
 
         if(optimal_parameter_table.count(target_recall) == 0) {
-          std::cerr << "Target recall level " << target_recall << "too high." << std::endl;
+          std::cerr << "Target recall level " << target_recall << " too high." << std::endl;
+          recall_level = -1;
           return;
         }
 
