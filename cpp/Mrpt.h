@@ -11,6 +11,7 @@
 #include <utility>
 #include <map>
 #include <set>
+#include <fstream>
 
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
@@ -25,6 +26,8 @@ struct Parameters {
   double estimated_recall = 0.0;
   double validation_qtime = -1.0;
   double validation_recall = -1.0;
+  double validation_qtime_sd = -1.0;
+  double validation_recall_sd = -1.0;
 };
 
 class Mrpt {
@@ -755,6 +758,7 @@ class Autotuning {
       // std::cout << "n_test: " << n_test << "\n";
       // std::cout << "d: " << d << "\n";
 
+      double at_start = omp_get_wtime();
       recalls = std::vector<MatrixXd>(depth_max - depth_min + 1);
       cs_sizes = std::vector<MatrixXd>(depth_max - depth_min + 1);
 
@@ -803,6 +807,9 @@ class Autotuning {
       std::vector<int> target_recalls(99);
       std::iota(target_recalls.begin(), target_recalls.end(), 1);
       find_optimal_parameters(target_recalls);
+
+      double at_end = omp_get_wtime();
+      autotuning_time = at_end - at_start;
 
       measure_query_times(index, exact);
     }
@@ -917,6 +924,52 @@ class Autotuning {
       }
     }
 
+  static double mean(const std::vector<double> &x) {
+    int n = x.size();
+    double xsum = 0;
+    for(int i = 0; i < n; ++i)
+      xsum += x[i];
+    return xsum / n;
+  }
+
+  static double var(const std::vector<double> &x) {
+    int n = x.size();
+    double xmean = mean(x);
+    double ssr = 0;
+    for(int i = 0; i < n; ++i)
+      ssr += (x[i] - xmean) * (x[i] - xmean);
+    return ssr / (n - 1);
+  }
+
+  void write_results(std::string filename, bool add) {
+    std::ofstream outf;
+    if(add) {
+      outf.open(filename, std::ios::app);
+    } else {
+      outf.open(filename);
+    }
+
+    if(!outf) {
+      std::cerr << "File " << filename << " could not be opened for writing." << std::endl;
+      return;
+    }
+
+    int n_test = Q->cols();
+    for(auto it = optimal_parameter_table.begin(); it != optimal_parameter_table.end(); ++it) {
+      Parameters &par = it->second;
+      outf << k << " "
+           << par.n_trees << " "
+           << par.depth << " "
+           << density << " "
+           << par.votes << " "
+           << par.validation_recall << " "
+           << par.validation_recall_sd << " "
+           << par.validation_qtime * static_cast<double>(n_test) << " "
+           << par.validation_qtime_sd << " "
+           << autotuning_time << std::endl;
+    }
+  }
+
   private:
 
     void measure_query_times(Mrpt &index, MatrixXi &exact) {
@@ -925,25 +978,28 @@ class Autotuning {
         int n_test = Q->cols();
         int d = Q->rows();
 
-        double qtime = 0.0, recall = 0.0;
+        std::vector<double> qtimes, recalls;
         for(int i = 0; i < n_test; ++i) {
           std::vector<int> result(k);
           const Map<VectorXf> q(Q->data() + i * d, d);
           double start = omp_get_wtime();
           index.query(q, k, par.votes, &result[0], par.n_trees, par.depth);
           double end = omp_get_wtime();
-          qtime += end - start;
+          qtimes.push_back(end - start);
 
           std::sort(result.begin(), result.end());
           std::set<int> intersect;
           std::set_intersection(exact.data() + i * k, exact.data() + i * k + k, result.begin(), result.end(),
                            std::inserter(intersect, intersect.begin()));
 
-          recall += intersect.size();
-
+          double rec = intersect.size() / static_cast<double>(k);
+          recalls.push_back(rec);
         }
-        par.validation_qtime = qtime / n_test;
-        par.validation_recall = recall / (n_test * k);
+
+        par.validation_qtime = mean(qtimes);
+        par.validation_recall = mean(recalls);
+        par.validation_qtime_sd = std::sqrt(var(qtimes));
+        par.validation_recall_sd = std::sqrt(var(recalls));
       }
     }
 
@@ -1088,6 +1144,7 @@ class Autotuning {
     int recall_level;
     Parameters optimal_parameters;
     std::map<int,Parameters> optimal_parameter_table;
+    double autotuning_time = -1.0;
 };
 
 #endif // CPP_MRPT_H_
