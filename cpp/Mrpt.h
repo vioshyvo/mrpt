@@ -111,7 +111,6 @@ class Mrpt {
             projected_query.noalias() = dense_random_matrix * q;
 
         std::vector<int> found_leaves(n_trees);
-        const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth];
         /*
         * The following loops over all trees, and routes the query to exactly one
         * leaf in each.
@@ -183,7 +182,7 @@ class Mrpt {
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees_crnt; ++n_tree) {
-          VectorXf projected_query;
+          VectorXf projected_query(depth_crnt);
 
           if (density < 1)
               projected_query.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth_crnt) * q;
@@ -538,49 +537,6 @@ class Mrpt {
       }
     }
 
-
-    friend class Autotuning;
-
- private:
-    /**
-    * Builds a single random projection tree. The tree is constructed by recursively
-    * projecting the data on a random vector and splitting into two by the median.
-    * @param begin - iterator to the index of the first data point of this branch
-    * @param end - iterator to the index of the last data point of this branch
-    * @param tree_level - The level in tree where the recursion is at
-    * @param i - The index within the tree where we are at
-    * @param n_tree - The index of the tree within the index
-    * @param tree_projections - Precalculated projection values for the current tree
-    */
-    void grow_subtree(std::vector<int>::iterator begin, std::vector<int>::iterator end,
-          int tree_level, int i, int n_tree, const MatrixXf &tree_projections) {
-        int n = end - begin;
-        int idx_left = 2 * i + 1;
-        int idx_right = idx_left + 1;
-
-        if (tree_level == depth) return;
-
-        std::nth_element(begin, begin + n/2, end,
-            [&tree_projections, tree_level] (int i1, int i2) {
-              return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
-            });
-        auto mid = end - n/2;
-
-        if(n % 2) {
-          split_points(i, n_tree) = tree_projections(tree_level, *(mid - 1));
-        } else {
-          auto left_it = std::max_element(begin, mid,
-              [&tree_projections, tree_level] (int i1, int i2) {
-                return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
-              });
-          split_points(i, n_tree) = (tree_projections(tree_level, *mid) +
-            tree_projections(tree_level, *left_it)) / 2.0;
-        }
-
-        grow_subtree(begin, mid, tree_level + 1, idx_left, n_tree, tree_projections);
-        grow_subtree(mid, end, tree_level + 1, idx_right, n_tree, tree_projections);
-    }
-
     /**
     * Builds a random sparse matrix for use in random projection. The components of
     * the matrix are drawn from the distribution
@@ -634,6 +590,49 @@ class Mrpt {
                       [&normal_dist, &gen] { return normal_dist(gen); });
     }
 
+
+
+    friend class Autotuning;
+
+ private:
+    /**
+    * Builds a single random projection tree. The tree is constructed by recursively
+    * projecting the data on a random vector and splitting into two by the median.
+    * @param begin - iterator to the index of the first data point of this branch
+    * @param end - iterator to the index of the last data point of this branch
+    * @param tree_level - The level in tree where the recursion is at
+    * @param i - The index within the tree where we are at
+    * @param n_tree - The index of the tree within the index
+    * @param tree_projections - Precalculated projection values for the current tree
+    */
+    void grow_subtree(std::vector<int>::iterator begin, std::vector<int>::iterator end,
+          int tree_level, int i, int n_tree, const MatrixXf &tree_projections) {
+        int n = end - begin;
+        int idx_left = 2 * i + 1;
+        int idx_right = idx_left + 1;
+
+        if (tree_level == depth) return;
+
+        std::nth_element(begin, begin + n/2, end,
+            [&tree_projections, tree_level] (int i1, int i2) {
+              return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
+            });
+        auto mid = end - n/2;
+
+        if(n % 2) {
+          split_points(i, n_tree) = tree_projections(tree_level, *(mid - 1));
+        } else {
+          auto left_it = std::max_element(begin, mid,
+              [&tree_projections, tree_level] (int i1, int i2) {
+                return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
+              });
+          split_points(i, n_tree) = (tree_projections(tree_level, *mid) +
+            tree_projections(tree_level, *left_it)) / 2.0;
+        }
+
+        grow_subtree(begin, mid, tree_level + 1, idx_left, n_tree, tree_projections);
+        grow_subtree(mid, end, tree_level + 1, idx_right, n_tree, tree_projections);
+    }
 
 
     void count_elected(const Map<VectorXf> &q, const Map<VectorXi> &exact, int votes_max,
@@ -717,6 +716,7 @@ class Mrpt {
     SparseMatrix<float, RowMajor> sparse_random_matrix; // random vectors needed for all the RP-trees
     // std::vector<int> leaf_first_indices; // first indices of each leaf of tree in tree_leaves
     std::vector<std::vector<int>> leaf_first_indices_all; // first indices for each level
+    std::vector<int> leaf_first_indices;
 
     const int n_samples; // sample size of data
     const int dim; // dimension of data
@@ -725,6 +725,7 @@ class Mrpt {
     float density; // expected ratio of non-zero components in a projection matrix
     int n_pool; // amount of random vectors needed for all the RP-trees
     int n_array; // length of the one RP-tree as array
+    int votes;
 };
 
 class Autotuning {
@@ -901,6 +902,15 @@ class Autotuning {
          optimal_parameters.depth, out_distances, out_n_elected);
     }
 
+    void query(const Map<VectorXf> &q, int *out, Mrpt &index,
+        float *out_distances = nullptr, int *out_n_elected = nullptr) {
+        if(recall_level < 0) {
+          std::cerr << "Recall level not set. Returning..." << std::endl;
+          return;
+        }
+        index.query(q, k, optimal_parameters.votes, out, out_distances, out_n_elected);
+    }
+
     void find_optimal_parameters(const std::vector<int> &target_recalls) {
       optimal_parameter_table.clear();
 
@@ -968,6 +978,29 @@ class Autotuning {
            << par.validation_qtime_sd << " "
            << autotuning_time << std::endl;
     }
+  }
+
+  void delete_extra_trees(Mrpt &index) {
+    if(recall_level < 0) {
+      std::cerr << "Recall level not set. Returning..." << std::endl;
+      return;
+    }
+
+    index.n_trees = optimal_parameters.n_trees;
+    index.depth = optimal_parameters.depth;
+    index.votes = optimal_parameters.votes;
+    index.n_pool = index.depth * index.n_trees;
+    index.n_array = 1 << (index.depth + 1);
+
+    index.split_points.conservativeResize(index.n_array, index.n_trees);
+    index.leaf_first_indices = index.leaf_first_indices_all[index.depth];
+    SparseMatrix<float, RowMajor> srm_new(index.n_pool, index.dim);
+    for(int n_tree = 0; n_tree < index.n_trees; ++n_tree) {
+      srm_new.middleRows(n_tree * index.depth, index.depth) = index.sparse_random_matrix.middleRows(n_tree * depth_max, index.depth);
+    }
+    index.sparse_random_matrix = srm_new;
+
+    std::cout << "Trees deleted...\n";
   }
 
   private:
@@ -1113,11 +1146,11 @@ class Autotuning {
       beta_voting = fit_theil_sen(voting_x, voting_times);
       beta_exact = fit_theil_sen(ex, exact_times);
 
-      // std::cout << std::endl;
-      // std::cout << "idx_sum: " << idx_sum << "\n";
-      // std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
-      // std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
-      // std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
+      std::cout << std::endl;
+      std::cout << "idx_sum: " << idx_sum << "\n";
+      std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
+      std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
+      std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
 
       query_times = std::vector<MatrixXd>(depth_max - depth_min + 1);
       for(int depth = depth_min; depth <= depth_max; ++depth) {
