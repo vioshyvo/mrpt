@@ -995,13 +995,17 @@ class Autotuning {
 
     index.split_points.conservativeResize(index.n_array, index.n_trees);
     index.leaf_first_indices = index.leaf_first_indices_all[index.depth];
-    SparseMatrix<float, RowMajor> srm_new(index.n_pool, index.dim);
-    for(int n_tree = 0; n_tree < index.n_trees; ++n_tree) {
-      srm_new.middleRows(n_tree * index.depth, index.depth) = index.sparse_random_matrix.middleRows(n_tree * depth_max, index.depth);
+    if(index.density < 1) {
+      SparseMatrix<float, RowMajor> srm_new(index.n_pool, index.dim);
+      for(int n_tree = 0; n_tree < index.n_trees; ++n_tree)
+        srm_new.middleRows(n_tree * index.depth, index.depth) = index.sparse_random_matrix.middleRows(n_tree * depth_max, index.depth);
+      index.sparse_random_matrix = srm_new;
+    } else {
+      Matrix<float, Dynamic, Dynamic, RowMajor> drm_new(index.n_pool, index.dim);
+      for(int n_tree = 0; n_tree < index.n_trees; ++n_tree)
+        drm_new.middleRows(n_tree * index.depth, index.depth) = index.dense_random_matrix.middleRows(n_tree * depth_max, index.depth);
+      index.dense_random_matrix = drm_new;
     }
-    index.sparse_random_matrix = srm_new;
-
-    std::cout << "Trees deleted...\n";
   }
 
   void subset_trees(const Mrpt &index, Mrpt &index2) {
@@ -1017,13 +1021,19 @@ class Autotuning {
     index2.n_array = 1 << (index2.depth + 1);
     index2.tree_leaves = index.tree_leaves;
     index2.leaf_first_indices_all = index.leaf_first_indices_all;
+    index2.density = index.density;
 
     index2.split_points = index.split_points.topLeftCorner(index2.n_array, index2.n_trees);
     index2.leaf_first_indices = index.leaf_first_indices_all[index2.depth];
-    index2.sparse_random_matrix = SparseMatrix<float, RowMajor>(index2.n_pool, index2.dim);
-    for(int n_tree = 0; n_tree < index2.n_trees; ++n_tree) {
-      index2.sparse_random_matrix.middleRows(n_tree * index2.depth, index2.depth) = index.sparse_random_matrix.middleRows(n_tree * depth_max, index2.depth);
-    }
+    if(index2.density < 1) {
+      index2.sparse_random_matrix = SparseMatrix<float, RowMajor>(index2.n_pool, index2.dim);
+      for(int n_tree = 0; n_tree < index2.n_trees; ++n_tree)
+        index2.sparse_random_matrix.middleRows(n_tree * index2.depth, index2.depth) = index.sparse_random_matrix.middleRows(n_tree * depth_max, index2.depth);
+    } else {
+      index2.dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(index2.n_pool, index2.dim);
+      for(int n_tree = 0; n_tree < index2.n_trees; ++n_tree)
+        index2.dense_random_matrix.middleRows(n_tree * index2.depth, index2.depth) = index.dense_random_matrix.middleRows(n_tree * depth_max, index2.depth);
+      }
   }
 
 
