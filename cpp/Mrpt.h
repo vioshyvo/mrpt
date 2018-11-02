@@ -10,6 +10,7 @@
 #include <cmath>
 #include <utility>
 #include <map>
+#include <set>
 
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
@@ -22,6 +23,8 @@ struct Parameters {
   int votes = 0;
   double estimated_qtime = 0.0;
   double estimated_recall = 0.0;
+  double validation_qtime = -1.0;
+  double validation_recall = -1.0;
 };
 
 class Mrpt {
@@ -742,6 +745,16 @@ class Autotuning {
       int n_test = Q->cols();
       int d = X->rows();
 
+      // std::cout << "trees_max: " << trees_max << "\n";
+      // std::cout << "depth_min: " << depth_min << "\n";
+      // std::cout << "depth_max: " << depth_max << "\n";
+      // std::cout << "votes_max: " << votes_max << "\n";
+      // std::cout << "k: " << k << "\n";
+      // std::cout << "seed_mrpt: " << seed_mrpt << "\n";
+      // std::cout << "density: " << density << "\n";
+      // std::cout << "n_test: " << n_test << "\n";
+      // std::cout << "d: " << d << "\n";
+
       recalls = std::vector<MatrixXd>(depth_max - depth_min + 1);
       cs_sizes = std::vector<MatrixXd>(depth_max - depth_min + 1);
 
@@ -756,25 +769,33 @@ class Autotuning {
       MatrixXi exact(k, n_test);
       compute_exact(index, exact);
 
+      // std::cout << "n_test: " << n_test << std::endl;
+      // for(int i = 0; i < n_test; ++i) {
+      //   std::cout << i << ": ";
+      //   for(int j = 0; j < k; ++j)
+      //     std::cout << exact(j,i) << " ";
+      //   std::cout << std::endl;
+      // }
+
+
       for(int i = 0; i < n_test; ++i) {
-        // std::cout << "point: " << i << std::endl;
         std::vector<MatrixXd> recall_tmp(depth_max - depth_min + 1);
         std::vector<MatrixXd> cs_size_tmp(depth_max - depth_min + 1);
 
         index.count_elected(Map<VectorXf>(Q->data() + i * d, d), Map<VectorXi>(exact.data() + i * k, k),
          votes_max, recall_tmp, cs_size_tmp);
 
+         // std::cout << recall_tmp[0] << std::endl;
+
         for(int depth = depth_min; depth <= depth_max; ++depth) {
           recalls[depth - depth_min] += recall_tmp[depth - depth_min];
           cs_sizes[depth - depth_min] += cs_size_tmp[depth - depth_min];
         }
-
       }
 
       for(int depth = depth_min; depth <= depth_max; ++depth) {
         recalls[depth - depth_min] /= (k * n_test);
         cs_sizes[depth - depth_min] /= n_test;
-        // std::cout << "Autotuning recall, depth = " << depth << "\n" << recalls[depth - depth_min] << "\n\n";
       }
 
       fit_times(index);
@@ -782,6 +803,8 @@ class Autotuning {
       std::vector<int> target_recalls(99);
       std::iota(target_recalls.begin(), target_recalls.end(), 1);
       find_optimal_parameters(target_recalls);
+
+      measure_query_times(index, exact);
     }
 
     float get_recall(int tree, int depth, int v) {
@@ -853,18 +876,18 @@ class Autotuning {
         recall_level = target_recall;
 
         if(optimal_parameter_table.count(target_recall) == 0) {
-          std::cerr << "Target recall level " << target_recall << " too high." << std::endl;
+          // std::cerr << "Target recall level " << target_recall << " too high." << std::endl;
           recall_level = -1;
           return;
         }
 
         optimal_parameters = optimal_parameter_table[target_recall];
 
-        std::cout << "Estimated recall: " << optimal_parameters.estimated_recall << "\n";
-        std::cout << "Estimated query time: " << optimal_parameters.estimated_qtime * 1000 << " ms.\n";
-        std::cout << "Optimal number of trees: " << optimal_parameters.n_trees << "\n";
-        std::cout << "Optimal depth of trees: " << optimal_parameters.depth << "\n";
-        std::cout << "Optimal vote threshold: " <<  optimal_parameters.votes << "\n\n";
+        // std::cout << "Estimated recall: " << optimal_parameters.estimated_recall << "\n";
+        // std::cout << "Estimated query time: " << optimal_parameters.estimated_qtime * 1000 << " ms.\n";
+        // std::cout << "Optimal number of trees: " << optimal_parameters.n_trees << "\n";
+        // std::cout << "Optimal depth of trees: " << optimal_parameters.depth << "\n";
+        // std::cout << "Optimal vote threshold: " <<  optimal_parameters.votes << "\n\n";
       }
 
       index.query(q, k, optimal_parameters.votes, out, optimal_parameters.n_trees,
@@ -884,7 +907,7 @@ class Autotuning {
               int tr = target_recalls[i];
               if(rec >= tr) {
                 if(optimal_parameter_table.count(tr) == 0 || qt < optimal_parameter_table[tr].estimated_qtime) {
-                  Parameters par {t, depth, v, qt, rec};
+                  Parameters par {t, depth, v, qt, rec / 100.0};
                   optimal_parameter_table[tr] = par;
                 }
               }
@@ -895,6 +918,34 @@ class Autotuning {
     }
 
   private:
+
+    void measure_query_times(Mrpt &index, MatrixXi &exact) {
+      for(auto it = optimal_parameter_table.begin(); it != optimal_parameter_table.end(); ++it) {
+        Parameters &par = it->second;
+        int n_test = Q->cols();
+        int d = Q->rows();
+
+        double qtime = 0.0, recall = 0.0;
+        for(int i = 0; i < n_test; ++i) {
+          std::vector<int> result(k);
+          const Map<VectorXf> q(Q->data() + i * d, d);
+          double start = omp_get_wtime();
+          index.query(q, k, par.votes, &result[0], par.n_trees, par.depth);
+          double end = omp_get_wtime();
+          qtime += end - start;
+
+          std::sort(result.begin(), result.end());
+          std::set<int> intersect;
+          std::set_intersection(exact.data() + i * k, exact.data() + i * k + k, result.begin(), result.end(),
+                           std::inserter(intersect, intersect.begin()));
+
+          recall += intersect.size();
+
+        }
+        par.validation_qtime = qtime / n_test;
+        par.validation_recall = recall / (n_test * k);
+      }
+    }
 
     void compute_exact(Mrpt &index, MatrixXi &out_exact) {
       int k = out_exact.rows();
@@ -1006,11 +1057,11 @@ class Autotuning {
       beta_voting = fit_theil_sen(voting_x, voting_times);
       beta_exact = fit_theil_sen(ex, exact_times);
 
-      std::cout << std::endl;
-      std::cout << "idx_sum: " << idx_sum << "\n";
-      std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
-      std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
-      std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
+      // std::cout << std::endl;
+      // std::cout << "idx_sum: " << idx_sum << "\n";
+      // std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
+      // std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
+      // std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
 
       query_times = std::vector<MatrixXd>(depth_max - depth_min + 1);
       for(int depth = depth_min; depth <= depth_max; ++depth) {
