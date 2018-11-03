@@ -993,6 +993,7 @@ class Autotuning {
     index.n_pool = index.depth * index.n_trees;
     index.n_array = 1 << (index.depth + 1);
 
+    index.tree_leaves.resize(index.n_trees);
     index.split_points.conservativeResize(index.n_array, index.n_trees);
     index.leaf_first_indices = index.leaf_first_indices_all[index.depth];
     if(index.density < 1) {
@@ -1019,7 +1020,7 @@ class Autotuning {
     index2.votes = optimal_parameters.votes;
     index2.n_pool = index2.depth * index2.n_trees;
     index2.n_array = 1 << (index2.depth + 1);
-    index2.tree_leaves = index.tree_leaves;
+    index2.tree_leaves.assign(index.tree_leaves.begin(), index.tree_leaves.begin() + index2.n_trees);
     index2.leaf_first_indices_all = index.leaf_first_indices_all;
     index2.density = index.density;
 
