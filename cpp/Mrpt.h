@@ -1009,7 +1009,7 @@ class Autotuning {
   private:
 
     void measure_query_times(Mrpt &index, MatrixXi &exact) {
-      for(const auto &par : pars) {
+      for(const auto &par : opt_pars) {
         int n_test = Q->cols();
         int d = Q->rows();
 
