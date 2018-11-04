@@ -68,6 +68,7 @@ class Mrpt {
         tree_leaves = std::vector<std::vector<int>>(n_trees);
 
         count_first_leaf_indices_all(leaf_first_indices_all, n_samples, depth);
+        leaf_first_indices = leaf_first_indices_all[depth];
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
@@ -132,21 +133,27 @@ class Mrpt {
             found_leaves[n_tree] = idx_tree - (1 << depth) + 1;
         }
 
+        // std::cout << "Trees traversed" << std::endl;
+
         int n_elected = 0, max_leaf_size = n_samples / (1 << depth) + 1;
         VectorXi elected(n_trees * max_leaf_size);
         VectorXi votes = VectorXi::Zero(n_samples);
 
         // count votes
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+            // std::cout << "tree number: " << n_tree << std::endl;
             int leaf_begin = leaf_first_indices[found_leaves[n_tree]];
             int leaf_end = leaf_first_indices[found_leaves[n_tree] + 1];
             const std::vector<int> &indices = tree_leaves[n_tree];
             for (int i = leaf_begin; i < leaf_end; ++i) {
+                // std::cout << "leaf number : " << i << std::endl;
                 int idx = indices[i];
                 if (++votes(idx) == votes_required)
                     elected(n_elected++) = idx;
             }
         }
+
+        // std::cout << "Votes counted!" << std::endl;
 
         if(out_n_elected) *out_n_elected += n_elected;
         exact_knn(q, k, elected, n_elected, out, out_distances);
