@@ -24,10 +24,10 @@ struct Parameters {
   int votes = 0;
   double estimated_qtime = 0.0;
   double estimated_recall = 0.0;
-  double validation_qtime = -1.0;
-  double validation_recall = -1.0;
-  double validation_qtime_sd = -1.0;
-  double validation_recall_sd = -1.0;
+  mutable double validation_qtime = -1.0;
+  mutable double validation_recall = -1.0;
+  mutable double validation_qtime_sd = -1.0;
+  mutable double validation_recall_sd = -1.0;
 };
 
 class Mrpt {
@@ -467,18 +467,28 @@ class Mrpt {
     * @return - number of trees in the index
     */
     int get_n_trees() const {
-      return split_points.cols();
+      return n_trees;
+    }
+
+    /**
+    * @return - is the index empty: can it be used for queries?
+    */
+    bool is_empty() const {
+      return get_n_trees() == 0;
     }
 
     /**
     * @return - depth of trees of index
     */
     int get_depth() const {
-      if(sparse_random_matrix.rows() > 0) {
-        return sparse_random_matrix.rows() / get_n_trees();
-      } else {
-        return dense_random_matrix.rows() / get_n_trees();
-      }
+      return depth;
+    }
+
+    /**
+    * @return - optimal vote count that is used as default is no vote count is specified.
+    */
+    int get_votes() const {
+      return votes;
     }
 
     /**
@@ -590,8 +600,6 @@ class Mrpt {
         std::generate(dense_random_matrix.data(), dense_random_matrix.data() + n_row * n_col,
                       [&normal_dist, &gen] { return normal_dist(gen); });
     }
-
-
 
     friend class Autotuning;
 
@@ -733,7 +741,7 @@ class Autotuning {
     Autotuning(const Map<const MatrixXf> *X_, Map<MatrixXf> *Q_) :
       X(X_),
       Q(Q_),
-      recall_level(-1) {}
+      recall_level(-1.0) {}
 
     ~Autotuning() {}
 
@@ -784,10 +792,6 @@ class Autotuning {
 
       fit_times(index);
 
-      std::vector<int> target_recalls(99);
-      std::iota(target_recalls.begin(), target_recalls.end(), 1);
-      find_optimal_parameters(target_recalls);
-
       double at_end = omp_get_wtime();
       autotuning_time = at_end - at_start;
 
@@ -821,13 +825,15 @@ class Autotuning {
            + get_exact_time(tree, depth, v);
     }
 
-    Parameters get_optimal_parameters(int target_recall) {
-      if(optimal_parameter_table.count(target_recall) == 0) {
-        Parameters par;
-        return par;
-      }
+    Parameters get_optimal_parameters(double target_recall) {
+      double tr = target_recall - 0.0001;
+      for(const auto &par : opt_pars)
+        if(par.estimated_recall > tr) {
+          return par;
+        }
 
-      return optimal_parameter_table[target_recall];
+      Parameters par;
+      return par;
     }
 
     static std::pair<double,double> fit_theil_sen(const std::vector<double> &x,
@@ -857,20 +863,18 @@ class Autotuning {
       return beta.first + beta.second * x;
     }
 
-    void query(const Map<VectorXf> &q, int target_recall, int *out, Mrpt &index,
+    void query(const Map<VectorXf> &q, float target_recall, int *out, Mrpt &index,
         float *out_distances = nullptr, int *out_n_elected = nullptr) {
 
       if(recall_level != target_recall) {
         recall_level = target_recall;
 
-        if(optimal_parameter_table.count(target_recall) == 0) {
+        optimal_parameters = get_optimal_parameters(target_recall);
+        if(!optimal_parameters.n_trees) {
           // std::cerr << "Target recall level " << target_recall << " too high." << std::endl;
-          recall_level = -1;
+          recall_level = -1.0;
           return;
         }
-
-        optimal_parameters = optimal_parameter_table[target_recall];
-
       }
 
       index.query(q, k, optimal_parameters.votes, out, optimal_parameters.n_trees,
@@ -886,28 +890,6 @@ class Autotuning {
         index.query(q, k, optimal_parameters.votes, out, out_distances, out_n_elected);
     }
 
-    void find_optimal_parameters(const std::vector<int> &target_recalls) {
-      optimal_parameter_table.clear();
-
-      for(int depth = depth_min; depth <= depth_max; ++depth) {
-        for(int t = 1; t <= trees_max; ++t) {
-          int votes_index = votes_max < t ? votes_max : t;
-          for(int v = 1; v <= votes_index; ++v) {
-            double rec = get_recall(t, depth, v) * 100.0;
-            double qt = get_query_time(t, depth, v);
-            for(int i = 0; i < target_recalls.size(); ++i) {
-              int tr = target_recalls[i];
-              if(rec >= tr) {
-                if(optimal_parameter_table.count(tr) == 0 || qt < optimal_parameter_table[tr].estimated_qtime) {
-                  Parameters par {t, depth, v, qt, rec / 100.0};
-                  optimal_parameter_table[tr] = par;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
 
   static double mean(const std::vector<double> &x) {
     int n = x.size();
@@ -940,8 +922,7 @@ class Autotuning {
     }
 
     int n_test = Q->cols();
-    for(auto it = optimal_parameter_table.begin(); it != optimal_parameter_table.end(); ++it) {
-      Parameters &par = it->second;
+    for(const auto &par : opt_pars) {
       outf << k << " "
            << par.n_trees << " "
            << par.depth << " "
@@ -955,7 +936,7 @@ class Autotuning {
     }
   }
 
-  void delete_extra_trees(int target_recall, Mrpt &index) {
+  void delete_extra_trees(double target_recall, Mrpt &index) {
     recall_level = target_recall;
     optimal_parameters = get_optimal_parameters(target_recall);
     if(!optimal_parameters.n_trees) {
@@ -985,7 +966,7 @@ class Autotuning {
     }
   }
 
-  void subset_trees(int target_recall, const Mrpt &index, Mrpt &index2) {
+  void subset_trees(double target_recall, const Mrpt &index, Mrpt &index2) {
     recall_level = target_recall;
     optimal_parameters = get_optimal_parameters(target_recall);
     if(!optimal_parameters.n_trees) {
@@ -1015,12 +996,20 @@ class Autotuning {
       }
   }
 
+  static bool is_faster(const Parameters &par1, const Parameters &par2) {
+    return par1.estimated_qtime < par2.estimated_qtime;
+  }
+
+  std::vector<Parameters> optimal_parameter_list() {
+    std::vector<Parameters> new_pars;
+    std::copy(opt_pars.begin(), opt_pars.end(), std::back_inserter(new_pars));
+    return new_pars;
+  }
 
   private:
 
     void measure_query_times(Mrpt &index, MatrixXi &exact) {
-      for(auto it = optimal_parameter_table.begin(); it != optimal_parameter_table.end(); ++it) {
-        Parameters &par = it->second;
+      for(const auto &par : pars) {
         int n_test = Q->cols();
         int d = Q->rows();
 
@@ -1165,6 +1154,7 @@ class Autotuning {
       // std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
       // std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
 
+      pars = std::set<Parameters,decltype(is_faster)*>(is_faster);
       query_times = std::vector<MatrixXd>(depth_max - depth_min + 1);
       for(int depth = depth_min; depth <= depth_max; ++depth) {
         MatrixXd query_time = MatrixXd::Zero(votes_max, trees_max);
@@ -1172,11 +1162,23 @@ class Autotuning {
         for(int t = 1; t <= trees_max; ++t) {
           int votes_index = votes_max < t ? votes_max : t;
           for(int v = 1; v <= votes_index; ++v) {
-            query_time(v - 1, t - 1) = get_query_time(t, depth, v);
+            double qt = get_query_time(t, depth, v);
+            query_time(v - 1, t - 1) = qt;
+            Parameters par {t, depth, v, qt, get_recall(t, depth, v)};
+            pars.insert(par);
           }
         }
         query_times[depth - depth_min] = query_time;
       }
+
+      opt_pars = std::set<Parameters,decltype(is_faster)*>(is_faster);
+      double best_recall = -1.0;
+      for(const auto &par : pars) // compute pareto frontier for query times and recalls
+        if(par.estimated_recall > best_recall) {
+          opt_pars.insert(par);
+          best_recall = par.estimated_recall;
+        }
+
     }
 
     const Map<const MatrixXf> *X;
@@ -1185,10 +1187,11 @@ class Autotuning {
     int trees_max, depth_min, depth_max, votes_max, k, seed_mrpt;
     float density;
     std::pair<double,double> beta_projection, beta_voting, beta_exact;
-    int recall_level;
+    double recall_level;
     Parameters optimal_parameters;
-    std::map<int,Parameters> optimal_parameter_table;
+    std::set<Parameters,decltype(is_faster)*> opt_pars;
     double autotuning_time = -1.0;
+    std::set<Parameters,decltype(is_faster)*> pars;
 };
 
 #endif // CPP_MRPT_H_
