@@ -689,8 +689,7 @@ class Mrpt {
 
               int leaf_begin = leaf_first_indices[found_leaves[depth_crnt - depth_min]];
               int leaf_end = leaf_first_indices[found_leaves[depth_crnt - depth_min] + 1];
-              // std::cout << "leaf_begin: " << leaf_begin << std::endl;
-              // std::cout << "leaf_end: " << leaf_end << std::endl;
+
               const std::vector<int> &indices = tree_leaves[n_tree];
               for (int i = leaf_begin; i < leaf_end; ++i) {
                   int idx = indices[i];
@@ -721,12 +720,12 @@ class Mrpt {
 
     const int n_samples; // sample size of data
     const int dim; // dimension of data
-    int n_trees; // number of RP-trees
-    int depth; // depth of an RP-tree with median split
-    float density; // expected ratio of non-zero components in a projection matrix
-    int n_pool; // amount of random vectors needed for all the RP-trees
-    int n_array; // length of the one RP-tree as array
-    int votes;
+    int n_trees = 0; // number of RP-trees
+    int depth = 0; // depth of an RP-tree with median split
+    float density = 1; // expected ratio of non-zero components in a projection matrix
+    int n_pool = 0; // amount of random vectors needed for all the RP-trees
+    int n_array = 0; // length of the one RP-tree as array
+    int votes = 0;
 };
 
 class Autotuning {
@@ -738,27 +737,17 @@ class Autotuning {
 
     ~Autotuning() {}
 
-    void tune(int trees_max_, int depth_min_, int depth_max_, int votes_max_,
+    Mrpt tune(int trees_max_, int depth_min_, int depth_max_, int votes_max_,
        float density_, int k_, int seed_mrpt_ = 0) {
       trees_max = trees_max_;
       depth_min = depth_min_;
       depth_max = depth_max_;
       votes_max = votes_max_;
       k = k_;
-      seed_mrpt = seed_mrpt;
+      seed_mrpt = seed_mrpt_;
       density = density_;
       int n_test = Q->cols();
       int d = X->rows();
-
-      // std::cout << "trees_max: " << trees_max << "\n";
-      // std::cout << "depth_min: " << depth_min << "\n";
-      // std::cout << "depth_max: " << depth_max << "\n";
-      // std::cout << "votes_max: " << votes_max << "\n";
-      // std::cout << "k: " << k << "\n";
-      // std::cout << "seed_mrpt: " << seed_mrpt << "\n";
-      // std::cout << "density: " << density << "\n";
-      // std::cout << "n_test: " << n_test << "\n";
-      // std::cout << "d: " << d << "\n";
 
       double at_start = omp_get_wtime();
       recalls = std::vector<MatrixXd>(depth_max - depth_min + 1);
@@ -775,23 +764,12 @@ class Autotuning {
       MatrixXi exact(k, n_test);
       compute_exact(index, exact);
 
-      // std::cout << "n_test: " << n_test << std::endl;
-      // for(int i = 0; i < n_test; ++i) {
-      //   std::cout << i << ": ";
-      //   for(int j = 0; j < k; ++j)
-      //     std::cout << exact(j,i) << " ";
-      //   std::cout << std::endl;
-      // }
-
-
       for(int i = 0; i < n_test; ++i) {
         std::vector<MatrixXd> recall_tmp(depth_max - depth_min + 1);
         std::vector<MatrixXd> cs_size_tmp(depth_max - depth_min + 1);
 
         index.count_elected(Map<VectorXf>(Q->data() + i * d, d), Map<VectorXi>(exact.data() + i * k, k),
          votes_max, recall_tmp, cs_size_tmp);
-
-         // std::cout << recall_tmp[0] << std::endl;
 
         for(int depth = depth_min; depth <= depth_max; ++depth) {
           recalls[depth - depth_min] += recall_tmp[depth - depth_min];
@@ -814,6 +792,7 @@ class Autotuning {
       autotuning_time = at_end - at_start;
 
       measure_query_times(index, exact);
+      return index;
     }
 
     float get_recall(int tree, int depth, int v) {
@@ -892,11 +871,6 @@ class Autotuning {
 
         optimal_parameters = optimal_parameter_table[target_recall];
 
-        // std::cout << "Estimated recall: " << optimal_parameters.estimated_recall << "\n";
-        // std::cout << "Estimated query time: " << optimal_parameters.estimated_qtime * 1000 << " ms.\n";
-        // std::cout << "Optimal number of trees: " << optimal_parameters.n_trees << "\n";
-        // std::cout << "Optimal depth of trees: " << optimal_parameters.depth << "\n";
-        // std::cout << "Optimal vote threshold: " <<  optimal_parameters.votes << "\n\n";
       }
 
       index.query(q, k, optimal_parameters.votes, out, optimal_parameters.n_trees,
@@ -981,9 +955,11 @@ class Autotuning {
     }
   }
 
-  void delete_extra_trees(Mrpt &index) {
-    if(recall_level < 0) {
-      std::cerr << "Recall level not set. Returning..." << std::endl;
+  void delete_extra_trees(int target_recall, Mrpt &index) {
+    recall_level = target_recall;
+    optimal_parameters = get_optimal_parameters(target_recall);
+    if(!optimal_parameters.n_trees) {
+      std::cerr << "Recall level " << target_recall << " too high. Returning..." << std::endl;
       return;
     }
 
@@ -1009,9 +985,11 @@ class Autotuning {
     }
   }
 
-  void subset_trees(const Mrpt &index, Mrpt &index2) {
-    if(recall_level < 0) {
-      std::cerr << "Recall level not set. Returning..." << std::endl;
+  void subset_trees(int target_recall, const Mrpt &index, Mrpt &index2) {
+    recall_level = target_recall;
+    optimal_parameters = get_optimal_parameters(target_recall);
+    if(!optimal_parameters.n_trees) {
+      std::cerr << "Recall level " << target_recall << " too high. Returning..." << std::endl;
       return;
     }
 
@@ -1181,11 +1159,11 @@ class Autotuning {
       beta_voting = fit_theil_sen(voting_x, voting_times);
       beta_exact = fit_theil_sen(ex, exact_times);
 
-      std::cout << std::endl;
-      std::cout << "idx_sum: " << idx_sum << "\n";
-      std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
-      std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
-      std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
+      // std::cout << std::endl;
+      // std::cout << "idx_sum: " << idx_sum << "\n";
+      // std::cout << "projection, intercept: " << beta_projection.first << " slope: " << beta_projection.second << "\n";
+      // std::cout << "voting, intercept: " << beta_voting.first << " slope: " << beta_voting.second << "\n";
+      // std::cout << "exact, intercept: " << beta_exact.first << " slope: " << beta_exact.second << "\n\n";
 
       query_times = std::vector<MatrixXd>(depth_max - depth_min + 1);
       for(int depth = depth_min; depth <= depth_max; ++depth) {
@@ -1198,8 +1176,6 @@ class Autotuning {
           }
         }
         query_times[depth - depth_min] = query_time;
-        // std::cout << "depth: " << depth << " query times (at):\n";
-        // std::cout << query_time * 1000 << "\n\n";
       }
     }
 
