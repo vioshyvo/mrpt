@@ -706,31 +706,13 @@ class Mrpt {
     }
 
 
-    void query(const Map<VectorXf> &q, float target_recall, int *out,
+    void query(const Map<VectorXf> &q, int *out,
         float *out_distances = nullptr, int *out_n_elected = nullptr) {
-
-      if(recall_level != target_recall) {
-        recall_level = target_recall;
-
-        optimal_parameters = get_optimal_parameters(target_recall);
-        if(!optimal_parameters.n_trees) {
-          // std::cerr << "Target recall level " << target_recall << " too high." << std::endl;
-          recall_level = -1.0;
-          return;
-        }
+      if(recall_level < 0) {
+        std::cerr << "Recall level not set. Returning..." << std::endl;
+        return;
       }
-
-      query(q, k, optimal_parameters.votes, out, optimal_parameters.n_trees,
-         optimal_parameters.depth, out_distances, out_n_elected);
-    }
-
-    void query(const Map<VectorXf> &q, int *out, Mrpt &index,
-        float *out_distances = nullptr, int *out_n_elected = nullptr) {
-        if(recall_level < 0) {
-          std::cerr << "Recall level not set. Returning..." << std::endl;
-          return;
-        }
-        query(q, k, optimal_parameters.votes, out, out_distances, out_n_elected);
+      query(q, k, votes, out, out_distances, out_n_elected);
     }
 
 
@@ -767,23 +749,24 @@ class Mrpt {
   }
 
   void subset_trees(double target_recall, Mrpt &index2) {
-    recall_level = target_recall;
-    optimal_parameters = get_optimal_parameters(target_recall);
-    if(!optimal_parameters.n_trees) {
+    index2.recall_level = target_recall;
+    index2.optimal_parameters = get_optimal_parameters(target_recall);
+    if(!index2.optimal_parameters.n_trees) {
       std::cerr << "Recall level " << target_recall << " too high. Returning..." << std::endl;
       return;
     }
 
     int depth_max = depth;
 
-    index2.n_trees = optimal_parameters.n_trees;
-    index2.depth = optimal_parameters.depth;
-    index2.votes = optimal_parameters.votes;
+    index2.n_trees = index2.optimal_parameters.n_trees;
+    index2.depth = index2.optimal_parameters.depth;
+    index2.votes = index2.optimal_parameters.votes;
     index2.n_pool = index2.depth * index2.n_trees;
     index2.n_array = 1 << (index2.depth + 1);
     index2.tree_leaves.assign(tree_leaves.begin(), tree_leaves.begin() + index2.n_trees);
     index2.leaf_first_indices_all = leaf_first_indices_all;
     index2.density = density;
+    index2.k = k;
 
     index2.split_points = split_points.topLeftCorner(index2.n_array, index2.n_trees);
     index2.leaf_first_indices = leaf_first_indices_all[index2.depth];
