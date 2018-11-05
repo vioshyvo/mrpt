@@ -125,6 +125,12 @@ class Mrpt {
       fit_times();
     }
 
+    void grow(float target_recall, Map<MatrixXf> *Q_, int k_, int trees_max, int depth_min_, int depth_max, int votes_max_,
+        float density, int seed_mrpt = 0) {
+      recall_level = target_recall;
+      grow(Q_, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
+      delete_extra_trees(target_recall);
+    }
 
     /**
     * This function finds the k approximate nearest neighbors of the query object
