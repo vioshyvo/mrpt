@@ -50,12 +50,17 @@ class Mrpt {
     * @param seed - A seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with rd()
     */
-    void grow(int n_trees_, int depth_, float density_, int seed = 0) {
+    void grow(int n_trees_, int depth_, float density_ = -1.0, int seed = 0) {
         n_trees = n_trees_;
         depth = depth_;
-        density = density_;
         n_pool = n_trees_ * depth_;
         n_array = 1 << (depth_ + 1);
+
+        if(density_ < 0) {
+          density = 1.0 / std::sqrt(dim);
+        } else {
+          density = density_;
+        }
 
         density < 1 ? build_sparse_random_matrix(sparse_random_matrix, n_pool, dim, density, seed) : build_dense_random_matrix(dense_random_matrix, n_pool, dim, seed);
 
@@ -82,11 +87,32 @@ class Mrpt {
         }
     }
 
-    void grow(Map<MatrixXf> *Q_, int k_, int trees_max, int depth_min_, int depth_max, int votes_max_,
-       float density, int seed_mrpt = 0) {
+    void grow(Map<MatrixXf> *Q_, int k_, int trees_max = -1, int depth_max = -1,
+       int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed_mrpt = 0) {
+
+      if(trees_max == - 1) {
+        trees_max = std::min(std::sqrt(n_samples), 1000.0);
+      }
+      if(depth_min_ == -1) {
+        depth_min = std::min(static_cast<int>(std::log2(n_samples)), 5);
+      } else {
+        depth_min = depth_min_;
+      }
+      if(depth_max == -1) {
+        depth_max = std::max(static_cast<int>(std::log2(n_samples) - 4), depth_min);
+      }
+      if(votes_max_ == -1) {
+        votes_max = std::max(trees_max / 10, std::min(trees_max, 10));
+      } else {
+        votes_max = votes_max_;
+      }
+      if(density_ < 0) {
+        density = 1.0 / std::sqrt(dim);
+      } else {
+        density = density_;
+      }
+
       Q = Q_;
-      depth_min = depth_min_;
-      votes_max = votes_max_;
       k = k_;
       n_test = Q->cols();
 
@@ -124,8 +150,9 @@ class Mrpt {
       fit_times();
     }
 
-    void grow(float target_recall, Map<MatrixXf> *Q_, int k_, int trees_max, int depth_min_, int depth_max, int votes_max_,
-        float density, int seed_mrpt = 0) {
+    void grow(float target_recall, Map<MatrixXf> *Q_, int k_, int trees_max = -1,
+              int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
+              float density = -1.0, int seed_mrpt = 0) {
       recall_level = target_recall;
       grow(Q_, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
       delete_extra_trees(target_recall);
@@ -617,6 +644,10 @@ class Mrpt {
       return predict_theil_sen(n_trees * depth, beta_projection);
     }
 
+    float get_density() const {
+      return density;
+    }
+
     double get_voting_time(int n_trees, int depth, int v) {
       const std::map<int,std::pair<double,double>> &beta = beta_voting[depth - depth_min];
       if(v <= 0 || beta.empty()) {
@@ -1048,7 +1079,7 @@ class Mrpt {
     const int dim; // dimension of data
     int n_trees = 0; // number of RP-trees
     int depth = 0; // depth of an RP-tree with median split
-    float density = 1; // expected ratio of non-zero components in a projection matrix
+    float density = -1.0; // expected ratio of non-zero components in a projection matrix
     int n_pool = 0; // amount of random vectors needed for all the RP-trees
     int n_array = 0; // length of the one RP-tree as array
     int votes = 0; // optimal number of votes to use
