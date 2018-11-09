@@ -221,9 +221,20 @@ class Mrpt {
             }
         }
 
-        if(out_n_elected) *out_n_elected += n_elected;
+        if(out_n_elected) {
+          *out_n_elected = n_elected;
+        }
 
         exact_knn(q, k, elected, n_elected, out, out_distances);
+    }
+
+
+    void query(const Map<VectorXf> &q, int *out, float *out_distances = nullptr,
+               int *out_n_elected = nullptr) {
+      if(recall_level < 0) {
+        return;
+      }
+      query(q, k, votes, out, out_distances, out_n_elected);
     }
 
 
@@ -236,7 +247,8 @@ class Mrpt {
     * @param out_distances - output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @return
     */
-    void exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices, int n_elected, int *out, float *out_distances = nullptr) const {
+    void exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices,
+      int n_elected, int *out, float *out_distances = nullptr) const {
 
         if(!n_elected) {
           for(int i = 0; i < k; ++i) out[i] = -1;
@@ -382,52 +394,6 @@ class Mrpt {
         return true;
     }
 
-    void project_query(const Map<VectorXf> &q, VectorXf &projected_query) {
-      if (density < 1)
-          projected_query.noalias() = sparse_random_matrix * q;
-      else
-          projected_query.noalias() = dense_random_matrix * q;
-    }
-
-    void vote(const VectorXf &projected_query, int votes_required, VectorXi &elected,
-      int &n_elected, int n_trees, int depth_crnt) {
-      std::vector<int> found_leaves(n_trees);
-      const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth_crnt];
-
-
-      #pragma omp parallel for
-      for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-        int idx_tree = 0;
-        for (int d = 0; d < depth_crnt; ++d) {
-          const int j = n_tree * depth + d;
-          const int idx_left = 2 * idx_tree + 1;
-          const int idx_right = idx_left + 1;
-          const float split_point = split_points(idx_tree, n_tree);
-          if (projected_query(j) <= split_point) {
-              idx_tree = idx_left;
-          } else {
-              idx_tree = idx_right;
-          }
-        }
-        found_leaves[n_tree] = idx_tree - (1 << depth_crnt) + 1;
-      }
-
-      int max_leaf_size = n_samples / (1 << depth_crnt) + 1;
-      elected = VectorXi(n_trees * max_leaf_size);
-      VectorXi votes = VectorXi::Zero(n_samples);
-
-      // count votes
-      for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-        int leaf_begin = leaf_first_indices[found_leaves[n_tree]];
-        int leaf_end = leaf_first_indices[found_leaves[n_tree] + 1];
-        const std::vector<int> &indices = tree_leaves[n_tree];
-        for (int i = leaf_begin; i < leaf_end; ++i) {
-            int idx = indices[i];
-            if (++votes(idx) == votes_required)
-                elected(n_elected++) = idx;
-        }
-      }
-    }
 
     /**
     * Accessor for split points of trees (for testing purposes)
@@ -477,8 +443,8 @@ class Mrpt {
     /**
     * @return - is the index empty: can it be used for queries?
     */
-    bool is_empty() const {
-      return get_n_trees() == 0;
+    bool empty() const {
+      return n_trees == 0;
     }
 
     /**
@@ -586,6 +552,8 @@ class Mrpt {
         sparse_random_matrix.makeCompressed();
     }
 
+
+
     /*
     * Builds a random dense matrix for use in random projection. The components of
     * the matrix are drawn from the standard normal distribution.
@@ -603,29 +571,6 @@ class Mrpt {
 
         std::generate(dense_random_matrix.data(), dense_random_matrix.data() + n_row * n_col,
                       [&normal_dist, &gen] { return normal_dist(gen); });
-    }
-
-    static std::pair<double,double> fit_theil_sen(const std::vector<double> &x,
-        const std::vector<double> &y) {
-      int n = x.size();
-      std::vector<double> slopes;
-      for(int i = 0; i < n; ++i)
-        for(int j = 0; j < n; ++j)
-          if(i != j)
-            slopes.push_back((y[j] - y[i]) / (x[j] - x[i]));
-
-      int n_slopes = slopes.size();
-      std::nth_element(slopes.begin(), slopes.begin() + n_slopes / 2, slopes.end());
-      double slope = *(slopes.begin() + n_slopes / 2);
-
-      std::vector<double> residuals(n);
-      for(int i = 0; i < n; ++i)
-        residuals[i] = y[i] - slope * x[i];
-
-      std::nth_element(residuals.begin(), residuals.begin() + n / 2, residuals.end());
-      double intercept = *(residuals.begin() + n / 2);
-
-      return std::make_pair(intercept, slope);
     }
 
     static double predict_theil_sen(double x, std::pair<double,double> beta) {
@@ -680,15 +625,6 @@ class Mrpt {
 
       Parameters par;
       return par;
-    }
-
-
-    void query(const Map<VectorXf> &q, int *out, float *out_distances = nullptr,
-               int *out_n_elected = nullptr) {
-      if(recall_level < 0) {
-        return;
-      }
-      query(q, k, votes, out, out_distances, out_n_elected);
     }
 
 
@@ -762,9 +698,13 @@ class Mrpt {
     return new_pars;
   }
 
-
+  friend class MrptTest;
+  friend class SaveTest;
+  friend class UtilityTest;
 
  private:
+   FRIEND_TEST(MrptTest, DefaultArguments);
+
     /**
     * Builds a single random projection tree. The tree is constructed by recursively
     * projecting the data on a random vector and splitting into two by the median.
@@ -888,6 +828,54 @@ class Mrpt {
     static bool is_faster(const Parameters &par1, const Parameters &par2) {
       return par1.estimated_qtime < par2.estimated_qtime;
     }
+
+    void project_query(const Map<VectorXf> &q, VectorXf &projected_query) {
+      if (density < 1)
+          projected_query.noalias() = sparse_random_matrix * q;
+      else
+          projected_query.noalias() = dense_random_matrix * q;
+    }
+
+    void vote(const VectorXf &projected_query, int votes_required, VectorXi &elected,
+      int &n_elected, int n_trees, int depth_crnt) {
+      std::vector<int> found_leaves(n_trees);
+      const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth_crnt];
+
+
+      #pragma omp parallel for
+      for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+        int idx_tree = 0;
+        for (int d = 0; d < depth_crnt; ++d) {
+          const int j = n_tree * depth + d;
+          const int idx_left = 2 * idx_tree + 1;
+          const int idx_right = idx_left + 1;
+          const float split_point = split_points(idx_tree, n_tree);
+          if (projected_query(j) <= split_point) {
+              idx_tree = idx_left;
+          } else {
+              idx_tree = idx_right;
+          }
+        }
+        found_leaves[n_tree] = idx_tree - (1 << depth_crnt) + 1;
+      }
+
+      int max_leaf_size = n_samples / (1 << depth_crnt) + 1;
+      elected = VectorXi(n_trees * max_leaf_size);
+      VectorXi votes = VectorXi::Zero(n_samples);
+
+      // count votes
+      for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
+        int leaf_begin = leaf_first_indices[found_leaves[n_tree]];
+        int leaf_end = leaf_first_indices[found_leaves[n_tree] + 1];
+        const std::vector<int> &indices = tree_leaves[n_tree];
+        for (int i = leaf_begin; i < leaf_end; ++i) {
+            int idx = indices[i];
+            if (++votes(idx) == votes_required)
+                elected(n_elected++) = idx;
+        }
+      }
+    }
+
 
     void fit_times() {
       int n_test = Q->cols();
@@ -1062,6 +1050,30 @@ class Mrpt {
           best_recall = par.estimated_recall;
         }
     }
+
+    static std::pair<double,double> fit_theil_sen(const std::vector<double> &x,
+        const std::vector<double> &y) {
+      int n = x.size();
+      std::vector<double> slopes;
+      for(int i = 0; i < n; ++i)
+        for(int j = 0; j < n; ++j)
+          if(i != j)
+            slopes.push_back((y[j] - y[i]) / (x[j] - x[i]));
+
+      int n_slopes = slopes.size();
+      std::nth_element(slopes.begin(), slopes.begin() + n_slopes / 2, slopes.end());
+      double slope = *(slopes.begin() + n_slopes / 2);
+
+      std::vector<double> residuals(n);
+      for(int i = 0; i < n; ++i)
+        residuals[i] = y[i] - slope * x[i];
+
+      std::nth_element(residuals.begin(), residuals.begin() + n / 2, residuals.end());
+      double intercept = *(residuals.begin() + n / 2);
+
+      return std::make_pair(intercept, slope);
+    }
+
 
 
 
