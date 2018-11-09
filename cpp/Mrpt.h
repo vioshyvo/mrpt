@@ -434,13 +434,6 @@ class Mrpt {
     }
 
     /**
-    * @return - number of trees in the index
-    */
-    int get_n_trees() const {
-      return n_trees;
-    }
-
-    /**
     * @return - is the index empty: can it be used for queries?
     */
     bool empty() const {
@@ -448,31 +441,10 @@ class Mrpt {
     }
 
     /**
-    * @return - depth of trees of index
-    */
-    int get_depth() const {
-      return depth;
-    }
-
-    /**
     * @return - optimal vote count that is used as default is no vote count is specified.
     */
     int get_votes() const {
       return votes;
-    }
-
-    /**
-    * @return - number of points of the data set from which the index is built
-    */
-    int get_n_points() const {
-      return n_samples;
-    }
-
-    /**
-    * @return - dimension of the data set from which the index is built
-    */
-    int get_dim() const {
-      return dim;
     }
 
     static double predict_theil_sen(double x, std::pair<double,double> beta) {
@@ -489,10 +461,6 @@ class Mrpt {
 
     double get_projection_time(int n_trees, int depth, int v) {
       return predict_theil_sen(n_trees * depth, beta_projection);
-    }
-
-    float get_density() const {
-      return density;
     }
 
     double get_voting_time(int n_trees, int depth, int v) {
@@ -603,7 +571,6 @@ class Mrpt {
   // Friend declarations for test classes.
   // Tests are located at https://github.com/vioshyvo/RP-test
   friend class MrptTest;
-  friend class SaveTest;
   friend class UtilityTest;
 
  private:
@@ -869,12 +836,21 @@ class Mrpt {
           int t = tested_trees[i];
           int n_random_vectors = t * d;
           projection_x.push_back(n_random_vectors);
-          SparseMatrix<float, RowMajor> sparse_random_matrix;
-          Mrpt::build_sparse_random_matrix(sparse_random_matrix, n_random_vectors, dim, density);
+          SparseMatrix<float, RowMajor> sparse_mat;
+          Matrix<float, Dynamic, Dynamic, RowMajor> dense_mat;
+          if(density < 1) {
+            build_sparse_random_matrix(sparse_mat, n_random_vectors, dim, density);
+          } else {
+            build_dense_random_matrix(dense_mat, n_random_vectors, dim);
+          }
 
           double start_proj = omp_get_wtime();
           VectorXf projected_query(n_random_vectors);
-          projected_query.noalias() = sparse_random_matrix * Q->col(0);
+          if(density < 1) {
+            projected_query.noalias() = sparse_mat * Q->col(0);
+          } else {
+            projected_query.noalias() = dense_mat * Q->col(0);
+          }
           double end_proj = omp_get_wtime();
           projection_times.push_back(end_proj - start_proj);
           idx_sum += projected_query.norm();
@@ -930,8 +906,13 @@ class Mrpt {
             int n_el = 0;
             VectorXi elected;
             auto ri = uni(rng);
+
             VectorXf projected_query(t * d);
-            projected_query.noalias() = sparse_random_matrix * Q->col(ri);
+            if(density < 1) {
+              projected_query.noalias() = sparse_random_matrix * Q->col(ri);
+            } else {
+              projected_query.noalias() = dense_random_matrix * Q->col(ri);
+            }
 
             double start_voting = omp_get_wtime();
             vote(projected_query, v, elected, n_el, t, d);
@@ -1085,9 +1066,8 @@ class Mrpt {
     std::vector<std::vector<int>> tree_leaves; // contains all leaves of all trees
     Matrix<float, Dynamic, Dynamic, RowMajor> dense_random_matrix; // random vectors needed for all the RP-trees
     SparseMatrix<float, RowMajor> sparse_random_matrix; // random vectors needed for all the RP-trees
-    // std::vector<int> leaf_first_indices; // first indices of each leaf of tree in tree_leaves
     std::vector<std::vector<int>> leaf_first_indices_all; // first indices for each level
-    std::vector<int> leaf_first_indices;
+    std::vector<int> leaf_first_indices; // first indices of each leaf of tree in tree_leaves
 
     const int n_samples; // sample size of data
     const int dim; // dimension of data
