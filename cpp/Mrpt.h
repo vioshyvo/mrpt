@@ -117,7 +117,6 @@ class Mrpt {
       n_test = Q->cols();
 
       grow(trees_max, depth_max, density, seed_mrpt);
-
       MatrixXi exact(k, n_test);
       compute_exact(exact);
 
@@ -755,13 +754,6 @@ class Mrpt {
       return par1.estimated_qtime < par2.estimated_qtime;
     }
 
-    void project_query(const Map<VectorXf> &q, VectorXf &projected_query) {
-      if (density < 1)
-          projected_query.noalias() = sparse_random_matrix * q;
-      else
-          projected_query.noalias() = dense_random_matrix * q;
-    }
-
     void vote(const VectorXf &projected_query, int votes_required, VectorXi &elected,
       int &n_elected, int n_trees, int depth_crnt) {
       std::vector<int> found_leaves(n_trees);
@@ -907,7 +899,7 @@ class Mrpt {
             VectorXi elected;
             auto ri = uni(rng);
 
-            VectorXf projected_query(t * d);
+            VectorXf projected_query(n_trees * depth);
             if(density < 1) {
               projected_query.noalias() = sparse_random_matrix * Q->col(ri);
             } else {
