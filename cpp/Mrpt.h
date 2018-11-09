@@ -475,104 +475,6 @@ class Mrpt {
       return dim;
     }
 
-    /**
-    * Computes the leaf sizes of a tree assuming a median split and that
-    * when the number points is odd, the extra point is always assigned to
-    * to the left branch.
-    * @param n - number data points
-    * @param level - current level of the tree
-    * @param tree_depth - depth of the whole tree
-    * @param out_leaf_sizes - vector for the output; after completing
-    * the function is a vector of length n containing the leaf sizes
-    */
-    static void count_leaf_sizes(int n, int level, int tree_depth, std::vector<int> &out_leaf_sizes) {
-      if(level == tree_depth) {
-        out_leaf_sizes.push_back(n);
-        return;
-      }
-      count_leaf_sizes(n - n/2, level + 1, tree_depth, out_leaf_sizes);
-      count_leaf_sizes(n/2, level + 1, tree_depth, out_leaf_sizes);
-    }
-
-    /**
-    * Computes indices of the first elements of leaves in a vector containing
-    * all the leaves of a tree concatenated. Assumes that median split is used
-    * and when the number points is odd, the extra point is always assigned to
-    * to the left branch.
-    */
-    static void count_first_leaf_indices(std::vector<int> &indices, int n, int depth) {
-      std::vector<int> leaf_sizes;
-      count_leaf_sizes(n, 0, depth, leaf_sizes);
-
-      indices = std::vector<int>(leaf_sizes.size() + 1);
-      indices[0] = 0;
-      for(int i = 0; i < leaf_sizes.size(); ++i)
-        indices[i+1] = indices[i] + leaf_sizes[i];
-    }
-
-    static void count_first_leaf_indices_all(std::vector<std::vector<int>> &indices, int n, int depth_max) {
-      for(int d = 0; d <= depth_max; ++d) {
-        std::vector<int> idx;
-        count_first_leaf_indices(idx, n, d);
-        indices.push_back(idx);
-      }
-    }
-
-    /**
-    * Builds a random sparse matrix for use in random projection. The components of
-    * the matrix are drawn from the distribution
-    *
-    *       0 w.p. 1 - a
-    * N(0, 1) w.p. a
-    *
-    * where a = density.
-    *
-    * @param seed - A seed given to a rng when generating random vectors;
-    * a default value 0 initializes the rng randomly with rd()
-    */
-    static void build_sparse_random_matrix(SparseMatrix<float, RowMajor> &sparse_random_matrix,
-          int n_row, int n_col, float density, int seed = 0) {
-        sparse_random_matrix = SparseMatrix<float, RowMajor>(n_row, n_col);
-
-        std::random_device rd;
-        int s = seed ? seed : rd();
-        std::mt19937 gen(s);
-        std::uniform_real_distribution<float> uni_dist(0, 1);
-        std::normal_distribution<float> norm_dist(0, 1);
-
-        std::vector<Triplet<float>> triplets;
-        for (int j = 0; j < n_row; ++j) {
-            for (int i = 0; i < n_col; ++i) {
-                if (uni_dist(gen) > density) continue;
-                triplets.push_back(Triplet<float>(j, i, norm_dist(gen)));
-            }
-        }
-
-        sparse_random_matrix.setFromTriplets(triplets.begin(), triplets.end());
-        sparse_random_matrix.makeCompressed();
-    }
-
-
-
-    /*
-    * Builds a random dense matrix for use in random projection. The components of
-    * the matrix are drawn from the standard normal distribution.
-    * @param seed - A seed given to a rng when generating random vectors;
-    * a default value 0 initializes the rng randomly with rd()
-    */
-    static void build_dense_random_matrix(Matrix<float, Dynamic, Dynamic, RowMajor> &dense_random_matrix,
-          int n_row, int n_col, int seed = 0) {
-        dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_row, n_col);
-
-        std::random_device rd;
-        int s = seed ? seed : rd();
-        std::mt19937 gen(s);
-        std::normal_distribution<float> normal_dist(0, 1);
-
-        std::generate(dense_random_matrix.data(), dense_random_matrix.data() + n_row * n_col,
-                      [&normal_dist, &gen] { return normal_dist(gen); });
-    }
-
     static double predict_theil_sen(double x, std::pair<double,double> beta) {
       return beta.first + beta.second * x;
     }
@@ -698,12 +600,13 @@ class Mrpt {
     return new_pars;
   }
 
+  // Friend declarations for test classes.
+  // Tests are located at https://github.com/vioshyvo/RP-test
   friend class MrptTest;
   friend class SaveTest;
   friend class UtilityTest;
 
  private:
-   FRIEND_TEST(MrptTest, DefaultArguments);
 
     /**
     * Builds a single random projection tree. The tree is constructed by recursively
@@ -814,6 +717,62 @@ class Mrpt {
            cs_sizes[depth_crnt - depth_min] = candidate_set_size;
         }
     }
+
+    /**
+    * Builds a random sparse matrix for use in random projection. The components of
+    * the matrix are drawn from the distribution
+    *
+    *       0 w.p. 1 - a
+    * N(0, 1) w.p. a
+    *
+    * where a = density.
+    *
+    * @param seed - A seed given to a rng when generating random vectors;
+    * a default value 0 initializes the rng randomly with rd()
+    */
+    static void build_sparse_random_matrix(SparseMatrix<float, RowMajor> &sparse_random_matrix,
+          int n_row, int n_col, float density, int seed = 0) {
+        sparse_random_matrix = SparseMatrix<float, RowMajor>(n_row, n_col);
+
+        std::random_device rd;
+        int s = seed ? seed : rd();
+        std::mt19937 gen(s);
+        std::uniform_real_distribution<float> uni_dist(0, 1);
+        std::normal_distribution<float> norm_dist(0, 1);
+
+        std::vector<Triplet<float>> triplets;
+        for (int j = 0; j < n_row; ++j) {
+            for (int i = 0; i < n_col; ++i) {
+                if (uni_dist(gen) > density) continue;
+                triplets.push_back(Triplet<float>(j, i, norm_dist(gen)));
+            }
+        }
+
+        sparse_random_matrix.setFromTriplets(triplets.begin(), triplets.end());
+        sparse_random_matrix.makeCompressed();
+    }
+
+
+
+    /*
+    * Builds a random dense matrix for use in random projection. The components of
+    * the matrix are drawn from the standard normal distribution.
+    * @param seed - A seed given to a rng when generating random vectors;
+    * a default value 0 initializes the rng randomly with rd()
+    */
+    static void build_dense_random_matrix(Matrix<float, Dynamic, Dynamic, RowMajor> &dense_random_matrix,
+          int n_row, int n_col, int seed = 0) {
+        dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_row, n_col);
+
+        std::random_device rd;
+        int s = seed ? seed : rd();
+        std::mt19937 gen(s);
+        std::normal_distribution<float> normal_dist(0, 1);
+
+        std::generate(dense_random_matrix.data(), dense_random_matrix.data() + n_row * n_col,
+                      [&normal_dist, &gen] { return normal_dist(gen); });
+    }
+
 
     void compute_exact(MatrixXi &out_exact) {
       for(int i = 0; i < n_test; ++i) {
@@ -1072,6 +1031,49 @@ class Mrpt {
       double intercept = *(residuals.begin() + n / 2);
 
       return std::make_pair(intercept, slope);
+    }
+
+    /**
+    * Computes the leaf sizes of a tree assuming a median split and that
+    * when the number points is odd, the extra point is always assigned to
+    * to the left branch.
+    * @param n - number data points
+    * @param level - current level of the tree
+    * @param tree_depth - depth of the whole tree
+    * @param out_leaf_sizes - vector for the output; after completing
+    * the function is a vector of length n containing the leaf sizes
+    */
+    static void count_leaf_sizes(int n, int level, int tree_depth, std::vector<int> &out_leaf_sizes) {
+      if(level == tree_depth) {
+        out_leaf_sizes.push_back(n);
+        return;
+      }
+      count_leaf_sizes(n - n/2, level + 1, tree_depth, out_leaf_sizes);
+      count_leaf_sizes(n/2, level + 1, tree_depth, out_leaf_sizes);
+    }
+
+    /**
+    * Computes indices of the first elements of leaves in a vector containing
+    * all the leaves of a tree concatenated. Assumes that median split is used
+    * and when the number points is odd, the extra point is always assigned to
+    * to the left branch.
+    */
+    static void count_first_leaf_indices(std::vector<int> &indices, int n, int depth) {
+      std::vector<int> leaf_sizes;
+      count_leaf_sizes(n, 0, depth, leaf_sizes);
+
+      indices = std::vector<int>(leaf_sizes.size() + 1);
+      indices[0] = 0;
+      for(int i = 0; i < leaf_sizes.size(); ++i)
+        indices[i+1] = indices[i] + leaf_sizes[i];
+    }
+
+    static void count_first_leaf_indices_all(std::vector<std::vector<int>> &indices, int n, int depth_max) {
+      for(int d = 0; d <= depth_max; ++d) {
+        std::vector<int> idx;
+        count_first_leaf_indices(idx, n, d);
+        indices.push_back(idx);
+      }
     }
 
 
