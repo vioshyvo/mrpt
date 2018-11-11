@@ -395,44 +395,6 @@ class Mrpt {
 
 
     /**
-    * Accessor for split points of trees (for testing purposes)
-    * @param tree - index of tree in (0, ... , T-1)
-    * @param index - the index of branch in (0, ... , (2^depth) - 1):
-    * 0 = root
-    * 1 = first branch of first level
-    * 2 = second branch of first level
-    * 3 = first branch of second level etc.
-    * @return split point of index:th branch of tree:th tree
-    */
-    float get_split_point(int tree, int index) const {
-      return split_points(index, tree);
-    }
-
-    /**
-    * Accessor for point stored in leaves of trees (for testing purposes)
-    * @param tree - index of tree in (0, ... T-1)
-    * @param leaf - index of leaf in (0, ... , 2^depth)
-    * @param index - index of a data point in a leaf
-    * @return index of index:th data point in leaf:th leaf of tree:th tree
-    */
-    int get_leaf_point(int tree, int leaf, int index) const {
-      const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth];
-      int leaf_begin = leaf_first_indices[leaf];
-      return tree_leaves[tree][leaf_begin + index];
-    }
-
-    /**
-    * Accessor for the number of points in a leaf of a tree (for test purposes)
-    * @param tree - index of tree in (0, ... T-1)
-    * @param leaf - index of leaf in (0, ... , 2^depth)
-    * @return - number of data points in leaf:th leaf of tree:th tree
-    */
-    int get_leaf_size(int tree, int leaf) const {
-      const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth];
-      return leaf_first_indices[leaf + 1] - leaf_first_indices[leaf];
-    }
-
-    /**
     * @return - is the index empty: can it be used for queries?
     */
     bool empty() const {
