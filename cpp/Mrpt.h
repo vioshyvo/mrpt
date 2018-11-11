@@ -439,53 +439,8 @@ class Mrpt {
       return n_trees == 0;
     }
 
-    /**
-    * @return - optimal vote count that is used as default is no vote count is specified.
-    */
-    int get_votes() const {
-      return votes;
-    }
 
-    static double predict_theil_sen(double x, std::pair<double,double> beta) {
-      return beta.first + beta.second * x;
-    }
-
-    float get_recall(int tree, int depth, int v) {
-      return recalls[depth - depth_min](v - 1, tree - 1);
-    }
-
-    float get_candidate_set_size(int tree, int depth, int v) {
-      return cs_sizes[depth - depth_min](v - 1, tree - 1);
-    }
-
-    double get_projection_time(int n_trees, int depth, int v) {
-      return predict_theil_sen(n_trees * depth, beta_projection);
-    }
-
-    double get_voting_time(int n_trees, int depth, int v) {
-      const std::map<int,std::pair<double,double>> &beta = beta_voting[depth - depth_min];
-      if(v <= 0 || beta.empty()) {
-        return 0.0;
-      }
-      for(const auto &b : beta)
-        if(v <= b.first) {
-          return predict_theil_sen(n_trees, b.second);
-        }
-
-      return predict_theil_sen(n_trees, beta.rbegin()->second);
-    }
-
-    double get_exact_time(int n_trees, int depth, int v) {
-      return predict_theil_sen(get_candidate_set_size(n_trees, depth, v), beta_exact);
-    }
-
-    double get_query_time(int tree, int depth, int v) {
-      return get_projection_time(tree, depth, v)
-           + get_voting_time(tree, depth, v)
-           + get_exact_time(tree, depth, v);
-    }
-
-    Parameters get_optimal_parameters(double target_recall) {
+    Parameters parameters(double target_recall) {
       double tr = target_recall - 0.0001;
       for(const auto &par : opt_pars)
         if(par.estimated_recall > tr) {
@@ -499,7 +454,7 @@ class Mrpt {
 
   void delete_extra_trees(double target_recall) {
     recall_level = target_recall;
-    optimal_parameters = get_optimal_parameters(target_recall);
+    optimal_parameters = parameters(target_recall);
     if(!optimal_parameters.n_trees) {
       return;
     }
@@ -530,7 +485,7 @@ class Mrpt {
 
   void subset_trees(double target_recall, Mrpt &index2) {
     index2.recall_level = target_recall;
-    index2.optimal_parameters = get_optimal_parameters(target_recall);
+    index2.optimal_parameters = parameters(target_recall);
 
     if(!index2.optimal_parameters.n_trees) {
       return;
@@ -1049,7 +1004,44 @@ class Mrpt {
       }
     }
 
+    static double predict_theil_sen(double x, std::pair<double,double> beta) {
+      return beta.first + beta.second * x;
+    }
 
+    float get_recall(int tree, int depth, int v) {
+      return recalls[depth - depth_min](v - 1, tree - 1);
+    }
+
+    float get_candidate_set_size(int tree, int depth, int v) {
+      return cs_sizes[depth - depth_min](v - 1, tree - 1);
+    }
+
+    double get_projection_time(int n_trees, int depth, int v) {
+      return predict_theil_sen(n_trees * depth, beta_projection);
+    }
+
+    double get_voting_time(int n_trees, int depth, int v) {
+      const std::map<int,std::pair<double,double>> &beta = beta_voting[depth - depth_min];
+      if(v <= 0 || beta.empty()) {
+        return 0.0;
+      }
+      for(const auto &b : beta)
+        if(v <= b.first) {
+          return predict_theil_sen(n_trees, b.second);
+        }
+
+      return predict_theil_sen(n_trees, beta.rbegin()->second);
+    }
+
+    double get_exact_time(int n_trees, int depth, int v) {
+      return predict_theil_sen(get_candidate_set_size(n_trees, depth, v), beta_exact);
+    }
+
+    double get_query_time(int tree, int depth, int v) {
+      return get_projection_time(tree, depth, v)
+           + get_voting_time(tree, depth, v)
+           + get_exact_time(tree, depth, v);
+    }
 
 
     const Map<const MatrixXf> *X; // the data matrix
