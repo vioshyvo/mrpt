@@ -176,6 +176,15 @@ class Mrpt {
     void query(const Map<VectorXf> &q, int k, int votes_required, int *out,
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
 
+        if(k <= 0 || k > n) {
+          return;
+        }
+
+        if(empty() || votes_required <= 0) {
+          set_to_default(k, out, out_distances, out_n_elected);
+          return;
+        }
+
         VectorXf projected_query(n_pool);
         if (density < 1)
             projected_query.noalias() = sparse_random_matrix * q;
@@ -1003,6 +1012,19 @@ class Mrpt {
       return get_projection_time(tree, depth, v)
            + get_voting_time(tree, depth, v)
            + get_exact_time(tree, depth, v);
+    }
+
+    void set_to_default(int k, int *out, float *out_distances = nullptr,
+       int *out_n_elected = nullptr) const {
+      for(int i = 0; i < k; ++i)
+        out[i] = -1;
+      if(out_distances) {
+        for(int i = 0; i < k; ++i)
+          out_distances[i] = -1;
+      }
+      if(out_n_elected) {
+        *out_n_elected = 0;
+      }
     }
 
 
