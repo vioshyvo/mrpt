@@ -22,6 +22,7 @@ struct Parameters {
   int n_trees = 0;
   int depth = 0;
   int votes = 0;
+  int k = 0;
   double estimated_qtime = 0.0;
   mutable double estimated_recall = 0.0;
 };
@@ -453,6 +454,17 @@ class Mrpt {
     */
     bool empty() const {
       return n_trees == 0;
+    }
+
+    Parameters parameters() {
+      if(recall_level < 0) {
+        Parameters par;
+        par.n_trees = n_trees;
+        par.depth = depth;
+        par.k = k;
+        return par;
+      }
+      return optimal_parameters;
     }
 
 
@@ -934,6 +946,7 @@ class Mrpt {
             par.n_trees = t;
             par.depth = d;
             par.votes = v;
+            par.k = k;
             par.estimated_qtime = qt;
             par.estimated_recall = get_recall(t, d, v);
             pars.insert(par);
@@ -1090,12 +1103,15 @@ class Mrpt {
     int n_pool = 0; // amount of random vectors needed for all the RP-trees
     int n_array = 0; // length of the one RP-tree as array
     int votes = 0; // optimal number of votes to use
+    int depth_min = 0;
+    int votes_max = 0;
+    int k = 0;
+    int n_test = 0;
+    double recall_level = -1.0;
 
     std::vector<MatrixXd> recalls, cs_sizes, query_times;
-    int depth_min, votes_max, k, n_test;
     std::pair<double,double> beta_projection, beta_exact;
     std::vector<std::map<int,std::pair<double,double>>> beta_voting;
-    double recall_level = -1.0;
     Parameters optimal_parameters;
     std::set<Parameters,decltype(is_faster)*> opt_pars;
     std::set<Parameters,decltype(is_faster)*> pars;
