@@ -284,7 +284,7 @@ class Mrpt {
 
 
     void query(const Map<VectorXf> &q, int *out, float *out_distances = nullptr,
-               int *out_n_elected = nullptr) {
+               int *out_n_elected = nullptr) const {
       if(recall_level < 0) {
         throw std::logic_error("You have to specify k and vote threshold, because the index has not been autotuned.");
       }
@@ -456,7 +456,7 @@ class Mrpt {
       return n_trees == 0;
     }
 
-    Parameters parameters() {
+    Parameters parameters() const {
       if(recall_level < 0) {
         Parameters par;
         par.n_trees = n_trees;
@@ -468,7 +468,7 @@ class Mrpt {
     }
 
 
-    Parameters parameters(double target_recall) {
+    Parameters parameters(double target_recall) const {
       double tr = target_recall - 0.0001;
       for(const auto &par : opt_pars)
         if(par.estimated_recall > tr) {
@@ -511,7 +511,7 @@ class Mrpt {
     }
   }
 
-  void subset_trees(double target_recall, Mrpt &index2) {
+  void subset_trees(double target_recall, Mrpt &index2) const {
     index2.recall_level = target_recall;
     index2.optimal_parameters = parameters(target_recall);
 
@@ -544,7 +544,7 @@ class Mrpt {
     }
   }
 
-  std::vector<Parameters> optimal_parameter_list() {
+  std::vector<Parameters> optimal_pars() const {
     if(depth_min == 0 && recall_level < 0.0) {
       throw std::logic_error("The list of optimal parameters cannot be retrieved for the non-autotuned index.");
     }
@@ -729,7 +729,7 @@ class Mrpt {
     }
 
 
-    void compute_exact(MatrixXi &out_exact) {
+    void compute_exact(MatrixXi &out_exact) const {
       for(int i = 0; i < n_test; ++i) {
         VectorXi idx(n_samples);
         std::iota(idx.data(), idx.data() + n_samples, 0);
@@ -1043,19 +1043,19 @@ class Mrpt {
       return beta.first + beta.second * x;
     }
 
-    float get_recall(int tree, int depth, int v) {
+    float get_recall(int tree, int depth, int v) const {
       return recalls[depth - depth_min](v - 1, tree - 1);
     }
 
-    float get_candidate_set_size(int tree, int depth, int v) {
+    float get_candidate_set_size(int tree, int depth, int v) const {
       return cs_sizes[depth - depth_min](v - 1, tree - 1);
     }
 
-    double get_projection_time(int n_trees, int depth, int v) {
+    double get_projection_time(int n_trees, int depth, int v) const {
       return predict_theil_sen(n_trees * depth, beta_projection);
     }
 
-    double get_voting_time(int n_trees, int depth, int v) {
+    double get_voting_time(int n_trees, int depth, int v) const {
       const std::map<int,std::pair<double,double>> &beta = beta_voting[depth - depth_min];
       if(v <= 0 || beta.empty()) {
         return 0.0;
@@ -1068,29 +1068,15 @@ class Mrpt {
       return predict_theil_sen(n_trees, beta.rbegin()->second);
     }
 
-    double get_exact_time(int n_trees, int depth, int v) {
+    double get_exact_time(int n_trees, int depth, int v) const {
       return predict_theil_sen(get_candidate_set_size(n_trees, depth, v), beta_exact);
     }
 
-    double get_query_time(int tree, int depth, int v) {
+    double get_query_time(int tree, int depth, int v) const {
       return get_projection_time(tree, depth, v)
            + get_voting_time(tree, depth, v)
            + get_exact_time(tree, depth, v);
     }
-
-    void set_to_default(int k, int *out, float *out_distances = nullptr,
-       int *out_n_elected = nullptr) const {
-      for(int i = 0; i < k; ++i)
-        out[i] = -1;
-      if(out_distances) {
-        for(int i = 0; i < k; ++i)
-          out_distances[i] = -1;
-      }
-      if(out_n_elected) {
-        *out_n_elected = 0;
-      }
-    }
-
 
     const Map<const MatrixXf> *X; // the data matrix
     Map<MatrixXf> *Q; // validation set
