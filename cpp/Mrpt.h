@@ -11,6 +11,7 @@
 #include <utility>
 #include <map>
 #include <set>
+#include <stdexcept>
 
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
@@ -51,6 +52,19 @@ class Mrpt {
     * a default value 0 initializes the rng randomly with rd()
     */
     void grow(int n_trees_, int depth_, float density_ = -1.0, int seed = 0) {
+
+        if(n_trees_ <= 0) {
+          throw std::out_of_range("The number of trees must be positive.");
+        }
+
+        if(depth_ <= 0 || depth_ > std::log2(n_samples)) {
+          throw std::out_of_range("The depth must belong to the set {1, ... , log2(n)}.");
+        }
+
+        if(density_ <= 0.0 || density_ > 1.0001) {
+          throw std::out_of_range("The density must be on the interval (0,1].");
+        }
+
         n_trees = n_trees_;
         depth = depth_;
         n_pool = n_trees_ * depth_;
@@ -176,7 +190,7 @@ class Mrpt {
     void query(const Map<VectorXf> &q, int k, int votes_required, int *out,
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
 
-        if(k <= 0 || k > n) {
+        if(k <= 0 || k > n_samples) {
           return;
         }
 
