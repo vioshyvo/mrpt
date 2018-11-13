@@ -104,6 +104,22 @@ class Mrpt {
     void grow(Map<MatrixXf> *Q_, int k_, int trees_max = -1, int depth_max = -1,
        int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed_mrpt = 0) {
 
+      if(k_ <= 0 || k_ > n_samples) {
+        throw std::out_of_range("k_ must belong to the set {1, ..., n}.");
+      }
+
+      if(depth_min_ < -1 || depth_min_ == 0 || depth_min_ > depth_max) {
+        throw std::out_of_range("depth_min_ must belong to the set {1, ... , depth_max}");
+      }
+
+      if(votes_max_ < -1 || votes_max_ == 0 || votes_max_ > trees_max) {
+        throw std::out_of_range("votes_max_ must belong to the set {1, ... , trees_max}.");
+      }
+
+      if(Q_->rows() != dim) {
+        throw std::invalid_argument("Dimensions of the data and the validation set do not match.");
+      }
+
       if(trees_max == - 1) {
         trees_max = std::min(std::sqrt(n_samples), 1000.0);
       }
@@ -166,8 +182,8 @@ class Mrpt {
     void grow(float target_recall, Map<MatrixXf> *Q_, int k_, int trees_max = -1,
               int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
               float density = -1.0, int seed_mrpt = 0) {
-      recall_level = target_recall;
       grow(Q_, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
+      recall_level = target_recall;
       delete_extra_trees(target_recall);
     }
 
