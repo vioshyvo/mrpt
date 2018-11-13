@@ -61,7 +61,7 @@ class Mrpt {
           throw std::out_of_range("The depth must belong to the set {1, ... , log2(n)}.");
         }
 
-        if(density_ <= 0.0 || density_ > 1.0001) {
+        if(density_ < -1.0001 || density_ > 1.0001 || (density_ > -0.9999 && density_ < -0.0001)) {
           throw std::out_of_range("The density must be on the interval (0,1].");
         }
 
@@ -191,12 +191,15 @@ class Mrpt {
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
 
         if(k <= 0 || k > n_samples) {
-          return;
+          throw std::out_of_range("k must belong to the set {1, ..., n}.");
         }
 
-        if(empty() || votes_required <= 0) {
-          set_to_default(k, out, out_distances, out_n_elected);
-          return;
+        if(votes_required <= 0 || votes_required > n_trees) {
+          throw std::out_of_range("votes_required must belong to the set {1, ... , n_trees}.");
+        }
+
+        if(empty()) {
+          throw std::logic_error("The index must be built before making queries.");
         }
 
         VectorXf projected_query(n_pool);
@@ -254,7 +257,7 @@ class Mrpt {
     void query(const Map<VectorXf> &q, int *out, float *out_distances = nullptr,
                int *out_n_elected = nullptr) {
       if(recall_level < 0) {
-        return;
+        throw std::logic_error("You have to specify k and vote threshold, because the index has not been autotuned.");
       }
       query(q, k, votes, out, out_distances, out_n_elected);
     }
