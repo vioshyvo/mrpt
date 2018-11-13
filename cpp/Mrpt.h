@@ -545,6 +545,12 @@ class Mrpt {
   }
 
   std::vector<Parameters> optimal_parameter_list() {
+    if(depth_min == 0 && recall_level < 0.0) {
+      throw std::logic_error("The list of optimal parameters cannot be retrieved for the non-autotuned index.");
+    }
+    if(recall_level >= 0.0) {
+      throw std::logic_error("The list of optimal parameters cannot be retrieved for the index which has already been subsetted or deleted to the target recall level.");
+    }
     std::vector<Parameters> new_pars;
     std::copy(opt_pars.begin(), opt_pars.end(), std::back_inserter(new_pars));
     return new_pars;
