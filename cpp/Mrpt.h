@@ -108,12 +108,24 @@ class Mrpt {
         throw std::out_of_range("k_ must belong to the set {1, ..., n}.");
       }
 
+      if(trees_max < -1 || trees_max == 0) {
+        throw std::out_of_range("trees_max must be positive.");
+      }
+
+      if(depth_max < -1 || depth_max == 0 || depth_max > std::log2(n_samples)) {
+        throw std::out_of_range("depth_max must belong to the set {1, ... , log2(n)}.");
+      }
+
       if(depth_min_ < -1 || depth_min_ == 0 || depth_min_ > depth_max) {
         throw std::out_of_range("depth_min_ must belong to the set {1, ... , depth_max}");
       }
 
       if(votes_max_ < -1 || votes_max_ == 0 || votes_max_ > trees_max) {
         throw std::out_of_range("votes_max_ must belong to the set {1, ... , trees_max}.");
+      }
+
+      if(density_ < -1.0001 || density_ > 1.0001 || (density_ > -0.9999 && density_ < -0.0001)) {
+        throw std::out_of_range("The density must be on the interval (0,1].");
       }
 
       if(Q_->rows() != dim) {
