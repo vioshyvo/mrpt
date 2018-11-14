@@ -190,6 +190,7 @@ class Mrpt {
       }
 
       fit_times();
+      index_type = 2;
     }
 
     void grow(float target_recall, Map<MatrixXf> *Q_, int k_, int trees_max = -1,
@@ -354,6 +355,10 @@ class Mrpt {
         if ((fd = fopen(path, "wb")) == NULL)
             return false;
 
+        fwrite(&index_type, sizeof(int), 1, fd);
+        if(index_type == 1) {
+          write_parameters(&optimal_parameters, fd);
+        }
         fwrite(&n_trees, sizeof(int), 1, fd);
         fwrite(&depth, sizeof(int), 1, fd);
         fwrite(&density, sizeof(float), 1, fd);
@@ -398,6 +403,10 @@ class Mrpt {
         if ((fd = fopen(path, "rb")) == NULL)
             return false;
 
+        fread(&index_type, sizeof(int), 1, fd);
+        if(index_type == 1) {
+          read_parameters(&optimal_parameters, fd);
+        }
         fread(&n_trees, sizeof(int), 1, fd);
         fread(&depth, sizeof(int), 1, fd);
         fread(&density, sizeof(float), 1, fd);
@@ -457,7 +466,7 @@ class Mrpt {
     }
 
     Parameters parameters() const {
-      if(recall_level < 0) {
+      if(index_type == 0 || index_type == 2) {
         Parameters par;
         par.n_trees = n_trees;
         par.depth = depth;
@@ -497,6 +506,7 @@ class Mrpt {
         drm_new.middleRows(n_tree * depth, depth) = dense_random_matrix.middleRows(n_tree * depth_max, depth);
       dense_random_matrix = drm_new;
     }
+    index_type = 1;
   }
 
   void subset_trees(double target_recall, Mrpt &index2) const {
@@ -530,6 +540,7 @@ class Mrpt {
       for(int n_tree = 0; n_tree < index2.n_trees; ++n_tree)
         index2.dense_random_matrix.middleRows(n_tree * index2.depth, index2.depth) = dense_random_matrix.middleRows(n_tree * depth_max, index2.depth);
     }
+    index2.index_type = 1;
   }
 
   std::vector<Parameters> optimal_pars() const {
@@ -984,6 +995,27 @@ class Mrpt {
       return std::make_pair(intercept, slope);
     }
 
+    void write_parameters(const Parameters *par, FILE *fd) const {
+      if(!fd) {
+        return;
+      }
+      fwrite(&par->n_trees, sizeof(int), 1, fd);
+      fwrite(&par->depth, sizeof(int), 1, fd);
+      fwrite(&par->votes, sizeof(int), 1, fd);
+      fwrite(&par->k, sizeof(int), 1, fd);
+      fwrite(&par->estimated_qtime, sizeof(double), 1, fd);
+      fwrite(&par->estimated_recall, sizeof(double), 1, fd);
+    }
+
+    void read_parameters(Parameters *par, FILE *fd) {
+      fread(&par->n_trees, sizeof(int), 1, fd);
+      fread(&par->depth, sizeof(int), 1, fd);
+      fread(&par->votes, sizeof(int), 1, fd);
+      fread(&par->k, sizeof(int), 1, fd);
+      fread(&par->estimated_qtime, sizeof(double), 1, fd);
+      fread(&par->estimated_recall, sizeof(double), 1, fd);
+    }
+
     Parameters parameters(double target_recall) const {
       double epsilon = 0.0001;
       double tr = target_recall - epsilon;
@@ -1105,6 +1137,8 @@ class Mrpt {
     int k = 0;
     int n_test = 0;
     double recall_level = -1.0;
+    int index_type = 0; // 0 = normal index, 1 = autotuned index with target
+    // recall specified, 2 = autotuned index without target recall specified
 
     std::vector<MatrixXd> recalls, cs_sizes, query_times;
     std::pair<double,double> beta_projection, beta_exact;
