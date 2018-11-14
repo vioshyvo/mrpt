@@ -17,7 +17,7 @@
 #include <Eigen/SparseCore>
 
 
-struct Parameters {
+struct Mrpt_Parameters {
   int n_trees = 0;
   int depth = 0;
   int votes = 0;
@@ -32,7 +32,7 @@ class Mrpt {
     * The constructor of the index. The constructor does not actually build
     * the index but that is done by the function 'grow' which has to be called
     * before queries can be made.
-    * @param X_ - Pointer to the Eigen::Eigen::Map which refers to the data matrix.
+    * @param X_ - Pointer to the Eigen::Map which refers to the data matrix.
     */
     Mrpt(const Eigen::Map<const Eigen::MatrixXf> *X_) :
         X(X_),
@@ -467,9 +467,9 @@ class Mrpt {
       return n_trees == 0;
     }
 
-    Parameters parameters() const {
+    Mrpt_Parameters parameters() const {
       if(index_type == 0 || index_type == 2) {
-        Parameters par;
+        Mrpt_Parameters par;
         par.n_trees = n_trees;
         par.depth = depth;
         par.k = params.k;
@@ -545,14 +545,14 @@ class Mrpt {
     index2.index_type = 1;
   }
 
-  std::vector<Parameters> optimal_pars() const {
+  std::vector<Mrpt_Parameters> optimal_pars() const {
     if(index_type == 0) {
       throw std::logic_error("The list of optimal parameters cannot be retrieved for the non-autotuned index.");
     }
     if(index_type == 1) {
       throw std::logic_error("The list of optimal parameters cannot be retrieved for the index which has already been subsetted or deleted to the target recall level.");
     }
-    std::vector<Parameters> new_pars;
+    std::vector<Mrpt_Parameters> new_pars;
     std::copy(opt_pars.begin(), opt_pars.end(), std::back_inserter(new_pars));
     return new_pars;
   }
@@ -740,7 +740,7 @@ class Mrpt {
       }
     }
 
-    static bool is_faster(const Parameters &par1, const Parameters &par2) {
+    static bool is_faster(const Mrpt_Parameters &par1, const Mrpt_Parameters &par2) {
       return par1.estimated_qtime < par2.estimated_qtime;
     }
 
@@ -939,7 +939,7 @@ class Mrpt {
       beta_projection = fit_theil_sen(projection_x, projection_times);
       beta_exact = fit_theil_sen(ex, exact_times);
 
-      pars = std::set<Parameters,decltype(is_faster)*>(is_faster);
+      pars = std::set<Mrpt_Parameters,decltype(is_faster)*>(is_faster);
       query_times = std::vector<Eigen::MatrixXd>(depth - depth_min + 1);
       for(int d = depth_min; d <= depth; ++d) {
         Eigen::MatrixXd query_time = Eigen::MatrixXd::Zero(votes_max, n_trees);
@@ -949,7 +949,7 @@ class Mrpt {
           for(int v = 1; v <= votes_index; ++v) {
             double qt = get_query_time(t, d, v);
             query_time(v - 1, t - 1) = qt;
-            Parameters par;
+            Mrpt_Parameters par;
             par.n_trees = t;
             par.depth = d;
             par.votes = v;
@@ -965,7 +965,7 @@ class Mrpt {
       // Just to make sure that the compiler does not optimize away timed code.
       pars.begin()->estimated_recall += idx_sum > 1.0 ? 0.0002 : 0.0001;
 
-      opt_pars = std::set<Parameters,decltype(is_faster)*>(is_faster);
+      opt_pars = std::set<Mrpt_Parameters,decltype(is_faster)*>(is_faster);
       double best_recall = -1.0;
       for(const auto &par : pars) // compute pareto frontier for query times and recalls
         if(par.estimated_recall > best_recall) {
@@ -997,7 +997,7 @@ class Mrpt {
       return std::make_pair(intercept, slope);
     }
 
-    void write_parameters(const Parameters *par, FILE *fd) const {
+    void write_parameters(const Mrpt_Parameters *par, FILE *fd) const {
       if(!fd) {
         return;
       }
@@ -1009,7 +1009,7 @@ class Mrpt {
       fwrite(&par->estimated_recall, sizeof(double), 1, fd);
     }
 
-    void read_parameters(Parameters *par, FILE *fd) {
+    void read_parameters(Mrpt_Parameters *par, FILE *fd) {
       fread(&par->n_trees, sizeof(int), 1, fd);
       fread(&par->depth, sizeof(int), 1, fd);
       fread(&par->votes, sizeof(int), 1, fd);
@@ -1018,7 +1018,7 @@ class Mrpt {
       fread(&par->estimated_recall, sizeof(double), 1, fd);
     }
 
-    void write_parameter_list(const std::set<Parameters,decltype(is_faster)*> &pars, FILE *fd) const {
+    void write_parameter_list(const std::set<Mrpt_Parameters,decltype(is_faster)*> &pars, FILE *fd) const {
       if(!fd) {
         return;
       }
@@ -1032,11 +1032,11 @@ class Mrpt {
       if(!fd) {
         return;
       }
-      opt_pars = std::set<Parameters,decltype(is_faster)*>(is_faster);
+      opt_pars = std::set<Mrpt_Parameters,decltype(is_faster)*>(is_faster);
       int par_sz = 0;
       fread(&par_sz, sizeof(int), 1, fd);
       for(int i = 0; i < par_sz; ++i) {
-        Parameters par;
+        Mrpt_Parameters par;
         read_parameters(&par, fd);
         opt_pars.insert(par);
       }
@@ -1044,7 +1044,7 @@ class Mrpt {
 
 
 
-    Parameters parameters(double target_recall) const {
+    Mrpt_Parameters parameters(double target_recall) const {
       double epsilon = 0.0001;
       double tr = target_recall - epsilon;
       for(const auto &par : opt_pars)
@@ -1056,7 +1056,7 @@ class Mrpt {
         return *(opt_pars.rbegin());
       }
 
-      Parameters par;
+      Mrpt_Parameters par;
       return par;
     }
 
@@ -1171,9 +1171,9 @@ class Mrpt {
     std::vector<Eigen::MatrixXd> recalls, cs_sizes, query_times;
     std::pair<double,double> beta_projection, beta_exact;
     std::vector<std::map<int,std::pair<double,double>>> beta_voting;
-    Parameters params;
-    std::set<Parameters,decltype(is_faster)*> opt_pars;
-    std::set<Parameters,decltype(is_faster)*> pars;
+    Mrpt_Parameters params;
+    std::set<Mrpt_Parameters,decltype(is_faster)*> opt_pars;
+    std::set<Mrpt_Parameters,decltype(is_faster)*> pars;
 
 };
 
