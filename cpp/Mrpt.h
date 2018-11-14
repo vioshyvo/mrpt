@@ -189,7 +189,7 @@ class Mrpt {
       }
 
       fit_times();
-      index_type = 2;
+      index_type = autotuned_unpruned;
       params.k = k_;
     }
 
@@ -197,8 +197,7 @@ class Mrpt {
               int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
               float density = -1.0, int seed_mrpt = 0) {
       grow(Q_, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
-      recall_level = target_recall;
-      delete_extra_trees(target_recall);
+      prune_trees(target_recall);
     }
 
     /**
@@ -286,8 +285,11 @@ class Mrpt {
 
     void query(const Eigen::Map<Eigen::VectorXf> &q, int *out, float *out_distances = nullptr,
                int *out_n_elected = nullptr) const {
-      if(recall_level < 0) {
-        throw std::logic_error("You have to specify k and vote threshold, because the index has not been autotuned.");
+      if(index_type == normal) {
+        throw std::logic_error("The index is not autotuned: k and vote threshold has to be specified.");
+      }
+      if(index_type == autotuned_unpruned) {
+        throw std::logic_error("The target recall level has to be set before making queries.");
       }
       query(q, k, votes, out, out_distances, out_n_elected);
     }
@@ -355,7 +357,8 @@ class Mrpt {
         if ((fd = fopen(path, "wb")) == NULL)
             return false;
 
-        fwrite(&index_type, sizeof(int), 1, fd);
+        int i = index_type;
+        fwrite(&i, sizeof(int), 1, fd);
         if(index_type == 2) {
           write_parameter_list(opt_pars, fd);
         }
@@ -404,8 +407,10 @@ class Mrpt {
         if ((fd = fopen(path, "rb")) == NULL)
             return false;
 
-        fread(&index_type, sizeof(int), 1, fd);
-        if(index_type == 2) {
+        int i;
+        fread(&i, sizeof(int), 1, fd);
+        index_type = static_cast<itype>(i);
+        if(index_type == autotuned_unpruned) {
           read_parameter_list(fd);
         }
         read_parameters(&params, fd);
@@ -468,7 +473,7 @@ class Mrpt {
     }
 
     Mrpt_Parameters parameters() const {
-      if(index_type == 0 || index_type == 2) {
+      if(index_type == normal || index_type == autotuned_unpruned) {
         Mrpt_Parameters par;
         par.n_trees = n_trees;
         par.depth = depth;
@@ -479,8 +484,7 @@ class Mrpt {
     }
 
 
-  void delete_extra_trees(double target_recall) {
-    recall_level = target_recall;
+  void prune_trees(double target_recall) {
     params = parameters(target_recall);
     if(!params.n_trees) {
       return;
@@ -508,11 +512,10 @@ class Mrpt {
         drm_new.middleRows(n_tree * depth, depth) = dense_random_matrix.middleRows(n_tree * depth_max, depth);
       dense_random_matrix = drm_new;
     }
-    index_type = 1;
+    index_type = autotuned;
   }
 
   void subset_trees(double target_recall, Mrpt &index2) const {
-    index2.recall_level = target_recall;
     index2.params = parameters(target_recall);
 
     if(!index2.params.n_trees) {
@@ -542,14 +545,14 @@ class Mrpt {
       for(int n_tree = 0; n_tree < index2.n_trees; ++n_tree)
         index2.dense_random_matrix.middleRows(n_tree * index2.depth, index2.depth) = dense_random_matrix.middleRows(n_tree * depth_max, index2.depth);
     }
-    index2.index_type = 1;
+    index2.index_type = autotuned;
   }
 
   std::vector<Mrpt_Parameters> optimal_pars() const {
-    if(index_type == 0) {
+    if(index_type == normal) {
       throw std::logic_error("The list of optimal parameters cannot be retrieved for the non-autotuned index.");
     }
-    if(index_type == 1) {
+    if(index_type == autotuned) {
       throw std::logic_error("The list of optimal parameters cannot be retrieved for the index which has already been subsetted or deleted to the target recall level.");
     }
     std::vector<Mrpt_Parameters> new_pars;
@@ -1164,9 +1167,8 @@ class Mrpt {
     int votes_max = 0;
     int k = 0;
     int n_test = 0; // test set size (for autotuned index)
-    double recall_level = -1.0;
-    int index_type = 0; // 0 = normal index, 1 = autotuned index with target
-    // recall specified, 2 = autotuned index without target recall specified
+    enum itype {normal, autotuned, autotuned_unpruned};
+    itype index_type = normal;
 
     std::vector<Eigen::MatrixXd> recalls, cs_sizes, query_times;
     std::pair<double,double> beta_projection, beta_exact;
