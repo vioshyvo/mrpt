@@ -16,7 +16,6 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 
-using namespace Eigen;
 
 struct Parameters {
   int n_trees = 0;
@@ -33,9 +32,9 @@ class Mrpt {
     * The constructor of the index. The constructor does not actually build
     * the index but that is done by the function 'grow' which has to be called
     * before queries can be made.
-    * @param X_ - Pointer to the Eigen::Map which refers to the data matrix.
+    * @param X_ - Pointer to the Eigen::Eigen::Map which refers to the data matrix.
     */
-    Mrpt(const Map<const MatrixXf> *X_) :
+    Mrpt(const Eigen::Map<const Eigen::MatrixXf> *X_) :
         X(X_),
         n_samples(X_->cols()),
         dim(X_->rows()) {}
@@ -79,7 +78,7 @@ class Mrpt {
 
         density < 1 ? build_sparse_random_matrix(sparse_random_matrix, n_pool, dim, density, seed) : build_dense_random_matrix(dense_random_matrix, n_pool, dim, seed);
 
-        split_points = MatrixXf(n_array, n_trees);
+        split_points = Eigen::MatrixXf(n_array, n_trees);
         tree_leaves = std::vector<std::vector<int>>(n_trees);
 
         count_first_leaf_indices_all(leaf_first_indices_all, n_samples, depth);
@@ -87,7 +86,7 @@ class Mrpt {
 
         #pragma omp parallel for
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-            MatrixXf tree_projections;
+            Eigen::MatrixXf tree_projections;
 
             if (density < 1)
                 tree_projections.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth) * *X;
@@ -102,7 +101,7 @@ class Mrpt {
         }
     }
 
-    void grow(Map<MatrixXf> *Q_, int k_, int trees_max = -1, int depth_max = -1,
+    void grow(Eigen::Map<Eigen::MatrixXf> *Q_, int k_, int trees_max = -1, int depth_max = -1,
        int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed_mrpt = 0) {
 
       if(k_ <= 0 || k_ > n_samples) {
@@ -160,22 +159,22 @@ class Mrpt {
       n_test = Q->cols();
 
       grow(trees_max, depth_max, density, seed_mrpt);
-      MatrixXi exact(k, n_test);
+      Eigen::MatrixXi exact(k, n_test);
       compute_exact(exact);
 
-      recalls = std::vector<MatrixXd>(depth_max - depth_min + 1);
-      cs_sizes = std::vector<MatrixXd>(depth_max - depth_min + 1);
+      recalls = std::vector<Eigen::MatrixXd>(depth_max - depth_min + 1);
+      cs_sizes = std::vector<Eigen::MatrixXd>(depth_max - depth_min + 1);
 
       for(int d = depth_min; d <= depth_max; ++d) {
-        recalls[d - depth_min] = MatrixXd::Zero(votes_max, trees_max);
-        cs_sizes[d - depth_min] = MatrixXd::Zero(votes_max, trees_max);
+        recalls[d - depth_min] = Eigen::MatrixXd::Zero(votes_max, trees_max);
+        cs_sizes[d - depth_min] = Eigen::MatrixXd::Zero(votes_max, trees_max);
       }
 
       for(int i = 0; i < n_test; ++i) {
-        std::vector<MatrixXd> recall_tmp(depth_max - depth_min + 1);
-        std::vector<MatrixXd> cs_size_tmp(depth_max - depth_min + 1);
+        std::vector<Eigen::MatrixXd> recall_tmp(depth_max - depth_min + 1);
+        std::vector<Eigen::MatrixXd> cs_size_tmp(depth_max - depth_min + 1);
 
-        count_elected(Map<VectorXf>(Q->data() + i * dim, dim), Map<VectorXi>(exact.data() + i * k, k),
+        count_elected(Eigen::Map<Eigen::VectorXf>(Q->data() + i * dim, dim), Eigen::Map<Eigen::VectorXi>(exact.data() + i * k, k),
          votes_max, recall_tmp, cs_size_tmp);
 
         for(int d = depth_min; d <= depth_max; ++d) {
@@ -194,7 +193,7 @@ class Mrpt {
       params.k = k_;
     }
 
-    void grow(double target_recall, Map<MatrixXf> *Q_, int k_, int trees_max = -1,
+    void grow(double target_recall, Eigen::Map<Eigen::MatrixXf> *Q_, int k_, int trees_max = -1,
               int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
               float density = -1.0, int seed_mrpt = 0) {
       grow(Q_, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
@@ -218,7 +217,7 @@ class Mrpt {
     * @param out_n_elected - An optional output parameter for the candidate set size
     * @return
     */
-    void query(const Map<VectorXf> &q, int k, int votes_required, int *out,
+    void query(const Eigen::Map<Eigen::VectorXf> &q, int k, int votes_required, int *out,
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
 
         if(k <= 0 || k > n_samples) {
@@ -233,7 +232,7 @@ class Mrpt {
           throw std::logic_error("The index must be built before making queries.");
         }
 
-        VectorXf projected_query(n_pool);
+        Eigen::VectorXf projected_query(n_pool);
         if (density < 1)
             projected_query.noalias() = sparse_random_matrix * q;
         else
@@ -262,8 +261,8 @@ class Mrpt {
         }
 
         int n_elected = 0, max_leaf_size = n_samples / (1 << depth) + 1;
-        VectorXi elected(n_trees * max_leaf_size);
-        VectorXi votes = VectorXi::Zero(n_samples);
+        Eigen::VectorXi elected(n_trees * max_leaf_size);
+        Eigen::VectorXi votes = Eigen::VectorXi::Zero(n_samples);
 
         // count votes
         for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
@@ -285,7 +284,7 @@ class Mrpt {
     }
 
 
-    void query(const Map<VectorXf> &q, int *out, float *out_distances = nullptr,
+    void query(const Eigen::Map<Eigen::VectorXf> &q, int *out, float *out_distances = nullptr,
                int *out_n_elected = nullptr) const {
       if(recall_level < 0) {
         throw std::logic_error("You have to specify k and vote threshold, because the index has not been autotuned.");
@@ -303,7 +302,7 @@ class Mrpt {
     * @param out_distances - output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @return
     */
-    void exact_knn(const Map<VectorXf> &q, int k, const VectorXi &indices,
+    void exact_knn(const Eigen::Map<Eigen::VectorXf> &q, int k, const Eigen::VectorXi &indices,
       int n_elected, int *out, float *out_distances = nullptr) const {
 
         if(!n_elected) {
@@ -314,14 +313,14 @@ class Mrpt {
           return;
         }
 
-        VectorXf distances(n_elected);
+        Eigen::VectorXf distances(n_elected);
 
         #pragma omp parallel for
         for (int i = 0; i < n_elected; ++i)
             distances(i) = (X->col(indices(i)) - q).squaredNorm();
 
         if (k == 1) {
-            MatrixXf::Index index;
+            Eigen::MatrixXf::Index index;
             distances.minCoeff(&index);
             out[0] = n_elected ? indices(index) : -1;
 
@@ -332,7 +331,7 @@ class Mrpt {
         }
 
         int n_to_sort = n_elected > k ? k : n_elected;
-        VectorXi idx(n_elected);
+        Eigen::VectorXi idx(n_elected);
         std::iota(idx.data(), idx.data() + n_elected, 0);
         std::partial_sort(idx.data(), idx.data() + n_to_sort, idx.data() + n_elected,
                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
@@ -379,7 +378,7 @@ class Mrpt {
             int non_zeros = sparse_random_matrix.nonZeros();
             fwrite(&non_zeros, sizeof(int), 1, fd);
             for (int k = 0; k < sparse_random_matrix.outerSize(); ++k) {
-                for (SparseMatrix<float, RowMajor>::InnerIterator it(sparse_random_matrix, k); it; ++it) {
+                for (Eigen::SparseMatrix<float, Eigen::RowMajor>::InnerIterator it(sparse_random_matrix, k); it; ++it) {
                     float val = it.value();
                     int row = it.row(), col = it.col();
                     fwrite(&row, sizeof(int), 1, fd);
@@ -420,7 +419,7 @@ class Mrpt {
         count_first_leaf_indices_all(leaf_first_indices_all, n_samples, depth);
         leaf_first_indices = leaf_first_indices_all[depth];
 
-        split_points = MatrixXf(n_array, n_trees);
+        split_points = Eigen::MatrixXf(n_array, n_trees);
         fread(split_points.data(), sizeof(float), n_array * n_trees, fd);
 
         // load tree leaves
@@ -438,21 +437,21 @@ class Mrpt {
             int non_zeros;
             fread(&non_zeros, sizeof(int), 1, fd);
 
-            sparse_random_matrix = SparseMatrix<float>(n_pool, dim);
-            std::vector<Triplet<float>> triplets;
+            sparse_random_matrix = Eigen::SparseMatrix<float>(n_pool, dim);
+            std::vector<Eigen::Triplet<float>> triplets;
             for (int k = 0; k < non_zeros; ++k) {
                 int row, col;
                 float val;
                 fread(&row, sizeof(int), 1, fd);
                 fread(&col, sizeof(int), 1, fd);
                 fread(&val, sizeof(float), 1, fd);
-                triplets.push_back(Triplet<float>(row, col, val));
+                triplets.push_back(Eigen::Triplet<float>(row, col, val));
             }
 
             sparse_random_matrix.setFromTriplets(triplets.begin(), triplets.end());
             sparse_random_matrix.makeCompressed();
         } else {
-            dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_pool, dim);
+            dense_random_matrix = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>(n_pool, dim);
             fread(dense_random_matrix.data(), sizeof(float), n_pool * dim, fd);
         }
 
@@ -499,12 +498,12 @@ class Mrpt {
     split_points.conservativeResize(n_array, n_trees);
     leaf_first_indices = leaf_first_indices_all[depth];
     if(density < 1) {
-      SparseMatrix<float, RowMajor> srm_new(n_pool, dim);
+      Eigen::SparseMatrix<float, Eigen::RowMajor> srm_new(n_pool, dim);
       for(int n_tree = 0; n_tree < n_trees; ++n_tree)
         srm_new.middleRows(n_tree * depth, depth) = sparse_random_matrix.middleRows(n_tree * depth_max, depth);
       sparse_random_matrix = srm_new;
     } else {
-      Matrix<float, Dynamic, Dynamic, RowMajor> drm_new(n_pool, dim);
+      Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> drm_new(n_pool, dim);
       for(int n_tree = 0; n_tree < n_trees; ++n_tree)
         drm_new.middleRows(n_tree * depth, depth) = dense_random_matrix.middleRows(n_tree * depth_max, depth);
       dense_random_matrix = drm_new;
@@ -535,11 +534,11 @@ class Mrpt {
     index2.split_points = split_points.topLeftCorner(index2.n_array, index2.n_trees);
     index2.leaf_first_indices = leaf_first_indices_all[index2.depth];
     if(index2.density < 1) {
-      index2.sparse_random_matrix = SparseMatrix<float, RowMajor>(index2.n_pool, index2.dim);
+      index2.sparse_random_matrix = Eigen::SparseMatrix<float, Eigen::RowMajor>(index2.n_pool, index2.dim);
       for(int n_tree = 0; n_tree < index2.n_trees; ++n_tree)
         index2.sparse_random_matrix.middleRows(n_tree * index2.depth, index2.depth) = sparse_random_matrix.middleRows(n_tree * depth_max, index2.depth);
     } else {
-      index2.dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(index2.n_pool, index2.dim);
+      index2.dense_random_matrix = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>(index2.n_pool, index2.dim);
       for(int n_tree = 0; n_tree < index2.n_trees; ++n_tree)
         index2.dense_random_matrix.middleRows(n_tree * index2.depth, index2.depth) = dense_random_matrix.middleRows(n_tree * depth_max, index2.depth);
     }
@@ -576,7 +575,7 @@ class Mrpt {
     * @param tree_projections - Precalculated projection values for the current tree
     */
     void grow_subtree(std::vector<int>::iterator begin, std::vector<int>::iterator end,
-          int tree_level, int i, int n_tree, const MatrixXf &tree_projections) {
+          int tree_level, int i, int n_tree, const Eigen::MatrixXf &tree_projections) {
         int n = end - begin;
         int idx_left = 2 * i + 1;
         int idx_right = idx_left + 1;
@@ -605,9 +604,9 @@ class Mrpt {
     }
 
 
-    void count_elected(const Map<VectorXf> &q, const Map<VectorXi> &exact, int votes_max,
-      std::vector<MatrixXd> &recalls, std::vector<MatrixXd> &cs_sizes) const {
-        VectorXf projected_query(n_pool);
+    void count_elected(const Eigen::Map<Eigen::VectorXf> &q, const Eigen::Map<Eigen::VectorXi> &exact, int votes_max,
+      std::vector<Eigen::MatrixXd> &recalls, std::vector<Eigen::MatrixXd> &cs_sizes) const {
+        Eigen::VectorXf projected_query(n_pool);
         if (density < 1)
             projected_query.noalias() = sparse_random_matrix * q;
         else
@@ -639,13 +638,13 @@ class Mrpt {
         const int *exact_end = exact.data() + exact.size();
 
         for(int depth_crnt = depth_min; depth_crnt <= depth; ++depth_crnt) {
-          VectorXi votes = VectorXi::Zero(n_samples);
+          Eigen::VectorXi votes = Eigen::VectorXi::Zero(n_samples);
           const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth_crnt];
 
-          MatrixXd recall(votes_max, n_trees);
-          MatrixXd candidate_set_size(votes_max, n_trees);
-          recall.col(0) = VectorXd::Zero(votes_max);
-          candidate_set_size.col(0) = VectorXd::Zero(votes_max);
+          Eigen::MatrixXd recall(votes_max, n_trees);
+          Eigen::MatrixXd candidate_set_size(votes_max, n_trees);
+          recall.col(0) = Eigen::VectorXd::Zero(votes_max);
+          candidate_set_size.col(0) = Eigen::VectorXd::Zero(votes_max);
 
           // count votes
           for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
@@ -687,9 +686,9 @@ class Mrpt {
     * @param seed - A seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with rd()
     */
-    static void build_sparse_random_matrix(SparseMatrix<float, RowMajor> &sparse_random_matrix,
+    static void build_sparse_random_matrix(Eigen::SparseMatrix<float, Eigen::RowMajor> &sparse_random_matrix,
           int n_row, int n_col, float density, int seed = 0) {
-        sparse_random_matrix = SparseMatrix<float, RowMajor>(n_row, n_col);
+        sparse_random_matrix = Eigen::SparseMatrix<float, Eigen::RowMajor>(n_row, n_col);
 
         std::random_device rd;
         int s = seed ? seed : rd();
@@ -697,11 +696,11 @@ class Mrpt {
         std::uniform_real_distribution<float> uni_dist(0, 1);
         std::normal_distribution<float> norm_dist(0, 1);
 
-        std::vector<Triplet<float>> triplets;
+        std::vector<Eigen::Triplet<float>> triplets;
         for (int j = 0; j < n_row; ++j) {
             for (int i = 0; i < n_col; ++i) {
                 if (uni_dist(gen) > density) continue;
-                triplets.push_back(Triplet<float>(j, i, norm_dist(gen)));
+                triplets.push_back(Eigen::Triplet<float>(j, i, norm_dist(gen)));
             }
         }
 
@@ -717,9 +716,9 @@ class Mrpt {
     * @param seed - A seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with rd()
     */
-    static void build_dense_random_matrix(Matrix<float, Dynamic, Dynamic, RowMajor> &dense_random_matrix,
+    static void build_dense_random_matrix(Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> &dense_random_matrix,
           int n_row, int n_col, int seed = 0) {
-        dense_random_matrix = Matrix<float, Dynamic, Dynamic, RowMajor>(n_row, n_col);
+        dense_random_matrix = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>(n_row, n_col);
 
         std::random_device rd;
         int s = seed ? seed : rd();
@@ -731,12 +730,12 @@ class Mrpt {
     }
 
 
-    void compute_exact(MatrixXi &out_exact) const {
+    void compute_exact(Eigen::MatrixXi &out_exact) const {
       for(int i = 0; i < n_test; ++i) {
-        VectorXi idx(n_samples);
+        Eigen::VectorXi idx(n_samples);
         std::iota(idx.data(), idx.data() + n_samples, 0);
 
-        exact_knn(Map<VectorXf>(Q->data() + i * dim, dim), k, idx, n_samples, out_exact.data() + i * k);
+        exact_knn(Eigen::Map<Eigen::VectorXf>(Q->data() + i * dim, dim), k, idx, n_samples, out_exact.data() + i * k);
         std::sort(out_exact.data() + i * k, out_exact.data() + i * k + k);
       }
     }
@@ -745,7 +744,7 @@ class Mrpt {
       return par1.estimated_qtime < par2.estimated_qtime;
     }
 
-    void vote(const VectorXf &projected_query, int votes_required, VectorXi &elected,
+    void vote(const Eigen::VectorXf &projected_query, int votes_required, Eigen::VectorXi &elected,
       int &n_elected, int n_trees, int depth_crnt) {
       std::vector<int> found_leaves(n_trees);
       const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth_crnt];
@@ -769,8 +768,8 @@ class Mrpt {
       }
 
       int max_leaf_size = n_samples / (1 << depth_crnt) + 1;
-      elected = VectorXi(n_trees * max_leaf_size);
-      VectorXi votes = VectorXi::Zero(n_samples);
+      elected = Eigen::VectorXi(n_trees * max_leaf_size);
+      Eigen::VectorXi votes = Eigen::VectorXi::Zero(n_samples);
 
       // count votes
       for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
@@ -819,8 +818,8 @@ class Mrpt {
           int t = tested_trees[i];
           int n_random_vectors = t * d;
           projection_x.push_back(n_random_vectors);
-          SparseMatrix<float, RowMajor> sparse_mat;
-          Matrix<float, Dynamic, Dynamic, RowMajor> dense_mat;
+          Eigen::SparseMatrix<float, Eigen::RowMajor> sparse_mat;
+          Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> dense_mat;
           if(density < 1) {
             build_sparse_random_matrix(sparse_mat, n_random_vectors, dim, density);
           } else {
@@ -828,7 +827,7 @@ class Mrpt {
           }
 
           double start_proj = omp_get_wtime();
-          VectorXf projected_query(n_random_vectors);
+          Eigen::VectorXf projected_query(n_random_vectors);
           if(density < 1) {
             projected_query.noalias() = sparse_mat * Q->col(0);
           } else {
@@ -887,10 +886,10 @@ class Mrpt {
           for(int i = 0; i < tested_trees.size(); ++i) {
             int t = tested_trees[i];
             int n_el = 0;
-            VectorXi elected;
+            Eigen::VectorXi elected;
             auto ri = uni(rng);
 
-            VectorXf projected_query(n_trees * depth);
+            Eigen::VectorXf projected_query(n_trees * depth);
             if(density < 1) {
               projected_query.noalias() = sparse_random_matrix * Q->col(ri);
             } else {
@@ -919,13 +918,13 @@ class Mrpt {
 
         for(int m = 0; m < n_sim; ++m) {
           auto ri = uni(rng);
-          VectorXi elected(s_size);
+          Eigen::VectorXi elected(s_size);
           for(int j = 0; j < elected.size(); ++j)
             elected(j) = uni2(rng);
 
           double start_exact = omp_get_wtime();
           std::vector<int> res(k);
-          exact_knn(Map<VectorXf>(Q->data() + ri * dim, dim), k, elected, s_size, &res[0]);
+          exact_knn(Eigen::Map<Eigen::VectorXf>(Q->data() + ri * dim, dim), k, elected, s_size, &res[0]);
           double end_exact = omp_get_wtime();
           mean_exact_time += (end_exact - start_exact);
 
@@ -941,9 +940,9 @@ class Mrpt {
       beta_exact = fit_theil_sen(ex, exact_times);
 
       pars = std::set<Parameters,decltype(is_faster)*>(is_faster);
-      query_times = std::vector<MatrixXd>(depth - depth_min + 1);
+      query_times = std::vector<Eigen::MatrixXd>(depth - depth_min + 1);
       for(int d = depth_min; d <= depth; ++d) {
-        MatrixXd query_time = MatrixXd::Zero(votes_max, n_trees);
+        Eigen::MatrixXd query_time = Eigen::MatrixXd::Zero(votes_max, n_trees);
 
         for(int t = 1; t <= n_trees; ++t) {
           int votes_index = votes_max < t ? votes_max : t;
@@ -1144,12 +1143,12 @@ class Mrpt {
            + get_exact_time(tree, depth, v);
     }
 
-    const Map<const MatrixXf> *X; // the data matrix
-    Map<MatrixXf> *Q; // validation set
-    MatrixXf split_points; // all split points in all trees
+    const Eigen::Map<const Eigen::MatrixXf> *X; // the data matrix
+    Eigen::Map<Eigen::MatrixXf> *Q; // validation set
+    Eigen::MatrixXf split_points; // all split points in all trees
     std::vector<std::vector<int>> tree_leaves; // contains all leaves of all trees
-    Matrix<float, Dynamic, Dynamic, RowMajor> dense_random_matrix; // random vectors needed for all the RP-trees
-    SparseMatrix<float, RowMajor> sparse_random_matrix; // random vectors needed for all the RP-trees
+    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> dense_random_matrix; // random vectors needed for all the RP-trees
+    Eigen::SparseMatrix<float, Eigen::RowMajor> sparse_random_matrix; // random vectors needed for all the RP-trees
     std::vector<std::vector<int>> leaf_first_indices_all; // first indices for each level
     std::vector<int> leaf_first_indices; // first indices of each leaf of tree in tree_leaves
 
@@ -1169,7 +1168,7 @@ class Mrpt {
     int index_type = 0; // 0 = normal index, 1 = autotuned index with target
     // recall specified, 2 = autotuned index without target recall specified
 
-    std::vector<MatrixXd> recalls, cs_sizes, query_times;
+    std::vector<Eigen::MatrixXd> recalls, cs_sizes, query_times;
     std::pair<double,double> beta_projection, beta_exact;
     std::vector<std::map<int,std::pair<double,double>>> beta_voting;
     Parameters params;
