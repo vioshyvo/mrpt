@@ -468,18 +468,6 @@ class Mrpt {
     }
 
 
-    Parameters parameters(double target_recall) const {
-      double tr = target_recall - 0.0001;
-      for(const auto &par : opt_pars)
-        if(par.estimated_recall > tr) {
-          return par;
-        }
-
-      Parameters par;
-      return par;
-    }
-
-
   void delete_extra_trees(double target_recall) {
     recall_level = target_recall;
     optimal_parameters = parameters(target_recall);
@@ -995,6 +983,23 @@ class Mrpt {
 
       return std::make_pair(intercept, slope);
     }
+
+    Parameters parameters(double target_recall) const {
+      double epsilon = 0.0001;
+      double tr = target_recall - epsilon;
+      for(const auto &par : opt_pars)
+        if(par.estimated_recall > tr) {
+          return par;
+        }
+
+      if(!opt_pars.empty()) {
+        return *(opt_pars.rbegin());
+      }
+
+      Parameters par;
+      return par;
+    }
+
 
     /**
     * Computes the leaf sizes of a tree assuming a median split and that
