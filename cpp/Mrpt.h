@@ -194,7 +194,7 @@ class Mrpt {
       params.k = k_;
     }
 
-    void grow(float target_recall, Map<MatrixXf> *Q_, int k_, int trees_max = -1,
+    void grow(double target_recall, Map<MatrixXf> *Q_, int k_, int trees_max = -1,
               int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
               float density = -1.0, int seed_mrpt = 0) {
       grow(Q_, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
@@ -1109,11 +1109,11 @@ class Mrpt {
       return beta.first + beta.second * x;
     }
 
-    float get_recall(int tree, int depth, int v) const {
+    double get_recall(int tree, int depth, int v) const {
       return recalls[depth - depth_min](v - 1, tree - 1);
     }
 
-    float get_candidate_set_size(int tree, int depth, int v) const {
+    double get_candidate_set_size(int tree, int depth, int v) const {
       return cs_sizes[depth - depth_min](v - 1, tree - 1);
     }
 
