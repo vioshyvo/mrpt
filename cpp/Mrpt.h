@@ -189,7 +189,7 @@ class Mrpt {
 
       fit_times(Q);
       index_type = autotuned_unpruned;
-      params.k = k_;
+      par.k = k_;
     }
 
     void grow(double target_recall, const Eigen::Map<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1,
@@ -364,7 +364,7 @@ class Mrpt {
         if(index_type == 2) {
           write_parameter_list(opt_pars, fd);
         }
-        write_parameters(&params, fd);
+        write_parameters(&par, fd);
         fwrite(&n_trees, sizeof(int), 1, fd);
         fwrite(&depth, sizeof(int), 1, fd);
         fwrite(&density, sizeof(float), 1, fd);
@@ -415,7 +415,7 @@ class Mrpt {
         if(index_type == autotuned_unpruned) {
           read_parameter_list(fd);
         }
-        read_parameters(&params, fd);
+        read_parameters(&par, fd);
         fread(&n_trees, sizeof(int), 1, fd);
         fread(&depth, sizeof(int), 1, fd);
         fread(&density, sizeof(float), 1, fd);
@@ -476,13 +476,13 @@ class Mrpt {
 
     Mrpt_Parameters parameters() const {
       if(index_type == normal || index_type == autotuned_unpruned) {
-        Mrpt_Parameters par;
-        par.n_trees = n_trees;
-        par.depth = depth;
-        par.k = params.k;
-        return par;
+        Mrpt_Parameters p;
+        p.n_trees = n_trees;
+        p.depth = depth;
+        p.k = par.k;
+        return p;
       }
-      return params;
+      return par;
     }
 
 
@@ -490,16 +490,16 @@ class Mrpt {
     if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
       throw std::out_of_range("Target recall must be on the interval [0,1].");
     }
-    params = parameters(target_recall);
-    if(!params.n_trees) {
+    par = parameters(target_recall);
+    if(!par.n_trees) {
       return;
     }
 
     int depth_max = depth;
 
-    n_trees = params.n_trees;
-    depth = params.depth;
-    votes = params.votes;
+    n_trees = par.n_trees;
+    depth = par.depth;
+    votes = par.votes;
     n_pool = depth * n_trees;
     n_array = 1 << (depth + 1);
 
@@ -526,13 +526,13 @@ class Mrpt {
     }
 
     Mrpt index2(X);
-    index2.params = parameters(target_recall);
+    index2.par = parameters(target_recall);
 
     int depth_max = depth;
 
-    index2.n_trees = index2.params.n_trees;
-    index2.depth = index2.params.depth;
-    index2.votes = index2.params.votes;
+    index2.n_trees = index2.par.n_trees;
+    index2.depth = index2.par.depth;
+    index2.votes = index2.par.votes;
     index2.n_pool = index2.depth * index2.n_trees;
     index2.n_array = 1 << (index2.depth + 1);
     index2.tree_leaves.assign(tree_leaves.begin(), tree_leaves.begin() + index2.n_trees);
@@ -950,7 +950,7 @@ class Mrpt {
       beta_projection = fit_theil_sen(projection_x, projection_times);
       beta_exact = fit_theil_sen(ex, exact_times);
 
-      pars = std::set<Mrpt_Parameters,decltype(is_faster)*>(is_faster);
+      std::set<Mrpt_Parameters,decltype(is_faster)*> pars(is_faster);
       query_times = std::vector<Eigen::MatrixXd>(depth - depth_min + 1);
       for(int d = depth_min; d <= depth; ++d) {
         Eigen::MatrixXd query_time = Eigen::MatrixXd::Zero(votes_max, n_trees);
@@ -960,28 +960,28 @@ class Mrpt {
           for(int v = 1; v <= votes_index; ++v) {
             double qt = get_query_time(t, d, v);
             query_time(v - 1, t - 1) = qt;
-            Mrpt_Parameters par;
-            par.n_trees = t;
-            par.depth = d;
-            par.votes = v;
-            par.k = k;
-            par.estimated_qtime = qt;
-            par.estimated_recall = get_recall(t, d, v);
-            pars.insert(par);
+            Mrpt_Parameters p;
+            p.n_trees = t;
+            p.depth = d;
+            p.votes = v;
+            p.k = k;
+            p.estimated_qtime = qt;
+            p.estimated_recall = get_recall(t, d, v);
+            pars.insert(p);
           }
         }
         query_times[d - depth_min] = query_time;
       }
 
       // Just to make sure that the compiler does not optimize away timed code.
-      pars.begin()->estimated_recall += idx_sum > 1.0 ? 0.0002 : 0.0001;
+      pars.begin()->estimated_recall += idx_sum > 1.0 ? 0.0000 : 0.0001;
 
       opt_pars = std::set<Mrpt_Parameters,decltype(is_faster)*>(is_faster);
       double best_recall = -1.0;
-      for(const auto &par : pars) // compute pareto frontier for query times and recalls
-        if(par.estimated_recall > best_recall) {
-          opt_pars.insert(par);
-          best_recall = par.estimated_recall;
+      for(const auto &p : pars) // compute pareto frontier for query times and recalls
+        if(p.estimated_recall > best_recall) {
+          opt_pars.insert(p);
+          best_recall = p.estimated_recall;
         }
     }
 
@@ -1008,25 +1008,25 @@ class Mrpt {
       return std::make_pair(intercept, slope);
     }
 
-    void write_parameters(const Mrpt_Parameters *par, FILE *fd) const {
+    void write_parameters(const Mrpt_Parameters *p, FILE *fd) const {
       if(!fd) {
         return;
       }
-      fwrite(&par->n_trees, sizeof(int), 1, fd);
-      fwrite(&par->depth, sizeof(int), 1, fd);
-      fwrite(&par->votes, sizeof(int), 1, fd);
-      fwrite(&par->k, sizeof(int), 1, fd);
-      fwrite(&par->estimated_qtime, sizeof(double), 1, fd);
-      fwrite(&par->estimated_recall, sizeof(double), 1, fd);
+      fwrite(&p->n_trees, sizeof(int), 1, fd);
+      fwrite(&p->depth, sizeof(int), 1, fd);
+      fwrite(&p->votes, sizeof(int), 1, fd);
+      fwrite(&p->k, sizeof(int), 1, fd);
+      fwrite(&p->estimated_qtime, sizeof(double), 1, fd);
+      fwrite(&p->estimated_recall, sizeof(double), 1, fd);
     }
 
-    void read_parameters(Mrpt_Parameters *par, FILE *fd) {
-      fread(&par->n_trees, sizeof(int), 1, fd);
-      fread(&par->depth, sizeof(int), 1, fd);
-      fread(&par->votes, sizeof(int), 1, fd);
-      fread(&par->k, sizeof(int), 1, fd);
-      fread(&par->estimated_qtime, sizeof(double), 1, fd);
-      fread(&par->estimated_recall, sizeof(double), 1, fd);
+    void read_parameters(Mrpt_Parameters *p, FILE *fd) {
+      fread(&p->n_trees, sizeof(int), 1, fd);
+      fread(&p->depth, sizeof(int), 1, fd);
+      fread(&p->votes, sizeof(int), 1, fd);
+      fread(&p->k, sizeof(int), 1, fd);
+      fread(&p->estimated_qtime, sizeof(double), 1, fd);
+      fread(&p->estimated_recall, sizeof(double), 1, fd);
     }
 
     void write_parameter_list(const std::set<Mrpt_Parameters,decltype(is_faster)*> &pars, FILE *fd) const {
@@ -1035,8 +1035,8 @@ class Mrpt {
       }
       int par_sz = pars.size();
       fwrite(&par_sz, sizeof(int), 1, fd);
-      for(const auto par : pars)
-        write_parameters(&par, fd);
+      for(const auto p : pars)
+        write_parameters(&p, fd);
     }
 
     void read_parameter_list(FILE *fd) {
@@ -1047,9 +1047,9 @@ class Mrpt {
       int par_sz = 0;
       fread(&par_sz, sizeof(int), 1, fd);
       for(int i = 0; i < par_sz; ++i) {
-        Mrpt_Parameters par;
-        read_parameters(&par, fd);
-        opt_pars.insert(par);
+        Mrpt_Parameters p;
+        read_parameters(&p, fd);
+        opt_pars.insert(p);
       }
     }
 
@@ -1057,17 +1057,16 @@ class Mrpt {
 
     Mrpt_Parameters parameters(double target_recall) const {
       double tr = target_recall - epsilon;
-      for(const auto &par : opt_pars)
-        if(par.estimated_recall > tr) {
-          return par;
+      for(const auto &p : opt_pars)
+        if(p.estimated_recall > tr) {
+          return p;
         }
 
       if(!opt_pars.empty()) {
         return *(opt_pars.rbegin());
       }
 
-      Mrpt_Parameters par;
-      return par;
+      return Mrpt_Parameters();
     }
 
 
@@ -1164,6 +1163,7 @@ class Mrpt {
 
     const int n_samples; // sample size of data
     const int dim; // dimension of data
+    Mrpt_Parameters par;
     int n_trees = 0; // number of RP-trees
     int depth = 0; // depth of an RP-tree with median split
     float density = -1.0; // expected ratio of non-zero components in a projection matrix
@@ -1180,10 +1180,7 @@ class Mrpt {
     std::vector<Eigen::MatrixXd> recalls, cs_sizes, query_times;
     std::pair<double,double> beta_projection, beta_exact;
     std::vector<std::map<int,std::pair<double,double>>> beta_voting;
-    Mrpt_Parameters params;
     std::set<Mrpt_Parameters,decltype(is_faster)*> opt_pars;
-    std::set<Mrpt_Parameters,decltype(is_faster)*> pars;
-
 };
 
 
