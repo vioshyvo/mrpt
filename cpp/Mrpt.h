@@ -521,17 +521,14 @@ class Mrpt {
     index_type = autotuned;
   }
 
-  void subset(double target_recall, Mrpt &index2) const {
+  Mrpt subset(double target_recall) const {
     if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
       throw std::out_of_range("Target recall must be on the interval [0,1].");
     }
 
+    Mrpt index2(X);
     index2.params = parameters(target_recall);
-
-    if(!index2.params.n_trees) {
-      return;
-    }
-
+    
     int depth_max = depth;
 
     index2.n_trees = index2.params.n_trees;
@@ -556,6 +553,7 @@ class Mrpt {
         index2.dense_random_matrix.middleRows(n_tree * index2.depth, index2.depth) = dense_random_matrix.middleRows(n_tree * depth_max, index2.depth);
     }
     index2.index_type = autotuned;
+    return index2;
   }
 
   std::vector<Mrpt_Parameters> optimal_pars() const {
