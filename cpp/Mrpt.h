@@ -34,10 +34,10 @@ class Mrpt {
     * before queries can be made.
     * @param X_ - Pointer to the Eigen::Map which refers to the data matrix.
     */
-    Mrpt(const Eigen::Map<const Eigen::MatrixXf> *X_) :
+    Mrpt(const Eigen::Map<const Eigen::MatrixXf> &X_) :
         X(X_),
-        n_samples(X_->cols()),
-        dim(X_->rows()) {}
+        n_samples(X_.cols()),
+        dim(X_.rows()) {}
 
     ~Mrpt() {}
 
@@ -89,9 +89,9 @@ class Mrpt {
             Eigen::MatrixXf tree_projections;
 
             if (density < 1)
-                tree_projections.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth) * *X;
+                tree_projections.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth) * X;
             else
-                tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * *X;
+                tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * X;
 
             tree_leaves[n_tree] = std::vector<int>(n_samples);
             std::vector<int> &indices = tree_leaves[n_tree];
@@ -322,7 +322,7 @@ class Mrpt {
 
         #pragma omp parallel for
         for (int i = 0; i < n_elected; ++i)
-            distances(i) = (X->col(indices(i)) - q).squaredNorm();
+            distances(i) = (X.col(indices(i)) - q).squaredNorm();
 
         if (k == 1) {
             Eigen::MatrixXf::Index index;
@@ -528,7 +528,7 @@ class Mrpt {
 
     Mrpt index2(X);
     index2.params = parameters(target_recall);
-    
+
     int depth_max = depth;
 
     index2.n_trees = index2.params.n_trees;
@@ -1153,7 +1153,7 @@ class Mrpt {
            + get_exact_time(tree, depth, v);
     }
 
-    const Eigen::Map<const Eigen::MatrixXf> *X; // the data matrix
+    const Eigen::Map<const Eigen::MatrixXf> X; // the data matrix
     Eigen::Map<Eigen::MatrixXf> *Q; // validation set
     Eigen::MatrixXf split_points; // all split points in all trees
     std::vector<std::vector<int>> tree_leaves; // contains all leaves of all trees
