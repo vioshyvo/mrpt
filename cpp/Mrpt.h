@@ -196,8 +196,11 @@ class Mrpt {
     void grow(double target_recall, Eigen::Map<Eigen::MatrixXf> *Q_, int k_, int trees_max = -1,
               int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
               float density = -1.0, int seed_mrpt = 0) {
+      if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
+        throw std::out_of_range("Target recall must be on the interval [0,1].");
+      }
       grow(Q_, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
-      prune_trees(target_recall);
+      prune(target_recall);
     }
 
     /**
@@ -484,7 +487,10 @@ class Mrpt {
     }
 
 
-  void prune_trees(double target_recall) {
+  void prune(double target_recall) {
+    if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
+      throw std::out_of_range("Target recall must be on the interval [0,1].");
+    }
     params = parameters(target_recall);
     if(!params.n_trees) {
       return;
@@ -515,7 +521,11 @@ class Mrpt {
     index_type = autotuned;
   }
 
-  void subset_trees(double target_recall, Mrpt &index2) const {
+  void subset(double target_recall, Mrpt &index2) const {
+    if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
+      throw std::out_of_range("Target recall must be on the interval [0,1].");
+    }
+
     index2.params = parameters(target_recall);
 
     if(!index2.params.n_trees) {
@@ -1048,7 +1058,6 @@ class Mrpt {
 
 
     Mrpt_Parameters parameters(double target_recall) const {
-      double epsilon = 0.0001;
       double tr = target_recall - epsilon;
       for(const auto &par : opt_pars)
         if(par.estimated_recall > tr) {
@@ -1169,6 +1178,7 @@ class Mrpt {
     int n_test = 0; // test set size (for autotuned index)
     enum itype {normal, autotuned, autotuned_unpruned};
     itype index_type = normal;
+    const double epsilon = 0.0001; // error bound for comparisons of recall levels
 
     std::vector<Eigen::MatrixXd> recalls, cs_sizes, query_times;
     std::pair<double,double> beta_projection, beta_exact;
