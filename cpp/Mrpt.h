@@ -101,7 +101,7 @@ class Mrpt {
         }
     }
 
-    void grow(Eigen::Map<Eigen::MatrixXf> *Q_, int k_, int trees_max = -1, int depth_max = -1,
+    void grow(const Eigen::Map<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1, int depth_max = -1,
        int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed_mrpt = 0) {
 
       if(k_ <= 0 || k_ > n_samples) {
@@ -128,7 +128,7 @@ class Mrpt {
         throw std::out_of_range("The density must be on the interval (0,1].");
       }
 
-      if(Q_->rows() != dim) {
+      if(Q.rows() != dim) {
         throw std::invalid_argument("Dimensions of the data and the validation set do not match.");
       }
 
@@ -154,13 +154,12 @@ class Mrpt {
         density = density_;
       }
 
-      Q = Q_;
       k = k_;
-      n_test = Q->cols();
+      int n_test = Q.cols();
 
       grow(trees_max, depth_max, density, seed_mrpt);
       Eigen::MatrixXi exact(k, n_test);
-      compute_exact(exact);
+      compute_exact(Q, exact);
 
       recalls = std::vector<Eigen::MatrixXd>(depth_max - depth_min + 1);
       cs_sizes = std::vector<Eigen::MatrixXd>(depth_max - depth_min + 1);
@@ -174,7 +173,7 @@ class Mrpt {
         std::vector<Eigen::MatrixXd> recall_tmp(depth_max - depth_min + 1);
         std::vector<Eigen::MatrixXd> cs_size_tmp(depth_max - depth_min + 1);
 
-        count_elected(Q->col(i), Eigen::Map<Eigen::VectorXi>(exact.data() + i * k, k),
+        count_elected(Q.col(i), Eigen::Map<Eigen::VectorXi>(exact.data() + i * k, k),
          votes_max, recall_tmp, cs_size_tmp);
 
         for(int d = depth_min; d <= depth_max; ++d) {
@@ -188,18 +187,18 @@ class Mrpt {
         cs_sizes[d - depth_min] /= n_test;
       }
 
-      fit_times();
+      fit_times(Q);
       index_type = autotuned_unpruned;
       params.k = k_;
     }
 
-    void grow(double target_recall, Eigen::Map<Eigen::MatrixXf> *Q_, int k_, int trees_max = -1,
+    void grow(double target_recall, const Eigen::Map<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1,
               int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
               float density = -1.0, int seed_mrpt = 0) {
       if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
         throw std::out_of_range("Target recall must be on the interval [0,1].");
       }
-      grow(Q_, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
+      grow(Q, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
       prune(target_recall);
     }
 
@@ -741,12 +740,13 @@ class Mrpt {
     }
 
 
-    void compute_exact(Eigen::MatrixXi &out_exact) const {
+    void compute_exact(const Eigen::Map<const Eigen::MatrixXf> &Q, Eigen::MatrixXi &out_exact) const {
+      int n_test = Q.cols();
       for(int i = 0; i < n_test; ++i) {
         Eigen::VectorXi idx(n_samples);
         std::iota(idx.data(), idx.data() + n_samples, 0);
 
-        exact_knn(Q->col(i), k, idx, n_samples, out_exact.data() + i * k);
+        exact_knn(Q.col(i), k, idx, n_samples, out_exact.data() + i * k);
         std::sort(out_exact.data() + i * k, out_exact.data() + i * k + k);
       }
     }
@@ -796,8 +796,8 @@ class Mrpt {
     }
 
 
-    void fit_times() {
-      int n_test = Q->cols();
+    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q) {
+      int n_test = Q.cols();
       std::vector<double> projection_times, projection_x;
       std::vector<double> exact_times;
       std::vector<int> exact_x;
@@ -840,9 +840,9 @@ class Mrpt {
           double start_proj = omp_get_wtime();
           Eigen::VectorXf projected_query(n_random_vectors);
           if(density < 1) {
-            projected_query.noalias() = sparse_mat * Q->col(0);
+            projected_query.noalias() = sparse_mat * Q.col(0);
           } else {
-            projected_query.noalias() = dense_mat * Q->col(0);
+            projected_query.noalias() = dense_mat * Q.col(0);
           }
           double end_proj = omp_get_wtime();
           projection_times.push_back(end_proj - start_proj);
@@ -902,9 +902,9 @@ class Mrpt {
 
             Eigen::VectorXf projected_query(n_trees * depth);
             if(density < 1) {
-              projected_query.noalias() = sparse_random_matrix * Q->col(ri);
+              projected_query.noalias() = sparse_random_matrix * Q.col(ri);
             } else {
-              projected_query.noalias() = dense_random_matrix * Q->col(ri);
+              projected_query.noalias() = dense_random_matrix * Q.col(ri);
             }
 
             double start_voting = omp_get_wtime();
@@ -935,7 +935,7 @@ class Mrpt {
 
           double start_exact = omp_get_wtime();
           std::vector<int> res(k);
-          exact_knn(Q->col(ri), k, elected, s_size, &res[0]);
+          exact_knn(Q.col(ri), k, elected, s_size, &res[0]);
           double end_exact = omp_get_wtime();
           mean_exact_time += (end_exact - start_exact);
 
@@ -1173,7 +1173,6 @@ class Mrpt {
     int depth_min = 0;
     int votes_max = 0;
     int k = 0;
-    int n_test = 0; // test set size (for autotuned index)
     enum itype {normal, autotuned, autotuned_unpruned};
     itype index_type = normal;
     const double epsilon = 0.0001; // error bound for comparisons of recall levels
