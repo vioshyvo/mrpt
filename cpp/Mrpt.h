@@ -174,7 +174,7 @@ class Mrpt {
         std::vector<Eigen::MatrixXd> recall_tmp(depth_max - depth_min + 1);
         std::vector<Eigen::MatrixXd> cs_size_tmp(depth_max - depth_min + 1);
 
-        count_elected(Eigen::Map<Eigen::VectorXf>(Q->data() + i * dim, dim), Eigen::Map<Eigen::VectorXi>(exact.data() + i * k, k),
+        count_elected(Q->col(i), Eigen::Map<Eigen::VectorXi>(exact.data() + i * k, k),
          votes_max, recall_tmp, cs_size_tmp);
 
         for(int d = depth_min; d <= depth_max; ++d) {
@@ -219,7 +219,7 @@ class Mrpt {
     * @param out_n_elected - An optional output parameter for the candidate set size
     * @return
     */
-    void query(const Eigen::Map<Eigen::VectorXf> &q, int k, int votes_required, int *out,
+    void query(const Eigen::VectorXf &q, int k, int votes_required, int *out,
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
 
         if(k <= 0 || k > n_samples) {
@@ -286,7 +286,7 @@ class Mrpt {
     }
 
 
-    void query(const Eigen::Map<Eigen::VectorXf> &q, int *out, float *out_distances = nullptr,
+    void query(const Eigen::VectorXf &q, int *out, float *out_distances = nullptr,
                int *out_n_elected = nullptr) const {
       if(index_type == normal) {
         throw std::logic_error("The index is not autotuned: k and vote threshold has to be specified.");
@@ -307,7 +307,7 @@ class Mrpt {
     * @param out_distances - output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @return
     */
-    void exact_knn(const Eigen::Map<Eigen::VectorXf> &q, int k, const Eigen::VectorXi &indices,
+    void exact_knn(const Eigen::VectorXf &q, int k, const Eigen::VectorXi &indices,
       int n_elected, int *out, float *out_distances = nullptr) const {
 
         if(!n_elected) {
@@ -615,7 +615,7 @@ class Mrpt {
     }
 
 
-    void count_elected(const Eigen::Map<Eigen::VectorXf> &q, const Eigen::Map<Eigen::VectorXi> &exact, int votes_max,
+    void count_elected(const Eigen::VectorXf &q, const Eigen::Map<Eigen::VectorXi> &exact, int votes_max,
       std::vector<Eigen::MatrixXd> &recalls, std::vector<Eigen::MatrixXd> &cs_sizes) const {
         Eigen::VectorXf projected_query(n_pool);
         if (density < 1)
@@ -746,7 +746,7 @@ class Mrpt {
         Eigen::VectorXi idx(n_samples);
         std::iota(idx.data(), idx.data() + n_samples, 0);
 
-        exact_knn(Eigen::Map<Eigen::VectorXf>(Q->data() + i * dim, dim), k, idx, n_samples, out_exact.data() + i * k);
+        exact_knn(Q->col(i), k, idx, n_samples, out_exact.data() + i * k);
         std::sort(out_exact.data() + i * k, out_exact.data() + i * k + k);
       }
     }
@@ -935,7 +935,7 @@ class Mrpt {
 
           double start_exact = omp_get_wtime();
           std::vector<int> res(k);
-          exact_knn(Eigen::Map<Eigen::VectorXf>(Q->data() + ri * dim, dim), k, elected, s_size, &res[0]);
+          exact_knn(Q->col(ri), k, elected, s_size, &res[0]);
           double end_exact = omp_get_wtime();
           mean_exact_time += (end_exact - start_exact);
 
