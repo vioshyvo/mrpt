@@ -39,6 +39,11 @@ class Mrpt {
         n_samples(X_.cols()),
         dim(X_.rows()) {}
 
+    Mrpt(const Eigen::MatrixXf &X_) :
+        X(Eigen::Map<const Eigen::MatrixXf>(X_.data(), X_.rows(), X_.cols())),
+        n_samples(X_.cols()),
+        dim(X_.rows()) {}
+
     ~Mrpt() {}
 
     /**
