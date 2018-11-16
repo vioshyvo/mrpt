@@ -260,7 +260,7 @@ class Mrpt {
     * @param out_n_elected - An optional output parameter for the candidate set size
     * @return
     */
-    void query(const Eigen::VectorXf &q, int k, int votes_required, int *out,
+    void query(const Eigen::Map<const Eigen::VectorXf> &q, int k, int votes_required, int *out,
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
 
         if(k <= 0 || k > n_samples) {
@@ -326,8 +326,19 @@ class Mrpt {
         exact_knn(q, k, elected, n_elected, out, out_distances);
     }
 
+    void query(const Eigen::VectorXf &q, int k, int votes_required, int *out,
+               float *out_distances = nullptr, int *out_n_elected = nullptr) const {
+      query(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), k, votes_required,
+        out, out_distances, out_n_elected);
+    }
 
-    void query(const Eigen::VectorXf &q, int *out, float *out_distances = nullptr,
+    void query(const float *q, int k, int votes_required, int *out,
+               float *out_distances = nullptr, int *out_n_elected = nullptr) const {
+      query(Eigen::Map<const Eigen::VectorXf>(q, dim), k, votes_required,
+        out, out_distances, out_n_elected);
+    }
+
+    void query(const Eigen::Map<const Eigen::VectorXf> &q, int *out, float *out_distances = nullptr,
                int *out_n_elected = nullptr) const {
       if(index_type == normal) {
         throw std::logic_error("The index is not autotuned: k and vote threshold has to be specified.");
@@ -338,6 +349,17 @@ class Mrpt {
       query(q, k, votes, out, out_distances, out_n_elected);
     }
 
+    void query(const Eigen::VectorXf &q, int *out, float *out_distances = nullptr,
+               int *out_n_elected = nullptr) const {
+      query(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), out,
+        out_distances, out_n_elected);
+    }
+
+    void query(const float *q, int *out, float *out_distances = nullptr,
+               int *out_n_elected = nullptr) const {
+      query(Eigen::Map<const Eigen::VectorXf>(q, dim), out,
+        out_distances, out_n_elected);
+    }
 
     /**
     * find k nearest neighbors from data for the query point
@@ -348,7 +370,7 @@ class Mrpt {
     * @param out_distances - output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @return
     */
-    void exact_knn(const Eigen::VectorXf &q, int k, const Eigen::VectorXi &indices,
+    void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q, int k, const Eigen::VectorXi &indices,
       int n_elected, int *out, float *out_distances = nullptr) const {
 
         if(!n_elected) {
@@ -788,7 +810,7 @@ class Mrpt {
         Eigen::VectorXi idx(n_samples);
         std::iota(idx.data(), idx.data() + n_samples, 0);
 
-        exact_knn(Q.col(i), k, idx, n_samples, out_exact.data() + i * k);
+        exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + i * dim, dim), k, idx, n_samples, out_exact.data() + i * k);
         std::sort(out_exact.data() + i * k, out_exact.data() + i * k + k);
       }
     }
@@ -977,7 +999,7 @@ class Mrpt {
 
           double start_exact = omp_get_wtime();
           std::vector<int> res(k);
-          exact_knn(Q.col(ri), k, elected, s_size, &res[0]);
+          exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + ri * dim, dim), k, elected, s_size, &res[0]);
           double end_exact = omp_get_wtime();
           mean_exact_time += (end_exact - start_exact);
 
