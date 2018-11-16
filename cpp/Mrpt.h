@@ -202,6 +202,18 @@ class Mrpt {
       par.k = k_;
     }
 
+    void grow(const Eigen::MatrixXf &Q, int k_, int trees_max = -1, int depth_max = -1,
+       int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed_mrpt = 0) {
+       grow(Eigen::Map<const Eigen::MatrixXf>(Q.data(), Q.rows(), Q.cols()), k_, trees_max,
+          depth_max, depth_min_, votes_max_, density_, seed_mrpt);
+    }
+
+    void grow(const float *data, int n_test, int k_, int trees_max = -1, int depth_max = -1,
+       int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed_mrpt = 0) {
+       grow(Eigen::Map<const Eigen::MatrixXf>(data, dim, n_test), k_, trees_max,
+          depth_max, depth_min_, votes_max_, density_, seed_mrpt);
+    }
+
     void grow(double target_recall, const Eigen::Map<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1,
               int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
               float density = -1.0, int seed_mrpt = 0) {
@@ -209,6 +221,26 @@ class Mrpt {
         throw std::out_of_range("Target recall must be on the interval [0,1].");
       }
       grow(Q, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
+      prune(target_recall);
+    }
+
+    void grow(double target_recall, const Eigen::MatrixXf &Q, int k_, int trees_max = -1,
+              int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
+              float density = -1.0, int seed_mrpt = 0) {
+      if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
+        throw std::out_of_range("Target recall must be on the interval [0,1].");
+      }
+      grow(Q, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
+      prune(target_recall);
+    }
+
+    void grow(double target_recall, const float *data, int n_test, int k_, int trees_max = -1,
+              int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
+              float density = -1.0, int seed_mrpt = 0) {
+      if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
+        throw std::out_of_range("Target recall must be on the interval [0,1].");
+      }
+      grow(data, n_test, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed_mrpt);
       prune(target_recall);
     }
 
