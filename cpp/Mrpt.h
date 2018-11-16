@@ -370,46 +370,37 @@ class Mrpt {
     * @param out_distances - output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @return
     */
-    void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q, int k, const Eigen::VectorXi &indices,
-      int n_elected, int *out, float *out_distances = nullptr) const {
+    void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q, int k,
+      int *out, float *out_distances = nullptr) const {
 
-        if(!n_elected) {
-          for(int i = 0; i < k; ++i) out[i] = -1;
-          if(out_distances) {
-            for(int i = 0; i < k; ++i) out_distances[i] = -1;
-          }
-          return;
-        }
-
-        Eigen::VectorXf distances(n_elected);
+        Eigen::VectorXf distances(n_samples);
 
         #pragma omp parallel for
-        for (int i = 0; i < n_elected; ++i)
-            distances(i) = (X.col(indices(i)) - q).squaredNorm();
+        for (int i = 0; i < n_samples; ++i)
+            distances(i) = (X.col(i) - q).squaredNorm();
 
         if (k == 1) {
             Eigen::MatrixXf::Index index;
             distances.minCoeff(&index);
-            out[0] = n_elected ? indices(index) : -1;
+            out[0] = index;
 
             if(out_distances)
-              out_distances[0] = n_elected ? std::sqrt(distances(index)) : -1;
+              out_distances[0] = std::sqrt(distances(index));
 
             return;
         }
 
-        int n_to_sort = n_elected > k ? k : n_elected;
-        Eigen::VectorXi idx(n_elected);
-        std::iota(idx.data(), idx.data() + n_elected, 0);
-        std::partial_sort(idx.data(), idx.data() + n_to_sort, idx.data() + n_elected,
+        Eigen::VectorXi idx(n_samples);
+        std::iota(idx.data(), idx.data() + n_samples, 0);
+        std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_samples,
                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
         for (int i = 0; i < k; ++i)
-          out[i] = i < n_elected ? indices(idx(i)) : -1;
+          out[i] = idx(i);
 
         if(out_distances) {
           for(int i = 0; i < k; ++i)
-            out_distances[i] = i < n_elected ? std::sqrt(distances(idx(i))) : -1;
+            out_distances[i] = std::sqrt(distances(idx(i)));
         }
     }
 
@@ -677,6 +668,57 @@ class Mrpt {
         grow_subtree(mid, end, tree_level + 1, idx_right, n_tree, tree_projections);
     }
 
+    /**
+    * find k nearest neighbors from data for the query point
+    * @param q - query point as a vector
+    * @param k - number of neighbors searched for
+    * @param indices - indices of the points in the original matrix where the search is made
+    * @param out - output buffer for the indices of the k approximate nearest neighbors
+    * @param out_distances - output buffer for distances of the k approximate nearest neighbors (optional parameter)
+    * @return
+    */
+    void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q, int k, const Eigen::VectorXi &indices,
+      int n_elected, int *out, float *out_distances = nullptr) const {
+
+        if(!n_elected) {
+          for(int i = 0; i < k; ++i) out[i] = -1;
+          if(out_distances) {
+            for(int i = 0; i < k; ++i) out_distances[i] = -1;
+          }
+          return;
+        }
+
+        Eigen::VectorXf distances(n_elected);
+
+        #pragma omp parallel for
+        for (int i = 0; i < n_elected; ++i)
+            distances(i) = (X.col(indices(i)) - q).squaredNorm();
+
+        if (k == 1) {
+            Eigen::MatrixXf::Index index;
+            distances.minCoeff(&index);
+            out[0] = n_elected ? indices(index) : -1;
+
+            if(out_distances)
+              out_distances[0] = n_elected ? std::sqrt(distances(index)) : -1;
+
+            return;
+        }
+
+        int n_to_sort = n_elected > k ? k : n_elected;
+        Eigen::VectorXi idx(n_elected);
+        std::iota(idx.data(), idx.data() + n_elected, 0);
+        std::partial_sort(idx.data(), idx.data() + n_to_sort, idx.data() + n_elected,
+                         [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
+
+        for (int i = 0; i < k; ++i)
+          out[i] = i < n_elected ? indices(idx(i)) : -1;
+
+        if(out_distances) {
+          for(int i = 0; i < k; ++i)
+            out_distances[i] = i < n_elected ? std::sqrt(distances(idx(i))) : -1;
+        }
+    }
 
     void count_elected(const Eigen::VectorXf &q, const Eigen::Map<Eigen::VectorXi> &exact, int votes_max,
       std::vector<Eigen::MatrixXd> &recalls, std::vector<Eigen::MatrixXd> &cs_sizes) const {
