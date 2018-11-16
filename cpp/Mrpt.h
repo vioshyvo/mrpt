@@ -404,6 +404,16 @@ class Mrpt {
         }
     }
 
+    void exact_knn(const Eigen::VectorXf &q, int k, int *out,
+        float *out_distances = nullptr) const {
+      exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), k, out, out_distances);
+    }
+
+    void exact_knn(const float *q, int k, int *out,
+        float *out_distances = nullptr) const {
+      exact_knn(Eigen::Map<const Eigen::VectorXf>(q, dim), k, out, out_distances);
+    }
+
     /**
     * Saves the index to a file.
     * @param path - Filepath to the output file.
