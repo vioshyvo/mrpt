@@ -370,14 +370,16 @@ class Mrpt {
     * @param out_distances - output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @return
     */
-    void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q, int k,
-      int *out, float *out_distances = nullptr) const {
+    static void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q,
+      const Eigen::Map<const Eigen::MatrixXf> &X_, int k, int *out,
+      float *out_distances = nullptr) {
 
-        Eigen::VectorXf distances(n_samples);
+        int n_points = X_.cols();
+        Eigen::VectorXf distances(n_points);
 
         #pragma omp parallel for
-        for (int i = 0; i < n_samples; ++i)
-            distances(i) = (X.col(i) - q).squaredNorm();
+        for (int i = 0; i < n_points; ++i)
+            distances(i) = (X_.col(i) - q).squaredNorm();
 
         if (k == 1) {
             Eigen::MatrixXf::Index index;
@@ -390,9 +392,9 @@ class Mrpt {
             return;
         }
 
-        Eigen::VectorXi idx(n_samples);
-        std::iota(idx.data(), idx.data() + n_samples, 0);
-        std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_samples,
+        Eigen::VectorXi idx(n_points);
+        std::iota(idx.data(), idx.data() + n_points, 0);
+        std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_points,
                          [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
         for (int i = 0; i < k; ++i)
@@ -404,33 +406,31 @@ class Mrpt {
         }
     }
 
-    void exact_knn(const Eigen::VectorXf &q, int k, int *out,
-        float *out_distances = nullptr) const {
-      exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), k, out, out_distances);
-    }
-
-    void exact_knn(const float *q, int k, int *out,
-        float *out_distances = nullptr) const {
-      exact_knn(Eigen::Map<const Eigen::VectorXf>(q, dim), k, out, out_distances);
-    }
-
-    static void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q,
-        const Eigen::Map<const Eigen::MatrixXf> &X_, int k, int *out,
-        float *out_distances = nullptr) {
-      Mrpt mrpt(X_);
-      mrpt.exact_knn(q, k, out, out_distances);
-    }
-
     static void exact_knn(const Eigen::VectorXf &q, const Eigen::MatrixXf &X_,
         int k, int *out, float *out_distances = nullptr) {
-      Mrpt mrpt(X_);
-      mrpt.exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), q.size()), k, out, out_distances);
+      Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), q.size()),
+        Eigen::Map<const Eigen::MatrixXf>(X_.data(), X_.rows(), X_.cols()), k, out, out_distances);
     }
 
     static void exact_knn(const float *q, const float *X_, int dim_, int n_samples_,
         int k, int *out, float *out_distances = nullptr) {
-      Mrpt mrpt(X_, dim_, n_samples_);
-      mrpt.exact_knn(Eigen::Map<const Eigen::VectorXf>(q, dim_), k, out, out_distances);
+      Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q, dim_),
+        Eigen::Map<const Eigen::MatrixXf>(X_, dim_, n_samples_), k, out, out_distances);
+    }
+
+    void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q, int k, int *out,
+        float *out_distances = nullptr) const {
+      Mrpt::exact_knn(q, X, k, out, out_distances);
+    }
+
+    void exact_knn(const Eigen::VectorXf &q, int k, int *out,
+        float *out_distances = nullptr) const {
+      Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), X, k, out, out_distances);
+    }
+
+    void exact_knn(const float *q, int k, int *out,
+        float *out_distances = nullptr) const {
+      Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q, dim), X, k, out, out_distances);
     }
 
     /**
