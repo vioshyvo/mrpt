@@ -371,39 +371,43 @@ class Mrpt {
     * @return
     */
     static void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q,
-      const Eigen::Map<const Eigen::MatrixXf> &X_, int k, int *out,
-      float *out_distances = nullptr) {
+       const Eigen::Map<const Eigen::MatrixXf> &X_, int k, int *out,
+       float *out_distances = nullptr) {
 
-        int n_points = X_.cols();
-        Eigen::VectorXf distances(n_points);
+      int n_points = X_.cols();
+      if(k < 1 || k > n_points) {
+        throw std::out_of_range("k must be positive and no greater than the sample size of data X_.");
+      }
 
-        #pragma omp parallel for
-        for (int i = 0; i < n_points; ++i)
-            distances(i) = (X_.col(i) - q).squaredNorm();
+      Eigen::VectorXf distances(n_points);
 
-        if (k == 1) {
-            Eigen::MatrixXf::Index index;
-            distances.minCoeff(&index);
-            out[0] = index;
+      #pragma omp parallel for
+      for (int i = 0; i < n_points; ++i)
+          distances(i) = (X_.col(i) - q).squaredNorm();
 
-            if(out_distances)
-              out_distances[0] = std::sqrt(distances(index));
+      if (k == 1) {
+          Eigen::MatrixXf::Index index;
+          distances.minCoeff(&index);
+          out[0] = index;
 
-            return;
-        }
+          if(out_distances)
+            out_distances[0] = std::sqrt(distances(index));
 
-        Eigen::VectorXi idx(n_points);
-        std::iota(idx.data(), idx.data() + n_points, 0);
-        std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_points,
-                         [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
+          return;
+      }
 
-        for (int i = 0; i < k; ++i)
-          out[i] = idx(i);
+      Eigen::VectorXi idx(n_points);
+      std::iota(idx.data(), idx.data() + n_points, 0);
+      std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_points,
+                       [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
-        if(out_distances) {
-          for(int i = 0; i < k; ++i)
-            out_distances[i] = std::sqrt(distances(idx(i)));
-        }
+      for (int i = 0; i < k; ++i)
+        out[i] = idx(i);
+
+      if(out_distances) {
+        for(int i = 0; i < k; ++i)
+          out_distances[i] = std::sqrt(distances(idx(i)));
+      }
     }
 
     static void exact_knn(const Eigen::VectorXf &q, const Eigen::MatrixXf &X_,
