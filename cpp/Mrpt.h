@@ -989,22 +989,14 @@ class Mrpt {
       return fit_theil_sen(projection_x, projection_times);
     }
 
-
-    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
-                   const std::vector<Eigen::MatrixXd> &recalls) {
-
-      std::vector<int> exact_x;
-      beta_projection = fit_projection_times(Q, exact_x);
-
+    std::vector<std::map<int,std::pair<double,double>>> fit_voting_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
+        std::vector<int> &s_tested) {
       int n_test = Q.cols();
-      std::vector<double> exact_times;
-
       long double idx_sum = 0;
 
       std::random_device rd;
       std::mt19937 rng(rd());
       std::uniform_int_distribution<int> uni(0, n_test-1);
-      std::uniform_int_distribution<int> uni2(0, n_samples-1);
 
       std::vector<int> tested_trees {1,2,3,4,5,7,10,15,20,25,30,40,50};
       int n_tested_trees = 10;
@@ -1015,16 +1007,13 @@ class Mrpt {
           tested_trees.push_back(i * incr);
         }
 
-      // remove tested tree numbers that are larger than the number of trees in the index
-      std::sort(tested_trees.begin(), tested_trees.end());
-      auto tt = tested_trees.begin();
-      for(; tt != tested_trees.end() && *tt <= n_trees; ++tt);
-      tested_trees.erase(tt, tested_trees.end());
+      int nt = n_trees;
+      auto end = std::remove_if(tested_trees.begin(), tested_trees.end(), [nt](int t) { return t > nt; });
+      tested_trees.erase(end, tested_trees.end());
 
-      std::vector<int> s_tested {1,2,5,10,20,35,50,75,100,150,200,300,400,500};
+      s_tested = {1,2,5,10,20,35,50,75,100,150,200,300,400,500};
       int s_max = n_samples / 20;
       int n_s_tested = 20;
-      std::vector<double> ex;
       int increment = s_max / n_s_tested;
       for(int i = 1; i <= n_s_tested; ++i)
         if(std::find(s_tested.begin(), s_tested.end(), i * increment) == s_tested.end()) {
@@ -1085,7 +1074,29 @@ class Mrpt {
         }
         beta_voting.push_back(beta);
       }
+      return beta_voting;
+    }
 
+
+    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
+                   const std::vector<Eigen::MatrixXd> &recalls) {
+
+      std::vector<int> exact_x, s_tested;
+      beta_projection = fit_projection_times(Q, exact_x);
+      beta_voting = fit_voting_times(Q, s_tested);
+
+      int n_test = Q.cols();
+      std::vector<double> exact_times;
+
+      long double idx_sum = 0;
+
+      std::random_device rd;
+      std::mt19937 rng(rd());
+      std::uniform_int_distribution<int> uni(0, n_test-1);
+      std::uniform_int_distribution<int> uni2(0, n_samples-1);
+
+
+      std::vector<double> ex;
       int n_sim = 100;
       for(int i = 0; i < s_tested.size(); ++i) {
         double mean_exact_time = 0;
