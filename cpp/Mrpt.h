@@ -937,23 +937,14 @@ class Mrpt {
       }
     }
 
+
     std::pair<double,double> fit_projection_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
           std::vector<int> &exact_x) {
       std::vector<double> projection_times, projection_x;
       long double idx_sum = 0;
 
       std::vector<int> tested_trees {1,2,3,4,5,7,10,15,20,25,30,40,50};
-      int n_tested_trees = 10;
-      n_tested_trees = n_trees > n_tested_trees ? n_tested_trees : n_trees;
-      int incr = n_trees / n_tested_trees;
-      for(int i = 1; i <= n_tested_trees; ++i)
-        if(std::find(tested_trees.begin(), tested_trees.end(), i * incr) == tested_trees.end() && i * incr <= n_trees) {
-          tested_trees.push_back(i * incr);
-        }
-
-      int nt = n_trees;
-      auto end = std::remove_if(tested_trees.begin(), tested_trees.end(), [nt](int t) { return t > nt; });
-      tested_trees.erase(end, tested_trees.end());
+      generate_x(tested_trees, n_trees, 10, n_trees);
 
       for(int d = depth_min; d <= depth; ++d) {
         for(int i = 0; i < tested_trees.size(); ++i) {
@@ -992,6 +983,7 @@ class Mrpt {
       return fit_theil_sen(projection_x, projection_times);
     }
 
+
     std::vector<std::map<int,std::pair<double,double>>> fit_voting_times(const Eigen::Map<const Eigen::MatrixXf> &Q) {
       int n_test = Q.cols();
 
@@ -1000,32 +992,9 @@ class Mrpt {
       std::uniform_int_distribution<int> uni(0, n_test-1);
 
       std::vector<int> tested_trees {1,2,3,4,5,7,10,15,20,25,30,40,50};
-      int n_tested_trees = 10;
-      n_tested_trees = n_trees > n_tested_trees ? n_tested_trees : n_trees;
-      int incr = n_trees / n_tested_trees;
-      for(int i = 1; i <= n_tested_trees; ++i)
-        if(std::find(tested_trees.begin(), tested_trees.end(), i * incr) == tested_trees.end()) {
-          tested_trees.push_back(i * incr);
-        }
-
-      int nt = n_trees;
-      auto end = std::remove_if(tested_trees.begin(), tested_trees.end(), [nt](int t) { return t > nt; });
-      tested_trees.erase(end, tested_trees.end());
-
-      std::vector<double> vote_thresholds_x {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-      int n_votes = 10; // for how many different vote thresholds voting is tested
-      n_votes = votes_max > n_votes ? n_votes : votes_max;
-      int inc = votes_max / n_votes;
-      for(int i = 1; i <= n_votes; ++i)
-        if(std::find(vote_thresholds_x.begin(), vote_thresholds_x.end(), i * inc) == vote_thresholds_x.end()) {
-          vote_thresholds_x.push_back(i * inc);
-        }
-
-      // remove tested vote thresholds that are larger than the preset maximum vote threshold
-      std::sort(vote_thresholds_x.begin(), vote_thresholds_x.end());
-      auto vt = vote_thresholds_x.begin();
-      for(; vt != vote_thresholds_x.end() && *vt <= votes_max; ++vt);
-      vote_thresholds_x.erase(vt, vote_thresholds_x.end());
+      generate_x(tested_trees, n_trees, 10, n_trees);
+      std::vector<int> vote_thresholds_x {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+      generate_x(vote_thresholds_x, votes_max, 10, votes_max);
 
       beta_voting = std::vector<std::map<int,std::pair<double,double>>>();
 
@@ -1065,10 +1034,11 @@ class Mrpt {
       return beta_voting;
     }
 
-    void generate_x(std::vector<int> &x, int max_generated, int n_tested, int max_val) {
+    static void generate_x(std::vector<int> &x, int max_generated, int n_tested, int max_val) {
+      n_tested = max_generated > n_tested ? n_tested : max_val;
       int increment = max_generated / n_tested;
       for(int i = 1; i <= n_tested; ++i)
-        if(std::find(x.begin(), x.end(), i * increment) == x.end()) {
+        if(std::find(x.begin(), x.end(), i * increment) == x.end() && i * increment <= max_generated) {
           x.push_back(i * increment);
         }
 
