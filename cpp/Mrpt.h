@@ -1119,14 +1119,7 @@ class Mrpt {
       return fit_theil_sen(ex, exact_times);
     }
 
-    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
-                   const std::vector<Eigen::MatrixXd> &recalls) {
-
-      std::vector<int> exact_x, s_tested;
-      beta_projection = fit_projection_times(Q, exact_x);
-      beta_voting = fit_voting_times(Q, s_tested);
-      beta_exact = fit_exact_times(Q, s_tested);
-
+    std::set<Mrpt_Parameters,decltype(is_faster)*> estimate_query_times(const std::vector<Eigen::MatrixXd> &recalls) {
       std::set<Mrpt_Parameters,decltype(is_faster)*> pars(is_faster);
       std::vector<Eigen::MatrixXd> query_times(depth - depth_min + 1);
       for(int d = depth_min; d <= depth; ++d) {
@@ -1149,6 +1142,18 @@ class Mrpt {
         }
         query_times[d - depth_min] = query_time;
       }
+      return pars;
+    }
+
+    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
+                   const std::vector<Eigen::MatrixXd> &recalls) {
+
+      std::vector<int> exact_x, s_tested;
+      beta_projection = fit_projection_times(Q, exact_x);
+      beta_voting = fit_voting_times(Q, s_tested);
+      beta_exact = fit_exact_times(Q, s_tested);
+
+      std::set<Mrpt_Parameters,decltype(is_faster)*> pars = estimate_query_times(recalls);
 
       opt_pars = std::set<Mrpt_Parameters,decltype(is_faster)*>(is_faster);
       double best_recall = -1.0;
