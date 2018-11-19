@@ -992,7 +992,6 @@ class Mrpt {
     std::vector<std::map<int,std::pair<double,double>>> fit_voting_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
         std::vector<int> &s_tested) {
       int n_test = Q.cols();
-      long double idx_sum = 0;
 
       std::random_device rd;
       std::mt19937 rng(rd());
@@ -1046,6 +1045,7 @@ class Mrpt {
       for(int d = depth_min; d <= depth; ++d) {
         std::map<int,std::pair<double,double>> beta;
         for(const auto &v : vote_thresholds_x) {
+          long double idx_sum = 0;
           std::vector<double> voting_times, voting_x;
 
           for(int i = 0; i < tested_trees.size(); ++i) {
@@ -1070,6 +1070,7 @@ class Mrpt {
             for(int i = 0; i < n_el; ++i)
               idx_sum += elected(i);
           }
+          voting_x[0] += idx_sum > 1.0 ? 0.0 : 0.00001;
           beta[v] = fit_theil_sen(voting_x, voting_times);
         }
         beta_voting.push_back(beta);
@@ -1077,24 +1078,17 @@ class Mrpt {
       return beta_voting;
     }
 
-
-    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
-                   const std::vector<Eigen::MatrixXd> &recalls) {
-
-      std::vector<int> exact_x, s_tested;
-      beta_projection = fit_projection_times(Q, exact_x);
-      beta_voting = fit_voting_times(Q, s_tested);
+    std::pair<double,double> fit_exact_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
+        const std::vector<int> &s_tested) {
 
       int n_test = Q.cols();
       std::vector<double> exact_times;
-
       long double idx_sum = 0;
 
       std::random_device rd;
       std::mt19937 rng(rd());
       std::uniform_int_distribution<int> uni(0, n_test-1);
       std::uniform_int_distribution<int> uni2(0, n_samples-1);
-
 
       std::vector<double> ex;
       int n_sim = 100;
@@ -1118,12 +1112,20 @@ class Mrpt {
           for(int l = 0; l < k; ++l)
             idx_sum += res[l];
         }
-
         mean_exact_time /= n_sim;
         exact_times.push_back(mean_exact_time);
       }
+      ex[0] += idx_sum > 1.0 ? 0.0 : 0.00001;
+      return fit_theil_sen(ex, exact_times);
+    }
 
-      beta_exact = fit_theil_sen(ex, exact_times);
+    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
+                   const std::vector<Eigen::MatrixXd> &recalls) {
+
+      std::vector<int> exact_x, s_tested;
+      beta_projection = fit_projection_times(Q, exact_x);
+      beta_voting = fit_voting_times(Q, s_tested);
+      beta_exact = fit_exact_times(Q, s_tested);
 
       std::set<Mrpt_Parameters,decltype(is_faster)*> pars(is_faster);
       std::vector<Eigen::MatrixXd> query_times(depth - depth_min + 1);
@@ -1147,9 +1149,6 @@ class Mrpt {
         }
         query_times[d - depth_min] = query_time;
       }
-
-      // Just to make sure that the compiler does not optimize away timed code.
-      pars.begin()->estimated_recall += idx_sum > 1.0 ? 0.0000 : 0.0001;
 
       opt_pars = std::set<Mrpt_Parameters,decltype(is_faster)*>(is_faster);
       double best_recall = -1.0;
