@@ -197,7 +197,10 @@ class Mrpt {
         cs_sizes[d - depth_min] /= n_test;
       }
 
-      fit_times(Q, recalls);
+      fit_times(Q);
+      std::set<Mrpt_Parameters,decltype(is_faster)*> pars = list_parameters(recalls);
+      opt_pars = pareto_frontier(pars);
+
       index_type = autotuned_unpruned;
       par.k = k_;
     }
@@ -1119,7 +1122,7 @@ class Mrpt {
       return fit_theil_sen(ex, exact_times);
     }
 
-    std::set<Mrpt_Parameters,decltype(is_faster)*> estimate_query_times(const std::vector<Eigen::MatrixXd> &recalls) {
+    std::set<Mrpt_Parameters,decltype(is_faster)*> list_parameters(const std::vector<Eigen::MatrixXd> &recalls) {
       std::set<Mrpt_Parameters,decltype(is_faster)*> pars(is_faster);
       std::vector<Eigen::MatrixXd> query_times(depth - depth_min + 1);
       for(int d = depth_min; d <= depth; ++d) {
@@ -1145,16 +1148,7 @@ class Mrpt {
       return pars;
     }
 
-    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
-                   const std::vector<Eigen::MatrixXd> &recalls) {
-
-      std::vector<int> exact_x, s_tested;
-      beta_projection = fit_projection_times(Q, exact_x);
-      beta_voting = fit_voting_times(Q, s_tested);
-      beta_exact = fit_exact_times(Q, s_tested);
-
-      std::set<Mrpt_Parameters,decltype(is_faster)*> pars = estimate_query_times(recalls);
-
+    std::set<Mrpt_Parameters,decltype(is_faster)*> pareto_frontier(const std::set<Mrpt_Parameters,decltype(is_faster)*> &pars) {
       opt_pars = std::set<Mrpt_Parameters,decltype(is_faster)*>(is_faster);
       double best_recall = -1.0;
       for(const auto &p : pars) // compute pareto frontier for query times and recalls
@@ -1162,6 +1156,14 @@ class Mrpt {
           opt_pars.insert(p);
           best_recall = p.estimated_recall;
         }
+      return opt_pars;
+    }
+
+    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q) {
+      std::vector<int> exact_x, s_tested;
+      beta_projection = fit_projection_times(Q, exact_x);
+      beta_voting = fit_voting_times(Q, s_tested);
+      beta_exact = fit_exact_times(Q, s_tested);
     }
 
     static std::pair<double,double> fit_theil_sen(const std::vector<double> &x,
