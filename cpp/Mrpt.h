@@ -992,8 +992,7 @@ class Mrpt {
       return fit_theil_sen(projection_x, projection_times);
     }
 
-    std::vector<std::map<int,std::pair<double,double>>> fit_voting_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
-        std::vector<int> &s_tested) {
+    std::vector<std::map<int,std::pair<double,double>>> fit_voting_times(const Eigen::Map<const Eigen::MatrixXf> &Q) {
       int n_test = Q.cols();
 
       std::random_device rd;
@@ -1012,21 +1011,6 @@ class Mrpt {
       int nt = n_trees;
       auto end = std::remove_if(tested_trees.begin(), tested_trees.end(), [nt](int t) { return t > nt; });
       tested_trees.erase(end, tested_trees.end());
-
-      s_tested = {1,2,5,10,20,35,50,75,100,150,200,300,400,500};
-      int s_max = n_samples / 20;
-      int n_s_tested = 20;
-      int increment = s_max / n_s_tested;
-      for(int i = 1; i <= n_s_tested; ++i)
-        if(std::find(s_tested.begin(), s_tested.end(), i * increment) == s_tested.end()) {
-          s_tested.push_back(i * increment);
-        }
-
-      // remove candidate set sizes that are larger than the size of the data set
-      std::sort(s_tested.begin(), s_tested.end());
-      auto s = s_tested.begin();
-      for(; s != s_tested.end() && *s <= n_samples; ++s);
-      s_tested.erase(s, s_tested.end());
 
       std::vector<double> vote_thresholds_x {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
       int n_votes = 10; // for how many different vote thresholds voting is tested
@@ -1081,8 +1065,21 @@ class Mrpt {
       return beta_voting;
     }
 
-    std::pair<double,double> fit_exact_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
-        const std::vector<int> &s_tested) {
+    void generate_x(std::vector<int> &x, int max_generated, int n_tested, int max_val) {
+      int increment = max_generated / n_tested;
+      for(int i = 1; i <= n_tested; ++i)
+        if(std::find(x.begin(), x.end(), i * increment) == x.end()) {
+          x.push_back(i * increment);
+        }
+
+      auto end = std::remove_if(x.begin(), x.end(), [max_val](int t) { return t > max_val; });
+      x.erase(end, x.end());
+    }
+
+
+    std::pair<double,double> fit_exact_times(const Eigen::Map<const Eigen::MatrixXf> &Q) {
+      std::vector<int> s_tested {1,2,5,10,20,35,50,75,100,150,200,300,400,500};
+      generate_x(s_tested, n_samples / 20, 20, n_samples);
 
       int n_test = Q.cols();
       std::vector<double> exact_times;
@@ -1160,10 +1157,10 @@ class Mrpt {
     }
 
     void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q) {
-      std::vector<int> exact_x, s_tested;
+      std::vector<int> exact_x;
       beta_projection = fit_projection_times(Q, exact_x);
-      beta_voting = fit_voting_times(Q, s_tested);
-      beta_exact = fit_exact_times(Q, s_tested);
+      beta_voting = fit_voting_times(Q);
+      beta_exact = fit_exact_times(Q);
     }
 
     static std::pair<double,double> fit_theil_sen(const std::vector<double> &x,
@@ -1330,7 +1327,6 @@ class Mrpt {
     }
 
     const Eigen::Map<const Eigen::MatrixXf> X; // the data matrix
-    Eigen::Map<Eigen::MatrixXf> *Q; // validation set
     Eigen::MatrixXf split_points; // all split points in all trees
     std::vector<std::vector<int>> tree_leaves; // contains all leaves of all trees
     Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> dense_random_matrix; // random vectors needed for all the RP-trees
@@ -1347,13 +1343,14 @@ class Mrpt {
     int n_pool = 0; // amount of random vectors needed for all the RP-trees
     int n_array = 0; // length of the one RP-tree as array
     int votes = 0; // optimal number of votes to use
-    int depth_min = 0;
-    int votes_max = 0;
     int k = 0;
     enum itype {normal, autotuned, autotuned_unpruned};
     itype index_type = normal;
-    const double epsilon = 0.0001; // error bound for comparisons of recall levels
 
+    // Member variables used in autotuning:
+    int depth_min = 0;
+    int votes_max = 0;
+    const double epsilon = 0.0001; // error bound for comparisons of recall levels
     std::vector<Eigen::MatrixXd> cs_sizes;
     std::pair<double,double> beta_projection, beta_exact;
     std::vector<std::map<int,std::pair<double,double>>> beta_voting;
