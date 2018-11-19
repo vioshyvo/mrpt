@@ -171,7 +171,7 @@ class Mrpt {
       Eigen::MatrixXi exact(k, n_test);
       compute_exact(Q, exact);
 
-      recalls = std::vector<Eigen::MatrixXd>(depth_max - depth_min + 1);
+      std::vector<Eigen::MatrixXd> recalls(depth_max - depth_min + 1);
       cs_sizes = std::vector<Eigen::MatrixXd>(depth_max - depth_min + 1);
 
       for(int d = depth_min; d <= depth_max; ++d) {
@@ -197,7 +197,7 @@ class Mrpt {
         cs_sizes[d - depth_min] /= n_test;
       }
 
-      fit_times(Q);
+      fit_times(Q, recalls);
       index_type = autotuned_unpruned;
       par.k = k_;
     }
@@ -934,34 +934,23 @@ class Mrpt {
       }
     }
 
-
-    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q) {
-      int n_test = Q.cols();
+    std::pair<double,double> fit_projection_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
+          std::vector<int> &exact_x) {
       std::vector<double> projection_times, projection_x;
-      std::vector<double> exact_times;
-      std::vector<int> exact_x;
-
       long double idx_sum = 0;
-
-      std::random_device rd;
-      std::mt19937 rng(rd());
-      std::uniform_int_distribution<int> uni(0, n_test-1);
-      std::uniform_int_distribution<int> uni2(0, n_samples-1);
 
       std::vector<int> tested_trees {1,2,3,4,5,7,10,15,20,25,30,40,50};
       int n_tested_trees = 10;
       n_tested_trees = n_trees > n_tested_trees ? n_tested_trees : n_trees;
       int incr = n_trees / n_tested_trees;
       for(int i = 1; i <= n_tested_trees; ++i)
-        if(std::find(tested_trees.begin(), tested_trees.end(), i * incr) == tested_trees.end()) {
+        if(std::find(tested_trees.begin(), tested_trees.end(), i * incr) == tested_trees.end() && i * incr <= n_trees) {
           tested_trees.push_back(i * incr);
         }
 
-      // remove tested tree numbers that are larger than the number of trees in the index
-      std::sort(tested_trees.begin(), tested_trees.end());
-      auto tt = tested_trees.begin();
-      for(; tt != tested_trees.end() && *tt <= n_trees; ++tt);
-      tested_trees.erase(tt, tested_trees.end());
+      int nt = n_trees;
+      auto end = std::remove_if(tested_trees.begin(), tested_trees.end(), [nt](int t) { return t > nt; });
+      tested_trees.erase(end, tested_trees.end());
 
       for(int d = depth_min; d <= depth; ++d) {
         for(int i = 0; i < tested_trees.size(); ++i) {
@@ -994,6 +983,43 @@ class Mrpt {
           }
         }
       }
+
+      // use results ensure that compiler does not optimize away the timed code.
+      projection_x[0] += idx_sum > 1.0 ? 0.0000 : 0.0001;
+      return fit_theil_sen(projection_x, projection_times);
+    }
+
+
+    void fit_times(const Eigen::Map<const Eigen::MatrixXf> &Q,
+                   const std::vector<Eigen::MatrixXd> &recalls) {
+
+      std::vector<int> exact_x;
+      beta_projection = fit_projection_times(Q, exact_x);
+
+      int n_test = Q.cols();
+      std::vector<double> exact_times;
+
+      long double idx_sum = 0;
+
+      std::random_device rd;
+      std::mt19937 rng(rd());
+      std::uniform_int_distribution<int> uni(0, n_test-1);
+      std::uniform_int_distribution<int> uni2(0, n_samples-1);
+
+      std::vector<int> tested_trees {1,2,3,4,5,7,10,15,20,25,30,40,50};
+      int n_tested_trees = 10;
+      n_tested_trees = n_trees > n_tested_trees ? n_tested_trees : n_trees;
+      int incr = n_trees / n_tested_trees;
+      for(int i = 1; i <= n_tested_trees; ++i)
+        if(std::find(tested_trees.begin(), tested_trees.end(), i * incr) == tested_trees.end()) {
+          tested_trees.push_back(i * incr);
+        }
+
+      // remove tested tree numbers that are larger than the number of trees in the index
+      std::sort(tested_trees.begin(), tested_trees.end());
+      auto tt = tested_trees.begin();
+      for(; tt != tested_trees.end() && *tt <= n_trees; ++tt);
+      tested_trees.erase(tt, tested_trees.end());
 
       std::vector<int> s_tested {1,2,5,10,20,35,50,75,100,150,200,300,400,500};
       int s_max = n_samples / 20;
@@ -1086,11 +1112,10 @@ class Mrpt {
         exact_times.push_back(mean_exact_time);
       }
 
-      beta_projection = fit_theil_sen(projection_x, projection_times);
       beta_exact = fit_theil_sen(ex, exact_times);
 
       std::set<Mrpt_Parameters,decltype(is_faster)*> pars(is_faster);
-      query_times = std::vector<Eigen::MatrixXd>(depth - depth_min + 1);
+      std::vector<Eigen::MatrixXd> query_times(depth - depth_min + 1);
       for(int d = depth_min; d <= depth; ++d) {
         Eigen::MatrixXd query_time = Eigen::MatrixXd::Zero(votes_max, n_trees);
 
@@ -1105,7 +1130,7 @@ class Mrpt {
             p.votes = v;
             p.k = k;
             p.estimated_qtime = qt;
-            p.estimated_recall = get_recall(t, d, v);
+            p.estimated_recall = recalls[d - depth_min](v - 1, t - 1);
             pars.insert(p);
           }
         }
@@ -1256,10 +1281,6 @@ class Mrpt {
       return beta.first + beta.second * x;
     }
 
-    double get_recall(int tree, int depth, int v) const {
-      return recalls[depth - depth_min](v - 1, tree - 1);
-    }
-
     double get_candidate_set_size(int tree, int depth, int v) const {
       return cs_sizes[depth - depth_min](v - 1, tree - 1);
     }
@@ -1316,7 +1337,7 @@ class Mrpt {
     itype index_type = normal;
     const double epsilon = 0.0001; // error bound for comparisons of recall levels
 
-    std::vector<Eigen::MatrixXd> recalls, cs_sizes, query_times;
+    std::vector<Eigen::MatrixXd> cs_sizes;
     std::pair<double,double> beta_projection, beta_exact;
     std::vector<std::map<int,std::pair<double,double>>> beta_voting;
     std::set<Mrpt_Parameters,decltype(is_faster)*> opt_pars;
