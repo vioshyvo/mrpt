@@ -18,12 +18,12 @@
 
 
 struct Mrpt_Parameters {
-  int n_trees = 0;
-  int depth = 0;
-  int votes = 0;
-  int k = 0;
-  double estimated_qtime = 0.0;
-  mutable double estimated_recall = 0.0;
+  int n_trees = 0; /**< Number of trees of the index. */
+  int depth = 0; /**< Depth of the trees of the index. */
+  int k = 0; /**< Number of nearest neighbors searched for (if the index is autotuned; otherwise 0). */
+  int votes = 0; /**< Optimal vote threshold (if the index is autotuned and the target recall is set; otherwise 0). */
+  double estimated_qtime = 0.0; /**< Estimated query time (if the index is autotuned and the target recall is set; otherwise 0.0). */
+  double estimated_recall = 0.0; /**< Estimated recall (if the index is autotuned and the target recall is set; otherwise 0.0). */
 };
 
 class Mrpt {
@@ -82,10 +82,12 @@ class Mrpt {
     * Builds a normal (not autotuned) index.
     *
     * @param n_trees_ number of trees to be grown
-    * @param depth_ depth of the trees; on the range [1, log2(n_samples)]
+    * @param depth_ depth of the trees; on the set
+    * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$, where \f$n \f$ is the number
+    * of data points
     * @param density_ expected proportion of non-zero components of
-    * random vectors; on the interval (0,1]; default value sets density to
-    * 1 / sqrt(dim)
+    * random vectors; on the interval \f$(0,1]\f$; default value sets density to
+    * \f$ 1 / \sqrt{d} \f$, where \f$d\f$ is the dimension of data
     * @param seed seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with std::random_device
     */
@@ -166,15 +168,21 @@ class Mrpt {
     * (col = data point, row = dimension).
     * @param k_ number of nearest neighbors searched for
     * @param trees_max number of trees grown; default value -1 sets this to
-    * min(sqrt(dim, n_samples), 1000)
-    * @param depth_max depth of trees grown; default value -1 sets this to
-    * log2(n_samples) - 4
+    * \f$ \mathrm{min}(\sqrt{d}, 1000)\f$, where \f$d\f$ is the dimension of data.
+    * @param depth_max depth of trees grown; ; on the set
+    * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$, where \f$n \f$
+    * is the number of data points; default value -1 sets this to
+    * \f$ \log_2(n) - 4 \f$, where \f$n\f$ is the number of data points
     * @param depth_min_ minimum depth of trees considered when searching for
-    * optimal parameters; a default value -1 sets this to 5
+    * optimal parameters on the set
+    * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
+    * sets this to 5
     * @param votes_max_ maximum number of votes considered when searching for
-    * optimal parameters; a default value -1 sets this to max(trees_max / 10, 10)
-    * @density expected proportion of non-zero components of random vectors;
-    * default value -1.0 sets this to sqrt(dim)
+    * optimal parameters; a default value -1 sets this to
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * @param density expected proportion of non-zero components of random vectors;
+    * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
+    * the dimension of data
     * @param seed seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with std::random_device
     */
@@ -430,7 +438,7 @@ class Mrpt {
     * that it is a fastest (measured by query time) parameter combination
     * to obtain as least as high recall level that it has.
     *
-    * @return vector of optimal paramters
+    * @return vector of optimal parameters
     */
 
     std::vector<Mrpt_Parameters> optimal_parameters() const {
@@ -559,7 +567,7 @@ class Mrpt {
     /** @name Approximate k-nn search using autotuned index
     * Approximate k-nn search using an autotuned index. Finds k approximate
     * nearest neighbors from a data set X for a query point q. Because the index
-    * is not autotuned, no paramters other than a query point and an output are
+    * is not autotuned, no parameters other than a query point and an output are
     * required: k is preset, and the optimal vote count is used automatically.
     * The indices of k nearest neighbors are written to a buffer out, which has
     * to be preallocated to have at least length k. Optionally also Euclidean
@@ -866,6 +874,15 @@ class Mrpt {
         fclose(fd);
         return true;
     }
+
+    /**@}*/
+
+    /** @name
+    * Friend declarations for test fixtures. Tests are located at
+    * https://github.com/vioshyvo/RP-test.
+    */
+    friend class MrptTest;
+    friend class UtilityTest;
 
     /**@}*/
 
@@ -1537,12 +1554,6 @@ class Mrpt {
            + get_voting_time(tree, depth, v)
            + get_exact_time(tree, depth, v);
     }
-
-
-    // Friend declarations for the test fixture.
-    // Tests are located at https://github.com/vioshyvo/RP-test
-    friend class MrptTest;
-    friend class UtilityTest;
 
     const Eigen::Map<const Eigen::MatrixXf> X; // the data matrix
     Eigen::MatrixXf split_points; // all split points in all trees
