@@ -42,10 +42,10 @@ class Mrpt {
     *
     * @param X_ Eigen map which refers to the array containing the data set
     */
-    Mrpt(const Eigen::Map<const Eigen::MatrixXf> &X_) :
-        X(X_),
-        n_samples(X_.cols()),
-        dim(X_.rows()) {}
+    // Mrpt(const Eigen::Map<const Eigen::MatrixXf> &X_) :
+    //     X(X_),
+    //     n_samples(X_.cols()),
+    //     dim(X_.rows()) {}
 
     /**
     * A constructor taking the data as an Eigen matrix.
@@ -53,7 +53,7 @@ class Mrpt {
     * @param X_ Eigen matrix containing the data set
     */
 
-    Mrpt(const Eigen::MatrixXf &X_) :
+    Mrpt(const Eigen::Ref<const Eigen::MatrixXf> &X_) :
         X(Eigen::Map<const Eigen::MatrixXf>(X_.data(), X_.rows(), X_.cols())),
         n_samples(X_.cols()),
         dim(X_.rows()) {}
@@ -186,7 +186,7 @@ class Mrpt {
     * @param seed seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with std::random_device
     */
-    void grow(double target_recall, const Eigen::Map<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1,
+    void grow(double target_recall, const Eigen::Ref<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1,
               int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
               float density = -1.0, int seed = 0) {
       if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
@@ -202,15 +202,15 @@ class Mrpt {
     * @param target_recall target recall level; on the range [0,1]
     * @param Q Eigen matrix containing the test queries.
     */
-    void grow(double target_recall, const Eigen::MatrixXf &Q, int k_, int trees_max = -1,
-              int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
-              float density = -1.0, int seed = 0) {
-      if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
-        throw std::out_of_range("Target recall must be on the interval [0,1].");
-      }
-      grow(Q, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed);
-      prune(target_recall);
-    }
+    // void grow(double target_recall, const Eigen::MatrixXf &Q, int k_, int trees_max = -1,
+    //           int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
+    //           float density = -1.0, int seed = 0) {
+    //   if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
+    //     throw std::out_of_range("Target recall must be on the interval [0,1].");
+    //   }
+    //   grow(Q, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed);
+    //   prune(target_recall);
+    // }
 
     /** Grow an autotuned index. A version which takes the test queries as
     * a float pointer.
@@ -269,7 +269,7 @@ class Mrpt {
     *
     * @param Q Eigen map containing the test queries.
     **/
-    void grow(const Eigen::Map<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1, int depth_max = -1,
+    void grow(const float *data, int n_test, int k_, int trees_max = -1, int depth_max = -1,
        int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
 
       if(k_ <= 0 || k_ > n_samples) {
@@ -296,10 +296,6 @@ class Mrpt {
         throw std::out_of_range("The density must be on the interval (0,1].");
       }
 
-      if(Q.rows() != dim) {
-        throw std::invalid_argument("Dimensions of the data and the validation set do not match.");
-      }
-
       if(trees_max == - 1) {
         trees_max = std::min(std::sqrt(n_samples), 1000.0);
       }
@@ -323,7 +319,7 @@ class Mrpt {
       }
 
       k = k_;
-      int n_test = Q.cols();
+      const Eigen::Map<const Eigen::MatrixXf> Q(data, dim, n_test);
 
       grow(trees_max, depth_max, density, seed);
       Eigen::MatrixXi exact(k, n_test);
@@ -368,11 +364,11 @@ class Mrpt {
     *
     * @param Q Eigen matrix containing the test queries.
     */
-    void grow(const Eigen::MatrixXf &Q, int k_, int trees_max = -1, int depth_max = -1,
-       int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
-       grow(Eigen::Map<const Eigen::MatrixXf>(Q.data(), Q.rows(), Q.cols()), k_, trees_max,
-          depth_max, depth_min_, votes_max_, density_, seed);
-    }
+    // void grow(const Eigen::MatrixXf &Q, int k_, int trees_max = -1, int depth_max = -1,
+    //    int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
+    //    grow(Eigen::Map<const Eigen::MatrixXf>(Q.data(), Q.rows(), Q.cols()), k_, trees_max,
+    //       depth_max, depth_min_, votes_max_, density_, seed);
+    // }
 
     /** Grow an autotuned index without preset recall level. A version which
     * takes the test queries as a float pointer.
@@ -380,10 +376,13 @@ class Mrpt {
     * @param data pointer to an (column-major) array containing the test queries.
     * @param n_test number of test queries.
     */
-    void grow(const float *Q, int n_test, int k_, int trees_max = -1, int depth_max = -1,
-       int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
-       grow(Eigen::Map<const Eigen::MatrixXf>(Q, dim, n_test), k_, trees_max,
-          depth_max, depth_min_, votes_max_, density_, seed);
+    void grow(const Eigen::Ref<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1, int depth_max = -1,
+        int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
+      if(Q.rows() != dim) {
+        throw std::invalid_argument("Dimensions of the data and the validation set do not match.");
+      }
+      grow(Q.data(), Q.cols(), k_, trees_max,
+        depth_max, depth_min_, votes_max_, density_, seed);
     }
 
     /** Creates a new index by copying trees from an autotuned index grown
@@ -474,7 +473,7 @@ class Mrpt {
     * @param out_distances - Output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @param out_n_elected - An optional output parameter for the candidate set size
     */
-    void query(const Eigen::Map<const Eigen::VectorXf> &q, int k, int votes_required, int *out,
+    void query(const float *data, int k, int votes_required, int *out,
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
 
         if(k <= 0 || k > n_samples) {
@@ -488,6 +487,8 @@ class Mrpt {
         if(empty()) {
           throw std::logic_error("The index must be built before making queries.");
         }
+
+        const Eigen::Map<const Eigen::VectorXf> q(data, dim);
 
         Eigen::VectorXf projected_query(n_pool);
         if (density < 1)
@@ -545,21 +546,20 @@ class Mrpt {
     *
     * @param q Eigen vector containing the query point
     */
-    void query(const Eigen::VectorXf &q, int k, int votes_required, int *out,
-               float *out_distances = nullptr, int *out_n_elected = nullptr) const {
-      query(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), k, votes_required,
-        out, out_distances, out_n_elected);
-    }
+    // void query(const Eigen::VectorXf &q, int k, int votes_required, int *out,
+    //            float *out_distances = nullptr, int *out_n_elected = nullptr) const {
+    //   query(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), k, votes_required,
+    //     out, out_distances, out_n_elected);
+    // }
 
     /**
     * A version of approximate k-nn search taking the input data as a float pointer.
     *
     * @param data pointer to an array containing the query point
     */
-    void query(const float *q, int k, int votes_required, int *out,
+    void query(const Eigen::Ref<const Eigen::MatrixXf> &q, int k, int votes_required, int *out,
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
-      query(Eigen::Map<const Eigen::VectorXf>(q, dim), k, votes_required,
-        out, out_distances, out_n_elected);
+      query(q.data(), k, votes_required, out, out_distances, out_n_elected);
     }
 
     /**@}*/
@@ -584,7 +584,7 @@ class Mrpt {
     * @param out_distances - Output buffer for distances of the k approximate nearest neighbors (optional parameter)
     * @param out_n_elected - An optional output parameter for the candidate set size
     */
-    void query(const Eigen::Map<const Eigen::VectorXf> &q, int *out, float *out_distances = nullptr,
+    void query(const float *q, int *out, float *out_distances = nullptr,
                int *out_n_elected = nullptr) const {
       if(index_type == normal) {
         throw std::logic_error("The index is not autotuned: k and vote threshold has to be specified.");
@@ -601,10 +601,9 @@ class Mrpt {
     *
     * @param q Eigen vector containing the query point
     */
-    void query(const Eigen::VectorXf &q, int *out, float *out_distances = nullptr,
+    void query(const Eigen::Ref<const Eigen::VectorXf> &q, int *out, float *out_distances = nullptr,
                int *out_n_elected = nullptr) const {
-      query(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), out,
-        out_distances, out_n_elected);
+      query(q.data(), out, out_distances, out_n_elected);
     }
 
     /**
@@ -613,11 +612,11 @@ class Mrpt {
     *
     * @param data pointer to an array containing the query point
     */
-    void query(const float *q, int *out, float *out_distances = nullptr,
-               int *out_n_elected = nullptr) const {
-      query(Eigen::Map<const Eigen::VectorXf>(q, dim), out,
-        out_distances, out_n_elected);
-    }
+    // void query(const float *q, int *out, float *out_distances = nullptr,
+    //            int *out_n_elected = nullptr) const {
+    //   query(Eigen::Map<const Eigen::VectorXf>(q, dim), out,
+    //     out_distances, out_n_elected);
+    // }
 
     /**@}*/
 
@@ -642,20 +641,21 @@ class Mrpt {
     * @param out output buffer for the indices of the k approximate nearest neighbors
     * @param out_distances output buffer for distances of the k approximate nearest neighbors (optional parameter)
     */
-    static void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q,
-       const Eigen::Map<const Eigen::MatrixXf> &X_, int k, int *out,
-       float *out_distances = nullptr) {
+    static void exact_knn(const float *q_data, const float *X_data, int dim, int n_samples,
+        int k, int *out, float *out_distances = nullptr) {
 
-      int n_points = X_.cols();
-      if(k < 1 || k > n_points) {
-        throw std::out_of_range("k must be positive and no greater than the sample size of data X_.");
+      const Eigen::Map<const Eigen::MatrixXf> X(X_data, dim, n_samples);
+      const Eigen::Map<const Eigen::VectorXf> q(q_data, dim);
+
+      if(k < 1 || k > n_samples) {
+        throw std::out_of_range("k must be positive and no greater than the sample size of data X.");
       }
 
-      Eigen::VectorXf distances(n_points);
+      Eigen::VectorXf distances(n_samples);
 
       #pragma omp parallel for
-      for (int i = 0; i < n_points; ++i)
-          distances(i) = (X_.col(i) - q).squaredNorm();
+      for (int i = 0; i < n_samples; ++i)
+          distances(i) = (X.col(i) - q).squaredNorm();
 
       if (k == 1) {
           Eigen::MatrixXf::Index index;
@@ -668,9 +668,9 @@ class Mrpt {
           return;
       }
 
-      Eigen::VectorXi idx(n_points);
-      std::iota(idx.data(), idx.data() + n_points, 0);
-      std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_points,
+      Eigen::VectorXi idx(n_samples);
+      std::iota(idx.data(), idx.data() + n_samples, 0);
+      std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_samples,
                        [&distances](int i1, int i2) {return distances(i1) < distances(i2);});
 
       for (int i = 0; i < k; ++i)
@@ -689,11 +689,11 @@ class Mrpt {
     * @param q Eigen vector containing the query point
     * @param X_ Eigen matrix containing the data set
     */
-    static void exact_knn(const Eigen::VectorXf &q, const Eigen::MatrixXf &X_,
-        int k, int *out, float *out_distances = nullptr) {
-      Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), q.size()),
-        Eigen::Map<const Eigen::MatrixXf>(X_.data(), X_.rows(), X_.cols()), k, out, out_distances);
-    }
+    // static void exact_knn(const Eigen::VectorXf &q, const Eigen::MatrixXf &X_,
+    //     int k, int *out, float *out_distances = nullptr) {
+    //   Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), q.size()),
+    //     Eigen::Map<const Eigen::MatrixXf>(X_.data(), X_.rows(), X_.cols()), k, out, out_distances);
+    // }
 
     /**
     * A version of approximate k-nn search using an autotuned index taking a
@@ -705,10 +705,10 @@ class Mrpt {
     * @n_samples_ number of points in a data set
     */
 
-    static void exact_knn(const float *q, const float *X_, int dim_, int n_samples_,
-        int k, int *out, float *out_distances = nullptr) {
-      Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q, dim_),
-        Eigen::Map<const Eigen::MatrixXf>(X_, dim_, n_samples_), k, out, out_distances);
+    static void exact_knn(const Eigen::Ref<const Eigen::MatrixXf> &q,
+                          const Eigen::Ref<const Eigen::MatrixXf> &X,
+                          int k, int *out, float *out_distances = nullptr) {
+      Mrpt::exact_knn(q.data(), X.data(), X.rows(), X.cols(), k, out, out_distances);
     }
 
 
@@ -721,9 +721,9 @@ class Mrpt {
     * @param out output buffer for the indices of the k approximate nearest neighbors
     * @param out_distances output buffer for distances of the k approximate nearest neighbors (optional parameter)
     */
-    void exact_knn(const Eigen::Map<const Eigen::VectorXf> &q, int k, int *out,
+    void exact_knn(const Eigen::Ref<const Eigen::VectorXf> &q, int k, int *out,
         float *out_distances = nullptr) const {
-      Mrpt::exact_knn(q, X, k, out, out_distances);
+      Mrpt::exact_knn(q.data(), X.data(), dim, n_samples, k, out, out_distances);
     }
 
     /**
@@ -732,10 +732,10 @@ class Mrpt {
     *
     * @param q Eigen vector containing the query point
     */
-    void exact_knn(const Eigen::VectorXf &q, int k, int *out,
-        float *out_distances = nullptr) const {
-      Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), X, k, out, out_distances);
-    }
+    // void exact_knn(const Eigen::VectorXf &q, int k, int *out,
+    //     float *out_distances = nullptr) const {
+    //   Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), X, k, out, out_distances);
+    // }
 
     /**
     * A version of approximate k-nn search using an autotuned index taking a
@@ -743,9 +743,8 @@ class Mrpt {
     *
     * @param q pointer to an array containing the query point
     */
-    void exact_knn(const float *q, int k, int *out,
-        float *out_distances = nullptr) const {
-      Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q, dim), X, k, out, out_distances);
+    void exact_knn(const float *q, int k, int *out, float *out_distances = nullptr) const {
+      Mrpt::exact_knn(q, X.data(), dim, n_samples, k, out, out_distances);
     }
 
     /**@}*/
