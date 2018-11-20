@@ -31,26 +31,21 @@ class Mrpt {
     /** @name Constructors
     * The constructor does not actually build the index but that is done by
     * the function grow() which has to be called before queries can be made.
-    * There are three different versions of the constructor which differ only
-    * on the format of the input data. There are also corresponding versions
+    * There are two different versions of the constructor which differ only
+    * on the type of the input data. The first version takes the data set
+    * as `Ref` to `MatrixXf`, which means that the argument
+    * can be either `MatrixXf` or `Map<MatrixXf>` (also certain blocks of `MatrixXf`
+    * may be accepted, see [Eigen::Ref](https://eigen.tuxfamily.org/dox/TopicFunctionTakingEigenTypes.html)
+    * for more information). The second version takes the float
+    * pointer to an array containing the data set, and the dimension and
+    * the sample size of the data. There are also corresponding versions
     * of all the member functions which take input data. In all cases data is
     * assumed to be stored in column-major order, so that a column is a
-    * data point and a row is a dimension. */
+    * data point and a row is a dimension. Also in all cases the original
+    * data set is used, so no unnecessary copies are made. */
 
     /**
-    * A constructor taking the data as an Eigen map.
-    *
-    * @param X_ Eigen map which refers to the array containing the data set
-    */
-    // Mrpt(const Eigen::Map<const Eigen::MatrixXf> &X_) :
-    //     X(X_),
-    //     n_samples(X_.cols()),
-    //     dim(X_.rows()) {}
-
-    /**
-    * A constructor taking the data as an Eigen matrix.
-    *
-    * @param X_ Eigen matrix containing the data set
+    * @param X_ Eigen ref to the data set
     */
 
     Mrpt(const Eigen::Ref<const Eigen::MatrixXf> &X_) :
@@ -59,9 +54,7 @@ class Mrpt {
         dim(X_.rows()) {}
 
     /**
-    * A constructor taking the data as a float pointer.
-    *
-    * @param data pointer to the array containing the data set
+    * @param X_ pointer to the array containing the data set
     * @param dim_ dimension of the data
     * @param n_samples_ number of data points
     */
@@ -74,12 +67,11 @@ class Mrpt {
     /**@}*/
 
     /** @name Normal index building.
-    * Builds a normal (not autotuned) index. Function empty() can be used
-    * to test if the index has been built.
+    * Build a normal (not autotuned) index.
     */
 
     /**
-    * Builds a normal (not autotuned) index.
+    * Build a normal index.
     *
     * @param n_trees_ number of trees to be grown
     * @param depth_ depth of the trees; on the set
@@ -141,15 +133,6 @@ class Mrpt {
         }
     }
 
-    /**
-    * Is the index is already constructed or not?
-    *
-    * @return - is the index empty?
-    */
-    bool empty() const {
-      return n_trees == 0;
-    }
-
     /**@}*/
 
     /** @name Autotuned index building
@@ -160,12 +143,11 @@ class Mrpt {
     * parameter values and the estimated query time and the estimated recall.
     */
 
-    /** Grow an autotuned index. A version which takes the test queries as
-    * an Eigen map.
+    /**
+    * Build an autotuned index.
     *
     * @param target_recall target recall level; on the range [0,1]
-    * @param Q Eigen map referring to the array containing the test points
-    * (col = data point, row = dimension).
+    * @param Q Eigen ref to the the test queries (col = data point, row = dimension).
     * @param k_ number of nearest neighbors searched for
     * @param trees_max number of trees grown; default value -1 sets this to
     * \f$ \mathrm{min}(\sqrt{d}, 1000)\f$, where \f$d\f$ is the dimension of data.
@@ -196,28 +178,30 @@ class Mrpt {
       prune(target_recall);
     }
 
-    /** Grow an autotuned index. A version which takes the test queries as
-    * an Eigen matrix.
-    *
-    * @param target_recall target recall level; on the range [0,1]
-    * @param Q Eigen matrix containing the test queries.
-    */
-    // void grow(double target_recall, const Eigen::MatrixXf &Q, int k_, int trees_max = -1,
-    //           int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
-    //           float density = -1.0, int seed = 0) {
-    //   if(target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
-    //     throw std::out_of_range("Target recall must be on the interval [0,1].");
-    //   }
-    //   grow(Q, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed);
-    //   prune(target_recall);
-    // }
-
-    /** Grow an autotuned index. A version which takes the test queries as
-    * a float pointer.
+    /** Build an autotuned index.
     *
     * @param target_recall target recall level; on the range [0,1]
     * @param data float pointer to an array containing the test queries
     * @param n_test number of test queries
+    * @param k_ number of nearest neighbors searched for
+    * @param trees_max number of trees grown; default value -1 sets this to
+    * \f$ \mathrm{min}(\sqrt{d}, 1000)\f$, where \f$d\f$ is the dimension of data.
+    * @param depth_max depth of trees grown; ; on the set
+    * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$, where \f$n \f$
+    * is the number of data points; default value -1 sets this to
+    * \f$ \log_2(n) - 4 \f$, where \f$n\f$ is the number of data points
+    * @param depth_min_ minimum depth of trees considered when searching for
+    * optimal parameters on the set
+    * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
+    * sets this to 5
+    * @param votes_max_ maximum number of votes considered when searching for
+    * optimal parameters; a default value -1 sets this to
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * @param density expected proportion of non-zero components of random vectors;
+    * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
+    * the dimension of data
+    * @param seed seed given to a rng when generating random vectors;
+    * a default value 0 initializes the rng randomly with std::random_device
     */
     void grow(double target_recall, const float *Q, int n_test, int k_, int trees_max = -1,
               int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
@@ -232,12 +216,11 @@ class Mrpt {
     /**
     * Get the optimal parameters, and estimated recall and query time found
     * by autotuning. If the index is autotuned without preset recall level,
-    * estimated recall, estimated query time and votes are set to their
-    * default value 0, and the number of trees and their depth are set to
-    * trees_max, and depth_max, respectively. If the index is not autotuned,
-    * estimated recall, estimated query time, votes and k are all set to
-    * their default value 0, so that the only fixed parameters are
-    * number of trees and their depth.
+    * `estimated_recall`, `estimated_qtime` and `votes` are set to their
+    * default value 0, and the `n_trees` and `depth` are set to
+    * `trees_max`, and `depth_max, respectively. If the index is not autotuned,
+    * `estimated_recall`, `estimated_qtime`, `votes` and `k` are all set to
+    * their default value 0.
     *
     * @return parameters of the index
     */
@@ -255,7 +238,7 @@ class Mrpt {
     /**@}*/
 
     /** @name Autotuned index building without preset recall level
-    * Builds an autotuned index. This version does not require prespecifying
+    * Build an autotuned index. This version does not require prespecifying
     * a target recall level, but an index generated by this function can be used
     * to subset different indices with different recall levels. This is done by
     * subset(). The function optimal_parameters() can be used to retrieve a
@@ -264,10 +247,29 @@ class Mrpt {
 
     /**@{*/
 
-    /** Grow an autotuned index without preset recall level. A version which
-    * takes the test queries as an Eigen map.
+    /** Build an autotuned index without prespecifying a recall level.
     *
-    * @param Q Eigen map containing the test queries.
+    * @param data pointer to an array containing the test queries.
+    * @param n_test number of test queries
+    * @param k_ number of nearest neighbors searched for
+    * @param trees_max number of trees grown; default value -1 sets this to
+    * \f$ \mathrm{min}(\sqrt{d}, 1000)\f$, where \f$d\f$ is the dimension of data.
+    * @param depth_max depth of trees grown; ; on the set
+    * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$, where \f$n \f$
+    * is the number of data points; default value -1 sets this to
+    * \f$ \log_2(n) - 4 \f$, where \f$n\f$ is the number of data points
+    * @param depth_min_ minimum depth of trees considered when searching for
+    * optimal parameters on the set
+    * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
+    * sets this to 5
+    * @param votes_max_ maximum number of votes considered when searching for
+    * optimal parameters; a default value -1 sets this to
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * @param density expected proportion of non-zero components of random vectors;
+    * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
+    * the dimension of data
+    * @param seed seed given to a rng when generating random vectors;
+    * a default value 0 initializes the rng randomly with std::random_device
     **/
     void grow(const float *data, int n_test, int k_, int trees_max = -1, int depth_max = -1,
        int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
@@ -359,22 +361,28 @@ class Mrpt {
       par.k = k_;
     }
 
-    /** Grow an autotuned index without preset recall level. A version which
-    * takes the test queries as an Eigen matrix.
+    /** Build an autotuned index without prespecifying a recall level.
     *
-    * @param Q Eigen matrix containing the test queries.
-    */
-    // void grow(const Eigen::MatrixXf &Q, int k_, int trees_max = -1, int depth_max = -1,
-    //    int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
-    //    grow(Eigen::Map<const Eigen::MatrixXf>(Q.data(), Q.rows(), Q.cols()), k_, trees_max,
-    //       depth_max, depth_min_, votes_max_, density_, seed);
-    // }
-
-    /** Grow an autotuned index without preset recall level. A version which
-    * takes the test queries as a float pointer.
-    *
-    * @param data pointer to an (column-major) array containing the test queries.
-    * @param n_test number of test queries.
+    * @param Q Eigen ref to the test queries.
+    * @param k_ number of nearest neighbors searched for
+    * @param trees_max number of trees grown; default value -1 sets this to
+    * \f$ \mathrm{min}(\sqrt{d}, 1000)\f$, where \f$d\f$ is the dimension of data.
+    * @param depth_max depth of trees grown; ; on the set
+    * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$, where \f$n \f$
+    * is the number of data points; default value -1 sets this to
+    * \f$ \log_2(n) - 4 \f$, where \f$n\f$ is the number of data points
+    * @param depth_min_ minimum depth of trees considered when searching for
+    * optimal parameters on the set
+    * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
+    * sets this to 5
+    * @param votes_max_ maximum number of votes considered when searching for
+    * optimal parameters; a default value -1 sets this to
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * @param density expected proportion of non-zero components of random vectors;
+    * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
+    * the dimension of data
+    * @param seed seed given to a rng when generating random vectors;
+    * a default value 0 initializes the rng randomly with std::random_device
     */
     void grow(const Eigen::Ref<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1, int depth_max = -1,
         int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
@@ -385,7 +393,7 @@ class Mrpt {
         depth_max, depth_min_, votes_max_, density_, seed);
     }
 
-    /** Creates a new index by copying trees from an autotuned index grown
+    /** Create a new index by copying trees from an autotuned index grown
     * without a prespecified recall level. The index is created so that
     * it gives a fastest query time at the recall level given as the parameter.
     * If this recall level is not met, then it creates an index with a
@@ -431,7 +439,7 @@ class Mrpt {
     }
 
     /**
-    * Returns the pareto frontier of optimal parameters for an index which
+    * Return the pareto frontier of optimal parameters for an index which
     * is autotuned without setting a recall level. This means that each
     * parameter combination in a returned vector is optimal in a sense
     * that it is a fastest (measured by query time) parameter combination
@@ -460,28 +468,30 @@ class Mrpt {
     * k and vote threshold are set manually. The indices of k nearest neighbors
     * are written to a buffer out, which has to be preallocated to have at least
     * length k. Optionally also Euclidean distances to these k nearest points
-    * are written to a buffer out_distances.
+    * are written to a buffer out_distances. If there are less than k points in
+    * the candidate set, -1 is written to the remaining locations of the
+    * output buffers.
     */
 
     /**
-    * A version of approximate k-nn search taking the input data as an Eigen map.
+    * Approximate k-nn search using a normal index.
     *
-    * @param q - Eigen map to a vector containing the query point
-    * @param k - The number of neighbors the user wants the function to return
-    * @param votes_required - The number of votes required for an object to be included in the linear search step
-    * @param out - The output buffer for the indices of the k approximate nearest neighbors
-    * @param out_distances - Output buffer for distances of the k approximate nearest neighbors (optional parameter)
-    * @param out_n_elected - An optional output parameter for the candidate set size
+    * @param data pointer to an array containing the query point
+    * @param k number of nearest neighbors searched for
+    * @param vote_threshold - number of votes required for a query point to be included in the candidate set
+    * @param out output buffer (size = k) for the indices of k approximate nearest neighbors
+    * @param out_distances optional output buffer (size = k) for distances to k approximate nearest neighbors
+    * @param out_n_elected optional output parameter (size = 1) for the candidate set size
     */
-    void query(const float *data, int k, int votes_required, int *out,
+    void query(const float *data, int k, int vote_threshold, int *out,
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
 
         if(k <= 0 || k > n_samples) {
           throw std::out_of_range("k must belong to the set {1, ..., n}.");
         }
 
-        if(votes_required <= 0 || votes_required > n_trees) {
-          throw std::out_of_range("votes_required must belong to the set {1, ... , n_trees}.");
+        if(vote_threshold <= 0 || vote_threshold > n_trees) {
+          throw std::out_of_range("vote_threshold must belong to the set {1, ... , n_trees}.");
         }
 
         if(empty()) {
@@ -529,7 +539,7 @@ class Mrpt {
             const std::vector<int> &indices = tree_leaves[n_tree];
             for (int i = leaf_begin; i < leaf_end; ++i) {
                 int idx = indices[i];
-                if (++votes(idx) == votes_required)
+                if (++votes(idx) == vote_threshold)
                     elected(n_elected++) = idx;
             }
         }
@@ -542,24 +552,18 @@ class Mrpt {
     }
 
     /**
-    * A version of approximate k-nn search taking the input data as an Eigen vector.
+    *  Approximate k-nn search using a normal index.
     *
-    * @param q Eigen vector containing the query point
+    * @param q Eigen ref to the query point
+    * @param k number of nearest neighbors searched for
+    * @param vote_threshold number of votes required for a query point to be included in the candidate set
+    * @param out output buffer (size = k) for the indices of k approximate nearest neighbors
+    * @param out_distances optional output buffer (size = k) for distances to k approximate nearest neighbors
+    * @param out_n_elected optional output parameter (size = 1) for the candidate set size
     */
-    // void query(const Eigen::VectorXf &q, int k, int votes_required, int *out,
-    //            float *out_distances = nullptr, int *out_n_elected = nullptr) const {
-    //   query(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), k, votes_required,
-    //     out, out_distances, out_n_elected);
-    // }
-
-    /**
-    * A version of approximate k-nn search taking the input data as a float pointer.
-    *
-    * @param data pointer to an array containing the query point
-    */
-    void query(const Eigen::Ref<const Eigen::MatrixXf> &q, int k, int votes_required, int *out,
+    void query(const Eigen::Ref<const Eigen::VectorXf> &q, int k, int vote_threshold, int *out,
                float *out_distances = nullptr, int *out_n_elected = nullptr) const {
-      query(q.data(), k, votes_required, out, out_distances, out_n_elected);
+      query(q.data(), k, vote_threshold, out, out_distances, out_n_elected);
     }
 
     /**@}*/
@@ -571,18 +575,18 @@ class Mrpt {
     * required: k is preset, and the optimal vote count is used automatically.
     * The indices of k nearest neighbors are written to a buffer out, which has
     * to be preallocated to have at least length k. Optionally also Euclidean
-    * distances to these k nearest points *are written to a buffer
-    * out_distances.
+    * distances to these k nearest points are written to a buffer
+    * out_distances. If there are less than k points in the candidate set,
+    * -1 is written to the remaining locations of the output buffers.
     */
 
     /**
-    * A version of approximate k-nn search using an autotuned index taking a
-    * query point as an Eigen map.
+    * Approximate k-nn search using an autotuned index.
     *
-    * @param q - Eigen map to a vector containing the query point
-    * @param out - The output buffer for the indices of the k approximate nearest neighbors
-    * @param out_distances - Output buffer for distances of the k approximate nearest neighbors (optional parameter)
-    * @param out_n_elected - An optional output parameter for the candidate set size
+    * @param q pointer to an array containing the query point
+    * @param out output buffer (size = k) for the indices of k approximate nearest neighbors
+    * @param out_distances optional output buffer (size = k) for distances to k approximate nearest neighbors
+    * @param out_n_elected optional output parameter (size = 1) for the candidate set size
     */
     void query(const float *q, int *out, float *out_distances = nullptr,
                int *out_n_elected = nullptr) const {
@@ -596,27 +600,17 @@ class Mrpt {
     }
 
     /**
-    * A version of approximate k-nn search using an autotuned index taking the
-    * query point as an Eigen vector.
+    * Approximate k-nn search using an autotuned index.
     *
-    * @param q Eigen vector containing the query point
+    * @param q Eigen ref to the query point
+    * @param out output buffer (size = k) for the indices of k approximate nearest neighbors
+    * @param out_distances optional output buffer (size = k) for distances to k approximate nearest neighbors
+    * @param out_n_elected optional output parameter (size = 1) for the candidate set size
     */
     void query(const Eigen::Ref<const Eigen::VectorXf> &q, int *out, float *out_distances = nullptr,
                int *out_n_elected = nullptr) const {
       query(q.data(), out, out_distances, out_n_elected);
     }
-
-    /**
-    * A version of approximate k-nn search using an autotuned index taking the
-    * query point as a float pointer.
-    *
-    * @param data pointer to an array containing the query point
-    */
-    // void query(const float *q, int *out, float *out_distances = nullptr,
-    //            int *out_n_elected = nullptr) const {
-    //   query(Eigen::Map<const Eigen::VectorXf>(q, dim), out,
-    //     out_distances, out_n_elected);
-    // }
 
     /**@}*/
 
@@ -626,20 +620,18 @@ class Mrpt {
     * query point q from a data set X_. The indices of k nearest neighbors are
     * written to a buffer out, which has to be preallocated to have at least
     * length k. Optionally also Euclidean distances to these k nearest points
-    * are written to a buffer out_distances. There are three versions for
-    * different format of the input data, and both static and member versions
-    * of each function.
+    * are written to a buffer out_distances. There are both static and member
+    * versions.
     */
 
     /**
-    * A version of approximate k-nn search using an autotuned index taking a
-    * query point and a data sets as Eigen Maps
-    *
-    * @param q Eigen Map to a query point
-    * @param X_ Eigen Map to a data set
+    * @param q_data pointer to an array containing the query point
+    * @param X_data pointer to an array containing the data set
+    * @param dim dimension of data
+    * @param n_samples number of points in a data set
     * @param k number of neighbors searched for
-    * @param out output buffer for the indices of the k approximate nearest neighbors
-    * @param out_distances output buffer for distances of the k approximate nearest neighbors (optional parameter)
+    * @param out output buffer (size = k) for the indices of k nearest neighbors
+    * @param out_distances optional output buffer (size = k) for the distances to k nearest neighbors
     */
     static void exact_knn(const float *q_data, const float *X_data, int dim, int n_samples,
         int k, int *out, float *out_distances = nullptr) {
@@ -683,76 +675,49 @@ class Mrpt {
     }
 
     /**
-    * A version of approximate k-nn search using an autotuned index taking a
-    * query point and a data sets as Eigen vector and matrix.
-    *
-    * @param q Eigen vector containing the query point
-    * @param X_ Eigen matrix containing the data set
-    */
-    // static void exact_knn(const Eigen::VectorXf &q, const Eigen::MatrixXf &X_,
-    //     int k, int *out, float *out_distances = nullptr) {
-    //   Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), q.size()),
-    //     Eigen::Map<const Eigen::MatrixXf>(X_.data(), X_.rows(), X_.cols()), k, out, out_distances);
-    // }
-
-    /**
-    * A version of approximate k-nn search using an autotuned index taking a
-    * query point and a data sets as float pointers
-    *
-    * @param q pointer to an array containing the query point
-    * @param X_ pointer to an array containing the data set
-    * @dim_ dimension of data
-    * @n_samples_ number of points in a data set
+    * @param q Eigen ref to a query point
+    * @param X Eigen ref to a data set
+    * @param k number of neighbors searched for
+    * @param out output buffer (size = k) for the indices of k nearest neighbors
+    * @param out_distances optional output buffer (size = k) for the distances to k nearest neighbors
     */
 
-    static void exact_knn(const Eigen::Ref<const Eigen::MatrixXf> &q,
+    static void exact_knn(const Eigen::Ref<const Eigen::VectorXf> &q,
                           const Eigen::Ref<const Eigen::MatrixXf> &X,
                           int k, int *out, float *out_distances = nullptr) {
       Mrpt::exact_knn(q.data(), X.data(), X.rows(), X.cols(), k, out, out_distances);
     }
 
+    /**
+    * @param q pointer to an array containing the query point
+    * @param k number of neighbors searched for
+    * @param out output buffer (size = k) for the indices of k nearest neighbors
+    * @param out_distances optional output buffer (size = k) for the distances to k nearest neighbors
+    */
+    void exact_knn(const float *q, int k, int *out, float *out_distances = nullptr) const {
+      Mrpt::exact_knn(q, X.data(), dim, n_samples, k, out, out_distances);
+    }
 
     /**
-    * A version of approximate k-nn search using an autotuned index taking a
-    * query point as an Eigen Map.
-    *
-    * @param q Eigen Map to a query point
-    * @param k number of neighbors searched for
-    * @param out output buffer for the indices of the k approximate nearest neighbors
-    * @param out_distances output buffer for distances of the k approximate nearest neighbors (optional parameter)
+    * @param q pointer to an array containing the query point
+    * @param X pointer to an array containing the data set
+    * @param k number of points searched for
+    * @param out output buffer (size = k) for the indices of k nearest neighbors
+    * @param out_distances optional output buffer (size = k) for the distances to k nearest neighbors
     */
     void exact_knn(const Eigen::Ref<const Eigen::VectorXf> &q, int k, int *out,
         float *out_distances = nullptr) const {
       Mrpt::exact_knn(q.data(), X.data(), dim, n_samples, k, out, out_distances);
     }
 
-    /**
-    * A version of approximate k-nn search using an autotuned index taking a
-    * query point as an Eigen vector.
-    *
-    * @param q Eigen vector containing the query point
-    */
-    // void exact_knn(const Eigen::VectorXf &q, int k, int *out,
-    //     float *out_distances = nullptr) const {
-    //   Mrpt::exact_knn(Eigen::Map<const Eigen::VectorXf>(q.data(), dim), X, k, out, out_distances);
-    // }
-
-    /**
-    * A version of approximate k-nn search using an autotuned index taking a
-    * query point as a float pointer.
-    *
-    * @param q pointer to an array containing the query point
-    */
-    void exact_knn(const float *q, int k, int *out, float *out_distances = nullptr) const {
-      Mrpt::exact_knn(q, X.data(), dim, n_samples, k, out, out_distances);
-    }
-
     /**@}*/
 
-    /** @name Saving and loading index
-    * Functions that save and load an index. These work for both autotuned
-    * and non-autotuned index, and load() retrieves also the optimal
-    * parameters found by autotuning.
+    /** @name Utility functions
+    * Saving and loading an index and checking if it is already constructed.
+    * Saving and loading work for both autotuned and non-autotuned indices, and
+    * load() retrieves also the optimal parameters found by autotuning.
+    * Obviously, the same data set used to build a saved index has to be used to
+    * construct the index into which it is loaded.
     */
 
     /**
@@ -872,6 +837,15 @@ class Mrpt {
 
         fclose(fd);
         return true;
+    }
+
+    /**
+    * Is the index is already constructed or not?
+    *
+    * @return - is the index empty?
+    */
+    bool empty() const {
+      return n_trees == 0;
     }
 
     /**@}*/
@@ -1155,7 +1129,7 @@ class Mrpt {
       return par1.estimated_qtime < par2.estimated_qtime;
     }
 
-    void vote(const Eigen::VectorXf &projected_query, int votes_required, Eigen::VectorXi &elected,
+    void vote(const Eigen::VectorXf &projected_query, int vote_threshold, Eigen::VectorXi &elected,
       int &n_elected, int n_trees, int depth_crnt) {
       std::vector<int> found_leaves(n_trees);
       const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth_crnt];
@@ -1189,7 +1163,7 @@ class Mrpt {
         const std::vector<int> &indices = tree_leaves[n_tree];
         for (int i = leaf_begin; i < leaf_end; ++i) {
             int idx = indices[i];
-            if (++votes(idx) == votes_required)
+            if (++votes(idx) == vote_threshold)
                 elected(n_elected++) = idx;
         }
       }
