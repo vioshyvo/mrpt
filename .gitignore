@@ -23,3 +23,4 @@ build
 dist
 mrpt.egg-info
 *.gch
+docs

@@ -29,20 +29,42 @@ struct Mrpt_Parameters {
 class Mrpt {
  public:
     /**
-    * The constructor of the index. The constructor does not actually build
+    * The constructor does not actually build
     * the index but that is done by the function 'grow' which has to be called
     * before queries can be made.
-    * @param X_ - Pointer to the Eigen::Map which refers to the data matrix.
+    * @param X_ Eigen Map which refers to the array containing the data. Data
+    * is assumed to be stored in column-major order, so that a column is
+    * a data point and a row is a dimension.
     */
     Mrpt(const Eigen::Map<const Eigen::MatrixXf> &X_) :
         X(X_),
         n_samples(X_.cols()),
         dim(X_.rows()) {}
 
+    /**
+    * The constructor does not actually build
+    * the index but that is done by the function 'grow' which has to be called
+    * before queries can be made.
+    * @param X_ Eigen matrix containing the data set. Data
+    * is assumed to be stored in column-major order, so that a column is
+    * a data point and a row is a dimension.
+    */
+
     Mrpt(const Eigen::MatrixXf &X_) :
         X(Eigen::Map<const Eigen::MatrixXf>(X_.data(), X_.rows(), X_.cols())),
         n_samples(X_.cols()),
         dim(X_.rows()) {}
+
+    /**
+    * The constructor does not actually build
+    * the index but that is done by the function 'grow' which has to be called
+    * before queries can be made.
+    * @param data pointer to the array containing the data set. Data
+    * is assumed to be stored in column-major order, so that a column is
+    * a data point and a row is a dimension.
+    * @dim_ dimension of the data
+    * @n_samples_ number of data points
+    */
 
     Mrpt(const float *data, int dim_, int n_samples_) :
         X(Eigen::Map<const Eigen::MatrixXf>(data, dim_, n_samples_)),
@@ -52,13 +74,14 @@ class Mrpt {
     ~Mrpt() {}
 
     /**
-    * The function whose call starts the actual index construction. Initializes
+    * The function doing the index construction. Initializes
     * arrays to store the tree structures and computes all the projections needed
     * later. Then repeatedly calls method grow_subtree that builds a single RP-tree.
-    * @param n_trees_ - The number of trees to be used in the index.
-    * @param depth_ - The depth of the trees.
-    * @param density_ - Expected ratio of non-zero components in a projection matrix.
-    * @param seed - A seed given to a rng when generating random vectors;
+    * @param n_trees_ The number of trees to be used in the index.
+    * @param depth_ The depth of the trees. On the range [1, log2(n_samples)]
+    * @param density_ Expected ratio of non-zero components in a projection matrix.
+    * On the interval [0,1].
+    * @param seed A seed given to a rng when generating random vectors;
     * a default value 0 initializes the rng randomly with rd()
     */
     void grow(int n_trees_, int depth_, float density_ = -1.0, int seed = 0) {
@@ -111,6 +134,17 @@ class Mrpt {
         }
     }
 
+    /**
+    * Builds index by autotuning so that the parameters giving the optimal
+    * query time for each recall level are found. This version does not yet
+    * prune the index for any given recall level, but indices with different
+    * recall levels can be obtained with subset().
+    *
+    * @param Q Eigen map referring to the array containing the test points
+    * (col = data point, row = dimension).
+    * @param k number of nearest neighbors searched for
+    *
+    */
     void grow(const Eigen::Map<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1, int depth_max = -1,
        int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed_mrpt = 0) {
 
