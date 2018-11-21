@@ -1,11 +1,14 @@
 # MRPT - fast nearest neighbor search with random projection
 ![NN search in 3 RP-trees](mrpt-image.png)
 
-NEW! Python 3 bindings available!
+MRPT is a lightweight and easy-to-use header-only library for approximate nearest neighbor search. It is written in C++11 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level! Also the saving and loading an index is supported.
 
-MRPT is a library for approximate nearest neighbor search written in C++11. According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MRPT is currently the *fastest* alternative to reach high recall levels in common benchmark data sets.
+According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MRPT is currently the *fastest* alternative to reach high recall levels in common benchmark data sets.
 
 In the offline phase of the algorithm MRPT indexes the data with a collection of *random projection trees*. In the online phase the index structure allows us to answer queries in superior time. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found on [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) that was published on IEEE International Conference on Big Data 2016.
+
+## New
+- Add index building with autotuning: no more manual hyperparameter tuning! (2018/11/21)
 
 ## Python installation
 
@@ -29,7 +32,7 @@ TODO
 
 ### C++
 
-Mrpt is a header only library, so no compilation is required: just include the header `cpp/Mrpt.h`. Only dependencies are Eigen linear algebra library (which is bundled at `cpp/lib`) and OpenMP, so when using g++, the following minimal example can be compiled (add `-std=c++11` if the default for your compiler is not at least c++11) for example as:
+MRPT is a header only library, so no compilation is required: just include the header `cpp/Mrpt.h`. Only dependencies are Eigen linear algebra library (Eigen 3.3.5 is bundled at `cpp/lib`) and OpenMP, so when using g++, the following minimal example can be compiled (add `-std=c++11` if the default for your compiler is not at least c++11) for example as:
 ```
 g++ -Icpp -Icpp/lib ex1.cpp -o ex1 -fopenmp -O3
 ```
@@ -71,15 +74,6 @@ Here is a sample output:
 ```
 The approximate nearest neighbor search found 9 of 10 true nearest neighbors; so this time the observed recall happened to match the expected recall exactly (results vary between the runs because the algorithm is randomized).
 
-
-## MRPT for other languages
-
-- [Go](https://github.com/rikonor/go-ann)
-
-## License
-
-MRPT is available under the MIT License (see LICENSE.txt). Note that third-party libraries in the cpp/lib folder may be distributed under other open source licenses. The Eigen library is licensed under the MPL2.
-
 ## Citation
 ~~~~
 @inproceedings{Hyvonen2016,
@@ -91,3 +85,12 @@ MRPT is available under the MIT License (see LICENSE.txt). Note that third-party
   organization={IEEE}
 }
 ~~~~
+
+
+## MRPT for other languages
+
+- [Go](https://github.com/rikonor/go-ann)
+
+## License
+
+MRPT is available under the MIT License (see LICENSE.txt). Note that third-party libraries in the cpp/lib folder may be distributed under other open source licenses. The Eigen library is licensed under the MPL2.
