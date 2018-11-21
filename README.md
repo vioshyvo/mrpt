@@ -9,6 +9,8 @@ According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MR
 
 In the offline phase of the algorithm MRPT indexes the data with a collection of *random projection trees*. In the online phase the index structure allows us to answer queries in superior time. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found on [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) that was published on IEEE International Conference on Big Data 2016.
 
+Tests for MRPT are at the separate [repo](https://github.com/vioshyvo/RP-test). The documentation of public API is currently at the `docs`folder, and will soon be available as github pages.
+
 ## New
 - Add index building with autotuning: no more manual hyperparameter tuning! (2018/11/21)
 
