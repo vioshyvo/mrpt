@@ -1,0 +1,16 @@
+\form#0:$ 1 / sqrt(d) $
+\form#1:$ 1 / \sqrt(d) $
+\form#2:$ 1 / \sqrt{d} $
+\form#3:$d$
+\form#4:$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}$
+\form#5:$n $
+\form#6:$(0,1]$
+\form#7:$\text{min}(\sqrt{d}, 1000)$
+\form#8:$ \mathrm{min}(\sqrt{d}, 1000)$
+\form#9:$ \log_2(n) - 4 $
+\form#10:$n$
+\form#11:$ \mathrm{max}(\lfloor \mathrm{trees_max} / 10 \rfloor, 10) $
+\form#12:$ \sqrt(d) $
+\form#13:$ d$
+\form#14:$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) $
+\form#15:$ \sqrt{d} $
