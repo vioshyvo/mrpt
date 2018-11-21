@@ -971,6 +971,7 @@ class Mrpt {
       n_array = 1 << (depth + 1);
 
       tree_leaves.resize(n_trees);
+      tree_leaves.shrink_to_fit();
       split_points.conservativeResize(n_array, n_trees);
       leaf_first_indices = leaf_first_indices_all[depth];
       if(density < 1) {
