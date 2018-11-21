@@ -1,5 +1,7 @@
 # MRPT - fast nearest neighbor search with random projection
-![NN search in 3 RP-trees](mrpt-image.png)
+
+![Fifty shades of green](voting-candidates2.png)
+
 
 MRPT is a lightweight and easy-to-use header-only library for approximate nearest neighbor search. It is written in C++11 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level! Also the saving and loading an index is supported.
 
