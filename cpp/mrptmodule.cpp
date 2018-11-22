@@ -196,7 +196,7 @@ static PyObject *build_autotune(mrptIndex *self, PyObject *args) {
 
     self->k = k;
     try {
-      self->ptr->grow(data, n_test, k, trees_max, depth_max, depth_min, votes_max, density);
+      self->ptr->grow(target_recall, data, n_test, k, trees_max, depth_max, depth_min, votes_max, density);
     } catch (const std::exception &e) {
       PyErr_SetString(PyExc_RuntimeError, e.what());
     }
@@ -452,7 +452,7 @@ static PyTypeObject MrptIndexType = {
 static PyMethodDef module_methods[] = {
   {NULL}	/* Sentinel */
 };
-  
+
 #if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
@@ -465,14 +465,13 @@ static struct PyModuleDef moduledef = {
     NULL,                /* m_clear */
     NULL,                /* m_free */
   };
-  
+
 PyMODINIT_FUNC PyInit_mrptlib(void) {
     PyObject *m;
     if (PyType_Ready(&MrptIndexType) < 0)
         return NULL;
-    
+
     m = PyModule_Create(&moduledef);
-    
 
     if (m == NULL)
         return NULL;
