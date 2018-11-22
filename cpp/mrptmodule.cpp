@@ -33,6 +33,7 @@ typedef struct {
     bool mmap;
     int n;
     int dim;
+    int k;
 } mrptIndex;
 
 static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
@@ -86,10 +87,9 @@ float *read_mmap(char *file, int n, int dim) {
 
 static int Mrpt_init(mrptIndex *self, PyObject *args) {
     PyObject *py_data;
-    int depth, n_trees, n, dim, mmap;
-    float density;
+    int n, dim, mmap;
 
-    if (!PyArg_ParseTuple(args, "Oiiiifi", &py_data, &n, &dim, &depth, &n_trees, &density, &mmap))
+    if (!PyArg_ParseTuple(args, "Oiii", &py_data, &n, &dim, &mmap))
         return -1;
 
     float *data;
@@ -132,14 +132,78 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
     self->n = n;
     self->dim = dim;
 
-    const Eigen::Map<const MatrixXf> *X = new Eigen::Map<const MatrixXf>(data, dim, n);
-    self->ptr = new Mrpt(X, n_trees, depth, density);
-
+    self->ptr = new Mrpt(data, dim, n);
     return 0;
 }
 
-static PyObject *build(mrptIndex *self) {
-    self->ptr->grow();
+static PyObject *build(mrptIndex *self, PyObject *args) {
+    int n_trees, depth;
+    float density;
+
+    if (!PyArg_ParseTuple(args, "iif", &n_trees, &depth, &density))
+        return NULL;
+
+    try {
+      self->ptr->grow(n_trees, depth, density);
+    } catch (const std::exception &e) {
+      PyErr_SetString(PyExc_RuntimeError, e.what());
+    }
+
+    Py_RETURN_NONE;
+}
+
+static PyObject *build_autotune(mrptIndex *self, PyObject *args) {
+    PyObject *py_data;
+    float target_recall, density;
+    int n_test, k, trees_max, depth_min, depth_max, votes_max;
+
+    if (!PyArg_ParseTuple(args, "fOiiiiiif", &target_recall, &py_data, &n_test, &k, &trees_max,
+                                             &depth_min, &depth_max, &votes_max, &density))
+        return NULL;
+
+    bool from_mem = false;
+
+    float *data;
+#if PY_MAJOR_VERSION >= 3
+    if (PyUnicode_Check(py_data)) {
+        char *file = PyBytes_AsString(py_data);
+#else
+    if (PyString_Check(py_data)) {
+        char *file = PyString_AsString(py_data);
+#endif
+
+        struct stat sb;
+        if (stat(file, &sb) != 0) {
+            PyErr_SetString(PyExc_IOError, strerror(errno));
+            return NULL;
+        }
+
+        if (sb.st_size != static_cast<unsigned>(sizeof(float) * self->dim * n_test)) {
+            PyErr_SetString(PyExc_ValueError, "Size of the input is not n_test x dim");
+            return NULL;
+        }
+
+        data = read_memory(file, n_test, self->dim);
+        if (data == NULL) {
+            PyErr_SetString(PyExc_IOError, "Unable to read data from file or allocate memory for it");
+            return NULL;
+        }
+
+        from_mem = true;
+    } else {
+        data = reinterpret_cast<float *>(PyArray_DATA(py_data));
+    }
+
+    self->k = k;
+    try {
+      self->ptr->grow(data, n_test, k, trees_max, depth_max, depth_min, votes_max, density);
+    } catch (const std::exception &e) {
+      PyErr_SetString(PyExc_RuntimeError, e.what());
+    }
+
+    if (from_mem)
+      delete[] data;
+
     Py_RETURN_NONE;
 }
 
@@ -167,6 +231,9 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
     float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
     PyObject *nearest;
 
+    if (k == -1)
+      k = self->k;
+
     if (PyArray_NDIM(v) == 1) {
         dim = PyArray_DIM(v, 0);
 
@@ -177,14 +244,23 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
         if (return_distances) {
             PyObject *distances = PyArray_SimpleNew(1, dims, NPY_FLOAT32);
             float *out_distances = reinterpret_cast<float *>(PyArray_DATA(distances));
-            self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, outdata, out_distances);
+
+            if (k == -1) {
+              self->ptr->query(indata, outdata, out_distances);
+            } else {
+              self->ptr->query(indata, k, elect, outdata, out_distances);
+            }
 
             PyObject *out_tuple = PyTuple_New(2);
             PyTuple_SetItem(out_tuple, 0, nearest);
             PyTuple_SetItem(out_tuple, 1, distances);
             return out_tuple;
         } else {
-            self->ptr->query(Eigen::Map<VectorXf>(indata, dim), k, elect, outdata);
+            if (k == -1) {
+              self->ptr->query(indata, outdata);
+            } else {
+              self->ptr->query(indata, k, elect, outdata);
+            }
             return nearest;
         }
     } else {
@@ -200,18 +276,29 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
             PyObject *distances = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
             float *distances_out = reinterpret_cast<float *>(PyArray_DATA(distances));
 
-            for (int i = 0; i < n; ++i) {
-                self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim),
-                                 k, elect, outdata + i * k, distances_out + i * k);
+            if (k == -1) {
+              for (int i = 0; i < n; ++i) {
+                  self->ptr->query(indata + i * dim, outdata + i * k, distances_out + i * k);
+              }
+            } else {
+              for (int i = 0; i < n; ++i) {
+                  self->ptr->query(indata + i * dim, k, elect, outdata + i * k, distances_out + i * k);
+              }
             }
+
             PyObject *out_tuple = PyTuple_New(2);
             PyTuple_SetItem(out_tuple, 0, nearest);
             PyTuple_SetItem(out_tuple, 1, distances);
             return out_tuple;
         } else {
-            for (int i = 0; i < n; ++i) {
-                self->ptr->query(Eigen::Map<VectorXf>(indata + i * dim, dim),
-                                 k, elect, outdata + i * k);
+            if (k == -1) {
+              for (int i = 0; i < n; ++i) {
+                  self->ptr->query(indata + i * dim, outdata + i * k);
+              }
+            } else {
+              for (int i = 0; i < n; ++i) {
+                  self->ptr->query(indata + i * dim, k, elect, outdata + i * k);
+              }
             }
             return nearest;
         }
@@ -228,9 +315,6 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
     float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
     PyObject *nearest;
 
-    VectorXi idx(self->n);
-    std::iota(idx.data(), idx.data() + self->n, 0);
-
     if (PyArray_NDIM(v) == 1) {
         dim = PyArray_DIM(v, 0);
 
@@ -241,14 +325,14 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
         if (return_distances) {
             PyObject *distances = PyArray_SimpleNew(1, dims, NPY_FLOAT32);
             float *out_distances = reinterpret_cast<float *>(PyArray_DATA(distances));
-            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata, dim), k, idx, self->n, outdata, out_distances);
+            self->ptr->exact_knn(indata, k, outdata, out_distances);
 
             PyObject *out_tuple = PyTuple_New(2);
             PyTuple_SetItem(out_tuple, 0, nearest);
             PyTuple_SetItem(out_tuple, 1, distances);
             return out_tuple;
         } else {
-            self->ptr->exact_knn(Eigen::Map<VectorXf>(indata, dim), k, idx, self->n, outdata);
+            self->ptr->exact_knn(indata, k, outdata);
             return nearest;
         }
     } else {
@@ -265,8 +349,7 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
             float *distances_out = reinterpret_cast<float *>(PyArray_DATA(distances));
 
             for (int i = 0; i < n; ++i) {
-                self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim),
-                                     k, idx, self->n, outdata + i * k, distances_out + i * k);
+                self->ptr->exact_knn(indata + i * dim, k, outdata + i * k, distances_out + i * k);
             }
             PyObject *out_tuple = PyTuple_New(2);
             PyTuple_SetItem(out_tuple, 0, nearest);
@@ -274,8 +357,7 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
             return out_tuple;
         } else {
             for (int i = 0; i < n; ++i) {
-                self->ptr->exact_knn(Eigen::Map<VectorXf>(indata + i * dim, dim),
-                                     k, idx, self->n, outdata + i * k);
+                self->ptr->exact_knn(indata + i * dim, k, outdata + i * k);
             }
             return nearest;
         }
@@ -317,6 +399,8 @@ static PyMethodDef MrptMethods[] = {
             "Return exact nearest neighbors"},
     {"build", (PyCFunction) build, METH_VARARGS,
             "Build the index"},
+    {"build_autotune", (PyCFunction) build_autotune, METH_VARARGS,
+            "Build the index using autotuning"},
     {"save", (PyCFunction) save, METH_VARARGS,
             "Save the index to a file"},
     {"load", (PyCFunction) load, METH_VARARGS,
@@ -407,7 +491,6 @@ PyMODINIT_FUNC initmrptlib(void) {
         return;
 
     m = Py_InitModule("mrptlib", module_methods);
-
 
     if (m == NULL)
         return;

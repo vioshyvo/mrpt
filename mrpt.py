@@ -8,13 +8,10 @@ class MRPTIndex(object):
     """
     Wraps the extension module written in C++
     """
-    def __init__(self, data, depth, n_trees, projection_sparsity='auto', shape=None, mmap=False):
+    def __init__(self, data, shape=None, mmap=False):
         """
         Initializes an MRPT index object.
-        :param data: Input data either as a NxDim numpy ndarray or as a filepath to a binary file containing the data
-        :param depth: The depth of the trees
-        :param n_trees: The number of trees used in the index
-        :param projection_sparsity: Expected ratio of non-zero components in a projection matrix
+        :param data: Input data either as a NxDim numpy ndarray or as a filepath to a binary file containing the data.
         :param shape: Shape of the data as a tuple (N, dim). Needs to be specified only if loading the data from a file.
         :param mmap: If true, the data is mapped into memory. Has effect only if the data is loaded from a file.
         :return:
@@ -35,32 +32,82 @@ class MRPTIndex(object):
         else:
             raise ValueError("Data must be either an ndarray or a filepath")
 
-        max_depth = np.ceil(np.log2(n_samples))
-        if not 1 <= depth <= max_depth:
-            raise ValueError("Depth should be in range [1, %d]" % max_depth)
-
-        if n_trees < 1:
-            raise ValueError("Number of trees must be positive")
-
-        if projection_sparsity == 'auto':
-            projection_sparsity = 1. / np.sqrt(dim)
-        elif projection_sparsity is None:
-            projection_sparsity = 1
-        elif not 0 < projection_sparsity <= 1:
-            raise ValueError("Sparsity should be in (0, 1]")
-
         if mmap and os.name == 'nt':
             raise ValueError("Memory mapping is not available on Windows")
 
-        self.index = mrptlib.MrptIndex(data, n_samples, dim, depth, n_trees, projection_sparsity, mmap)
+        self.index = mrptlib.MrptIndex(data, n_samples, dim, mmap)
         self.built = False
+        self.n_samples = n_samples
+        self.dim = dim
 
-    def build(self):
+    def _compute_sparsity(self, projection_sparsity):
+        if projection_sparsity == 'auto':
+            return 1. / np.sqrt(self.dim)
+        elif projection_sparsity is None:
+            return 1
+        elif not 0 < projection_sparsity <= 1:
+            raise ValueError("Sparsity should be in (0, 1]")
+
+    def build(self, depth, n_trees, projection_sparsity='auto'):
         """
-        Builds the MRPT index.
+        Builds a normal MRPT index.
+        :param depth: The depth of the trees; should be in the set {1, 2, ..., floor(log2(n))}.
+        :param n_trees: The number of trees used in the index.
+        :param projection_sparsity: Expected ratio of non-zero components in a projection matrix.
         :return:
         """
-        self.index.build()
+        if self.built:
+            raise RuntimeError("The index has already been built");
+
+        projection_sparsity = self._compute_sparsity(projection_sparsity)
+        self.index.build(n_trees, depth, projection_sparsity)
+        self.built = True
+
+    def build_autotune(self, target_recall, Q, k, trees_max=-1, depth_min=-1, depth_max=-1,
+                       votes_max=-1, projection_sparsity='auto', shape=None):
+        """
+        Builds an autotuned MRPT index.
+        :param target_recall: The target recall level.
+        :param Q: A matrix of test queries used for tuning, one per row.
+        :param k: Number of nearest neighbors searched for.
+        :param trees_max: Maximum number of trees grown; can be used to control the building time
+                          and memory usage; a default value -1 sets this to min(sqrt(d), 1000).
+        :param depth_min: Minimum depth of trees considered when searching for optimal parameters;
+                          a default value -1 sets this to min(log2(n), 5).
+        :param depth_max: Maximum depth of trees considered when searching for optimal parameters;
+                          a default value -1 sets this to log2(n) - 4:
+        :param votes_max: Maximum number of votes considered when searching for optimal parameters;
+                          a default value -1 sets this to max(trees / 10, 10).
+        :param projection_sparsity: Expected ratio of non-zero components in a projection matrix
+        :param shape: Shape of the test query matrix as a tuple (n_test, dim). Needs to be specified
+                      only if loading the test query matrix from a file.
+        :return:
+        """
+        if self.built:
+            raise RuntimeError("The index has already been built")
+
+        if isinstance(Q, np.ndarray):
+            if len(Q) == 0 or len(Q.shape) != 2:
+                raise ValueError("The test query matrix should be non-empty and two-dimensional")
+            if Q.dtype != np.float32:
+                raise ValueError("The test query matrix should have type float32")
+            if not Q.flags['C_CONTIGUOUS'] or not Q.flags['ALIGNED']:
+                raise ValueError("The test query matrix has to be C_CONTIGUOUS and ALIGNED")
+            n_test, dim = Q.shape
+        elif isinstance(Q, str):
+            if not isinstance(shape, tuple) or len(shape) != 2:
+                raise ValueError("You must specify the shape of the data as a tuple (n_test, dim) "
+                                 "when loading the test query matrix from a binary file")
+            n_test, dim = shape
+        else:
+            raise ValueError("The test query matrix must be either an ndarray or a filepath")
+
+        if dim != self.dim:
+            raise ValueError("The test query matrix should have the same number of columns as the data matrix")
+
+        projection_sparsity = self._compute_sparsity(projection_sparsity)
+        self.index.build_autotune(
+                target_recall, Q, n_test, k, trees_max, depth_min, depth_max, votes_max, projection_sparsity)
         self.built = True
 
     def save(self, path):
@@ -82,17 +129,19 @@ class MRPTIndex(object):
         self.index.load(path)
         self.built = True
 
-    def ann(self, q, k, votes_required=1, return_distances=False):
+    def ann(self, q, k=-1, votes_required=1, return_distances=False):
         """
-        The MRPT approximate nearest neighbor query.
-        :param q: The query object, i.e. the vector whose nearest neighbors are searched for
-        :param k: The number of neighbors the user wants the query to return
-        :param votes_required: The number of votes an object has to get to be included in the linear search part of the query.
-        :param return_distances: Whether the distances are also returned
-        :return: If return_distances is false, returns a vector of indices of the approximate
-                 nearest neighbors in the original input data for the corresponding query.
-                 Otherwise, returns a tuple where the first element contains the nearest
-                 neighbors and the second element contains their distances to the query.
+        Performs an approximate nearest neighbor query for a single query vector or multiple query vectors
+        in parallel. The queries are given as a numpy vector or a numpy matrix where each row contains a query.
+        :param q: The query object. Can be either a single query vector or a matrix with one query vector per row.
+        :param k: The number of nearest neighbors to be returned, has to be specified if the index has not been autotuned.
+        :param votes_required: The number of votes an object has to get to be included in the linear search part of the query;
+                               has to be specified and has effect only if the index has not been autotuned.
+        :param return_distances: Whether the distances are also returned.
+        :return: If return_distances is false, returns a vector or matrix of indices of the approximate
+                 nearest neighbors in the original input data for the corresponding query. Otherwise,
+                 returns a tuple where the first element contains the nearest neighbors and the second
+                 element contains their distances to the query.
         """
         if not self.built:
             raise RuntimeError("Cannot query before building index")
@@ -101,19 +150,19 @@ class MRPTIndex(object):
 
         return self.index.ann(q, k, votes_required, return_distances)
 
-    def exact_search(self, Q, k, return_distances=False):
+    def exact_search(self, q, k, return_distances=False):
         """
-        Performs an exact nearest neighbor query for several queries in parallel. The queries are
+        Performs an exact nearest neighbor query for a single query several queries in parallel. The queries are
         given as a numpy matrix where each row contains a query. Useful for measuring accuracy.
-        :param Q: The query object, i.e. the vector whose nearest neighbors are searched for
-        :param k: The number of neighbors the user wants the query to return
-        :param return_distances: Whether the distances are also returned
-        :return: If return_distances is false, returns a vector of indices of the exact
-                 nearest neighbors in the original input data for the corresponding query.
-                 Otherwise, returns a tuple where the first element contains the nearest
-                 neighbors and the second element contains their distances to the query.
+        :param q: The query object. Can be either a single query vector or a matrix with one query vector per row.
+        :param k: The number of nearest neighbors to return.
+        :param return_distances: Whether the distances are also returned.
+        :return: If return_distances is false, returns a vector or matrix of indices of the exact
+                 nearest neighbors in the original input data for the corresponding query. Otherwise,
+                 returns a tuple where the first element contains the nearest neighbors and the second
+                 element contains their distances to the query.
         """
-        if Q.dtype != np.float32:
+        if q.dtype != np.float32:
             raise ValueError("The query matrix should have type float32")
 
-        return self.index.exact_search(Q, k, return_distances)
+        return self.index.exact_search(q, k, return_distances)
