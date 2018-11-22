@@ -6,11 +6,11 @@
 
 MRPT is a lightweight and easy-to-use library for approximate nearest neighbor search. It is written in C++11 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level!
 
-According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MRPT is currently the *fastest* library to reach high recall levels in common benchmark data sets.
+According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MRPT is currently the *fastest* library to reach high recall levels for common data sets.
 
 In the offline phase of the algorithm MRPT indexes the data with a collection of *random projection trees*. In the online phase the index structure allows us to answer queries in superior time. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found in [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) that was published in IEEE International Conference on Big Data 2016.
 
-Tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test).
+The tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test).
 ## New
 - Add [documentation](http://vioshyvo.github.io/mrpt/html/index.html) for C++ API (2018/11/22)
 
