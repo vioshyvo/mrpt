@@ -118,4 +118,4 @@ The approximate nearest neighbor search found 9 of 10 true nearest neighbors; so
 
 ## License
 
-MRPT is available under the MIT License (see LICENSE.txt). Note that third-party libraries in the cpp/lib folder may be distributed under other open source licenses. The Eigen library is licensed under the MPL2.
+MRPT is available under the MIT License (see [LICENSE.txt](LICENSE.txt)). Note that third-party libraries in the cpp/lib folder may be distributed under other open source licenses. The Eigen library is licensed under the MPL2.
