@@ -169,13 +169,13 @@ class Mrpt {
     * a default value 0 initializes the rng randomly with std::random_device
     */
     void grow(double target_recall, const Eigen::Ref<const Eigen::MatrixXf> &Q, int k_, int trees_max = -1,
-              int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
+              int depth_max = -1, int depth_min_ = -1, int votes_max_ = -1,
               float density = -1.0, int seed = 0) {
       if (target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
         throw std::out_of_range("Target recall must be on the interval [0,1].");
       }
 
-      grow(Q, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed);
+      grow(Q, k_, trees_max, depth_max, depth_min_, votes_max_, density, seed);
       prune(target_recall);
     }
 
@@ -206,13 +206,13 @@ class Mrpt {
     * a default value 0 initializes the rng randomly with std::random_device
     */
     void grow(double target_recall, const float *Q, int n_test, int k_, int trees_max = -1,
-              int depth_min_ = -1, int depth_max = -1, int votes_max_ = -1,
+              int depth_max = -1, int depth_min_ = -1, int votes_max_ = -1,
               float density = -1.0, int seed = 0) {
       if (target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
         throw std::out_of_range("Target recall must be on the interval [0,1].");
       }
 
-      grow(Q, n_test, k_, trees_max, depth_min_, depth_max, votes_max_, density, seed);
+      grow(Q, n_test, k_, trees_max, depth_max, depth_min_, votes_max_, density, seed);
       prune(target_recall);
     }
 

@@ -87,10 +87,10 @@ Public Member Functions</h2></td></tr>
 <tr><td colspan="2"><div class="groupHeader">Autotuned index building</div></td></tr>
 <tr><td colspan="2"><div class="groupText"><p>Builds an index by autotuning such that the parameters giving the fastest query time at the target recall level are found. If the target recall level is not reached at all, then an index giving the highest recall level is built. The <a class="el" href="class_mrpt.html#a82a6cd3ce04ff8307bfd00d99fc5400a">parameters()</a> function can be used to retrieve these optimal parameter values and the estimated query time and the estimated recall. </p>
 </div></td></tr>
-<tr class="memitem:a7a241bc449e1d30e2e6e6cbc920f1f0b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_mrpt.html#a7a241bc449e1d30e2e6e6cbc920f1f0b">grow</a> (double target_recall, const Eigen::Ref&lt; const Eigen::MatrixXf &gt; &amp;Q, int k_, int trees_max=-1, int depth_min_=-1, int depth_max=-1, int votes_max_=-1, float density=-1.0, int seed=0)</td></tr>
-<tr class="separator:a7a241bc449e1d30e2e6e6cbc920f1f0b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad2f2ff5e83111e8a518716638eda40b9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_mrpt.html#ad2f2ff5e83111e8a518716638eda40b9">grow</a> (double target_recall, const float *Q, int n_test, int k_, int trees_max=-1, int depth_min_=-1, int depth_max=-1, int votes_max_=-1, float density=-1.0, int seed=0)</td></tr>
-<tr class="separator:ad2f2ff5e83111e8a518716638eda40b9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7360964458339aab0ddedde324a03e47"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_mrpt.html#a7360964458339aab0ddedde324a03e47">grow</a> (double target_recall, const Eigen::Ref&lt; const Eigen::MatrixXf &gt; &amp;Q, int k_, int trees_max=-1, int depth_max=-1, int depth_min_=-1, int votes_max_=-1, float density=-1.0, int seed=0)</td></tr>
+<tr class="separator:a7360964458339aab0ddedde324a03e47"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2c788f62810165d96632437f22c5e35e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_mrpt.html#a2c788f62810165d96632437f22c5e35e">grow</a> (double target_recall, const float *Q, int n_test, int k_, int trees_max=-1, int depth_max=-1, int depth_min_=-1, int votes_max_=-1, float density=-1.0, int seed=0)</td></tr>
+<tr class="separator:a2c788f62810165d96632437f22c5e35e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a82a6cd3ce04ff8307bfd00d99fc5400a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_mrpt___parameters.html">Mrpt_Parameters</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_mrpt.html#a82a6cd3ce04ff8307bfd00d99fc5400a">parameters</a> () const</td></tr>
 <tr class="separator:a82a6cd3ce04ff8307bfd00d99fc5400a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr><td colspan="2"><div class="groupHeader">Autotuned index building without preset recall level</div></td></tr>
@@ -579,8 +579,8 @@ Exact k-nn search</h2></td></tr>
 
 </div>
 </div>
-<a id="a7a241bc449e1d30e2e6e6cbc920f1f0b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a7a241bc449e1d30e2e6e6cbc920f1f0b">&#9670;&nbsp;</a></span>grow() <span class="overload">[2/5]</span></h2>
+<a id="a7360964458339aab0ddedde324a03e47"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7360964458339aab0ddedde324a03e47">&#9670;&nbsp;</a></span>grow() <span class="overload">[2/5]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -616,13 +616,13 @@ Exact k-nn search</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>depth_min_</em> = <code>-1</code>, </td>
+          <td class="paramname"><em>depth_max</em> = <code>-1</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>depth_max</em> = <code>-1</code>, </td>
+          <td class="paramname"><em>depth_min_</em> = <code>-1</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -672,8 +672,8 @@ Exact k-nn search</h2></td></tr>
 
 </div>
 </div>
-<a id="ad2f2ff5e83111e8a518716638eda40b9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad2f2ff5e83111e8a518716638eda40b9">&#9670;&nbsp;</a></span>grow() <span class="overload">[3/5]</span></h2>
+<a id="a2c788f62810165d96632437f22c5e35e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2c788f62810165d96632437f22c5e35e">&#9670;&nbsp;</a></span>grow() <span class="overload">[3/5]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -715,13 +715,13 @@ Exact k-nn search</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>depth_min_</em> = <code>-1</code>, </td>
+          <td class="paramname"><em>depth_max</em> = <code>-1</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>depth_max</em> = <code>-1</code>, </td>
+          <td class="paramname"><em>depth_min_</em> = <code>-1</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
