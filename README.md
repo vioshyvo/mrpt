@@ -44,7 +44,7 @@ index = mrpt.MRPTIndex(data)
 print(index.exact_search(test[0], k))
 
 index.build_autotune(target_recall, test, k)
-print(index.ann(test[0]))
+print(index.ann(test[0], return_distances=False))
 ```
 
 The approximate nearest neighbors are then searched by the function `ann`; because the index was autotuned, no other arguments than the query point are required.

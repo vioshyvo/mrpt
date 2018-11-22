@@ -153,7 +153,7 @@ class Mrpt {
     * @param Q Eigen ref to the the test queries (col = data point, row = dimension).
     * @param k_ number of nearest neighbors searched for
     * @param trees_max number of trees grown; default value -1 sets this to
-    * \f$ \mathrm{min}(\sqrt{d}, 1000)\f$, where \f$d\f$ is the dimension of data.
+    * \f$ \mathrm{min}(\sqrt{n}, 1000)\f$, where \f$n\f$ is the number of data points.
     * @param depth_max maximum depth of trees considered when searching for
     * optimal parameters; in the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$, where \f$n \f$
@@ -190,7 +190,7 @@ class Mrpt {
     * @param n_test number of test queries
     * @param k_ number of nearest neighbors searched for
     * @param trees_max number of trees grown; default value -1 sets this to
-    * \f$ \mathrm{min}(\sqrt{d}, 1000)\f$, where \f$d\f$ is the dimension of data.
+    * \f$ \mathrm{min}(\sqrt{n}, 1000)\f$, where \f$n\f$ is the number of data points.
     * @param depth_max maximum depth of trees considered when searching for
     * optimal parameters; in the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$, where \f$n \f$
@@ -261,7 +261,7 @@ class Mrpt {
     * @param n_test number of test queries
     * @param k_ number of nearest neighbors searched for
     * @param trees_max number of trees grown; default value -1 sets this to
-    * \f$ \mathrm{min}(\sqrt{d}, 1000)\f$, where \f$d\f$ is the dimension of data.
+    * \f$ \mathrm{min}(\sqrt{n}, 1000)\f$, where \f$n\f$ is the number of data points.
     * @param depth_max maximum depth of trees considered when searching for
     * optimal parameters; in the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$, where \f$n \f$
@@ -383,7 +383,7 @@ class Mrpt {
     * @param Q Eigen ref to the test queries.
     * @param k_ number of nearest neighbors searched for
     * @param trees_max number of trees grown; default value -1 sets this to
-    * \f$ \mathrm{min}(\sqrt{d}, 1000)\f$, where \f$d\f$ is the dimension of data.
+    * \f$ \mathrm{min}(\sqrt{n}, 1000)\f$, where \f$n\f$ is the number of data points.
     * @param depth_max depth of trees grown; ; on the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$, where \f$n \f$
     * is the number of data points; default value -1 sets this to

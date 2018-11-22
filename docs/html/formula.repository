@@ -14,3 +14,4 @@
 \form#13:$ d$
 \form#14:$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) $
 \form#15:$ \sqrt{d} $
+\form#16:$ \mathrm{min}(\sqrt{n}, 1000)$

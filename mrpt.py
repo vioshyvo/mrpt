@@ -37,6 +37,7 @@ class MRPTIndex(object):
 
         self.index = mrptlib.MrptIndex(data, n_samples, dim, mmap)
         self.built = False
+        self.autotuned = False
         self.n_samples = n_samples
         self.dim = dim
 
@@ -71,7 +72,7 @@ class MRPTIndex(object):
         :param Q: A matrix of test queries used for tuning, one per row.
         :param k: Number of nearest neighbors searched for.
         :param trees_max: Maximum number of trees grown; can be used to control the building time
-                          and memory usage; a default value -1 sets this to min(sqrt(d), 1000).
+                          and memory usage; a default value -1 sets this to min(sqrt(n), 1000).
         :param depth_min: Minimum depth of trees considered when searching for optimal parameters;
                           a default value -1 sets this to min(log2(n), 5).
         :param depth_max: Maximum depth of trees considered when searching for optimal parameters;
@@ -109,6 +110,7 @@ class MRPTIndex(object):
         self.index.build_autotune(
                 target_recall, Q, n_test, k, trees_max, depth_min, depth_max, votes_max, projection_sparsity)
         self.built = True
+        self.autotuned = True
 
     def save(self, path):
         """
@@ -148,6 +150,9 @@ class MRPTIndex(object):
         if q.dtype != np.float32:
             raise ValueError("The query matrix should have type float32")
 
+        if not self.autotuned and k < 1:
+            raise ValueError("k must be set if the index has not been autotuned")
+
         return self.index.ann(q, k, votes_required, return_distances)
 
     def exact_search(self, q, k, return_distances=False):
@@ -164,5 +169,8 @@ class MRPTIndex(object):
         """
         if q.dtype != np.float32:
             raise ValueError("The query matrix should have type float32")
+
+        if k < 1:
+            raise ValueError("k must be positive")
 
         return self.index.exact_search(q, k, return_distances)
