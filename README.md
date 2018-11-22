@@ -2,6 +2,7 @@
 
 ![Fifty shades of green](docs/img/voting-candidates2.png)
 
+[![Documentation](https://img.shields.io/badge/api-reference-blue.svg)](http://vioshyvo.github.io/mrpt/html/index.html)
 
 MRPT is a lightweight and easy-to-use library for approximate nearest neighbor search. It is written in C++11 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level!
 
@@ -9,7 +10,7 @@ According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MR
 
 In the offline phase of the algorithm MRPT indexes the data with a collection of *random projection trees*. In the online phase the index structure allows us to answer queries in superior time. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found in [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) that was published in IEEE International Conference on Big Data 2016.
 
-Tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test). 
+Tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test).
 ## New
 - Add [documentation](http://vioshyvo.github.io/mrpt/html/index.html) for C++ API (2018/11/22)
 
