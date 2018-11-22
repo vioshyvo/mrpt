@@ -28,7 +28,7 @@ On MacOS, LLVM is needed for compiling: `brew install llvm libomp`
 
 This example first generates a 200-dimensional data set of 10000 points, and 100 test query points. The `exact_search` function can be used to find the indices of the true 10 nearest neighbors of the first test query.
 
-The `build_autotune` function then builds an index for approximate k-nn search; it uses automatic parameter tuning, so only the target recall level (90% in this example), the set of test queries and the number of neighbors searched for have to be specified.
+The `build_autotune` function then builds an index for approximate k-nn search; it uses automatic parameter tuning, so only the target recall level (90% in this example), the set of test queries and the number of neighbors searched for have to be specified. According to our experiments a test set of 100 queries is sufficient to find the optimal parameters. Using more test queries increases the accuracy of the estimates of query time and recall, but slows the autotuning.
 
 ```python
 import mrpt
