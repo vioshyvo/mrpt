@@ -83,6 +83,10 @@ class Mrpt {
     */
     void grow(int n_trees_, int depth_, float density_ = -1.0, int seed = 0) {
 
+      if(!empty()) {
+        throw std::logic_error("The index has already been grown.");
+      }
+
       if (n_trees_ <= 0) {
         throw std::out_of_range("The number of trees must be positive.");
       }
@@ -279,6 +283,10 @@ class Mrpt {
     void grow(const float *data, int n_test, int k_, int trees_max = -1, int depth_max = -1,
               int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
 
+      if(!empty()) {
+        throw std::logic_error("The index has already been grown.");
+      }
+      
       if (k_ <= 0 || k_ > n_samples) {
         throw std::out_of_range("k_ must belong to the set {1, ..., n}.");
       }
