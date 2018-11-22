@@ -20,9 +20,10 @@
 <table cellspacing="0" cellpadding="0">
  <tbody>
  <tr style="height: 56px;">
+  <td id="projectlogo"><img alt="Logo" src="extree3.png"/></td>
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">Mrpt
-   &#160;<span id="projectnumber">0.1.0</span>
+   &#160;<span id="projectnumber">1.0.0</span>
    </div>
   </td>
  </tr>
@@ -111,7 +112,7 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a35235eb7acf4bff5fbfb12c9cd82f0b8"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_mrpt.html#a35235eb7acf4bff5fbfb12c9cd82f0b8">query</a> (const Eigen::Ref&lt; const Eigen::VectorXf &gt; &amp;q, int k, int vote_threshold, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const</td></tr>
 <tr class="separator:a35235eb7acf4bff5fbfb12c9cd82f0b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr><td colspan="2"><div class="groupHeader">Approximate k-nn search using autotuned index</div></td></tr>
-<tr><td colspan="2"><div class="groupText"><p>Approximate k-nn search using an autotuned index. Finds k approximate nearest neighbors from a data set X for a query point q. Because the index is not autotuned, no parameters other than a query point and an output are required: k is preset, and the optimal vote count is used automatically. The indices of k nearest neighbors are written to a buffer out, which has to be preallocated to have at least length k. Optionally also the Euclidean distances to these k nearest points are written to a buffer out_distances. If there are less than k points in the candidate set, -1 is written to the remaining locations of the output buffers. </p>
+<tr><td colspan="2"><div class="groupText"><p>Approximate k-nn search using an autotuned index. Finds k approximate nearest neighbors from a data set X for a query point q. Because the index is autotuned, no parameters other than a query point and an output are required: k is preset, and the optimal vote count is used automatically. The indices of k nearest neighbors are written to a buffer out, which has to be preallocated to have at least length k. Optionally also the Euclidean distances to these k nearest points are written to a buffer out_distances. If there are less than k points in the candidate set, -1 is written to the remaining locations of the output buffers. </p>
 </div></td></tr>
 <tr class="memitem:a16fac96c266abcc778694e0b0cdc5f3c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_mrpt.html#a16fac96c266abcc778694e0b0cdc5f3c">query</a> (const float *q, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const</td></tr>
 <tr class="separator:a16fac96c266abcc778694e0b0cdc5f3c"><td class="memSeparator" colspan="2">&#160;</td></tr>

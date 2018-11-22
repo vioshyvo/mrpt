@@ -584,7 +584,7 @@ class Mrpt {
     /** @name Approximate k-nn search using autotuned index
     * Approximate k-nn search using an autotuned index. Finds k approximate
     * nearest neighbors from a data set X for a query point q. Because the index
-    * is not autotuned, no parameters other than a query point and an output are
+    * is autotuned, no parameters other than a query point and an output are
     * required: k is preset, and the optimal vote count is used automatically.
     * The indices of k nearest neighbors are written to a buffer out, which has
     * to be preallocated to have at least length k. Optionally also the Euclidean
