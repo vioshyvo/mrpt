@@ -3,47 +3,66 @@
 ![Fifty shades of green](voting-candidates2.png)
 
 
-MRPT is a lightweight and easy-to-use header-only library for approximate nearest neighbor search. It is written in C++11 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level! Also the saving and loading an index is supported.
+MRPT is a lightweight and easy-to-use library for approximate nearest neighbor search. It is written in C++11 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level!
 
-According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MRPT is currently the *fastest* alternative to reach high recall levels in common benchmark data sets.
+According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MRPT is currently the *fastest* library to reach high recall levels in common benchmark data sets.
 
-In the offline phase of the algorithm MRPT indexes the data with a collection of *random projection trees*. In the online phase the index structure allows us to answer queries in superior time. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found on [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) that was published on IEEE International Conference on Big Data 2016.
+In the offline phase of the algorithm MRPT indexes the data with a collection of *random projection trees*. In the online phase the index structure allows us to answer queries in superior time. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found in [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) that was published in IEEE International Conference on Big Data 2016.
 
-Tests for MRPT are at the separate [repo](https://github.com/vioshyvo/RP-test). The documentation of public API is currently at the `docs`folder, and will soon be available as github pages.
+Tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test). The documentation of the public API is currently in the `docs`folder, and will soon be available as github pages.
 
 ## New
 - Add index building with autotuning: no more manual hyperparameter tuning! (2018/11/21)
 
 ## Python installation
 
-Install the module with `pip install git+https://github.com/teemupitkanen/mrpt/`
+Install the module with `pip install mrpt`
 
-On MacOS, LLVM is needed for compiling: `brew install llvm`
-
-You can now run the demo (runs in less than a minute): `python demo.py`. An example output:
-~~~~
-Indexing time: 5.993 seconds
-100 approximate queries time: 0.230 seconds
-100 exact queries time: 11.776 seconds
-Average recall: 0.97
-~~~~
+On MacOS, LLVM is needed for compiling: `brew install llvm libomp`
 
 ## Minimal examples
 
 ### Python
 
-TODO
+This example first generates a 200-dimensional data set of 10000 points, and 100 test query points. The `exact_search` function can be used to find the indices of the true 10 nearest neighbors of the first test query.
+
+The `build_autotune` function then builds an index for approximate k-nn search; it uses automatic parameter tuning, so only the target recall level (90% in this example), the set of test queries and the number of neighbors searched for have to be specified.
+
+```python
+import mrpt
+import numpy as np
+
+n, n_test, d, k = 10000, 100, 200, 10
+target_recall = 0.9
+
+data = np.random.rand(n, d).astype(np.float32)
+test = np.random.rand(n_test, d).astype(np.float32)
+
+index = mrpt.MRPTIndex(data)
+print(index.exact_search(test[0], k))
+
+index.build_autotune(target_recall, test, k)
+print(index.ann(test[0]))
+```
+
+The approximate nearest neighbors are then searched by the function `ann`; because the index was autotuned, no other arguments than the query point are required. 
+
+Here is a sample output:
+```
+[7802 9451 3454 4851 8643 3491 1121 1879 6609 4385]
+[7802 9451 3454 4851 8643 3491 1121 6609 8249 6949]
+```
 
 ### C++
 
-MRPT is a header only library, so no compilation is required: just include the header `cpp/Mrpt.h`. Only dependencies are Eigen linear algebra library (Eigen 3.3.5 is bundled at `cpp/lib`) and OpenMP, so when using g++, the following minimal example can be compiled (add `-std=c++11` if the default for your compiler is not at least c++11) for example as:
+MRPT is a header-only library, so no compilation is required: just include the header `cpp/Mrpt.h`. The only dependency is the Eigen linear algebra library (Eigen 3.3.5 is bundled in `cpp/lib`), so when using g++, the following minimal example can be compiled for example as:
 ```
-g++ -Icpp -Icpp/lib ex1.cpp -o ex1 -fopenmp -O3
+g++ -std=c++11 -Ofast -march=native -Icpp -Icpp/lib ex1.cpp -o ex1 -fopenmp -lgomp
 ```
 
-Let's first generate a 200-dimensional data set of 10000 points, and 100 test query points (row = dimension, column = data point). Then `Mrpt::exact_knn` can be used to find the indices of true 10 nearest neighbors of the first test query.
+Let's first generate a 200-dimensional data set of 10000 points, and 100 test query points (row = dimension, column = data point). Then `Mrpt::exact_knn` can be used to find the indices of the true 10 nearest neighbors of the first test query.
 
-Function `grow` builds an index for approximate k-nn search; it uses automatic parameter tuning, so only the target recall level (90% in this example), the set of test queries and the number of neighbors searched for have to be specified.
+The `grow` function builds an index for approximate k-nn search; it uses automatic parameter tuning, so only the target recall level (90% in this example), the set of test queries and the number of neighbors searched for have to be specified.
 
 ```c++
 #include <iostream>
@@ -59,17 +78,17 @@ int main() {
   Eigen::VectorXi indices(k), indices_exact(k);
 
   Mrpt::exact_knn(Q.col(0), X, k, indices_exact.data());
-  std::cout << indices_exact.transpose() << "\n";
+  std::cout << indices_exact.transpose() << std::endl;
 
   Mrpt mrpt(X);
   mrpt.grow(target_recall, Q, k);
 
   mrpt.query(Q.col(0), indices.data());
-  std::cout << indices.transpose() << "\n";
+  std::cout << indices.transpose() << std::endl;
 }
 ```
 
-The approximate nearest neighbors are then searched by function `query`; because the index was autotuned, no other arguments than a query point and an output buffer for indices are required.
+The approximate nearest neighbors are then searched by the function `query`; because the index was autotuned, no other arguments than a query point and an output buffer for indices are required.
 
 Here is a sample output:
 ```
