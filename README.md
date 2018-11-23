@@ -12,13 +12,16 @@ In the offline phase of the algorithm MRPT indexes the data with a collection of
 
 The tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test).
 ## New
+
+- Release [MRPT 1.0.0](https://github.com/vioshyvo/mrpt/releases) (2018/11/22)
+
 - Add [documentation](http://vioshyvo.github.io/mrpt/html/index.html) for C++ API (2018/11/22)
 
 - Add index building with autotuning: no more manual hyperparameter tuning! (2018/11/21)
 
 ## Python installation
 
-Install the module with `pip install mrpt`
+Install the module with `pip install git+https://github.com/vioshyvo/mrpt/`
 
 On MacOS, LLVM is needed for compiling: `brew install llvm libomp`
 
