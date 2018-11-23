@@ -286,7 +286,7 @@ class Mrpt {
       if(!empty()) {
         throw std::logic_error("The index has already been grown.");
       }
-      
+
       if (k_ <= 0 || k_ > n_samples) {
         throw std::out_of_range("k_ must belong to the set {1, ..., n}.");
       }
@@ -410,6 +410,12 @@ class Mrpt {
       grow(Q.data(), Q.cols(), k_, trees_max,
         depth_max, depth_min_, votes_max_, density_, seed);
     }
+
+    // void grow_train(int k_, int n_test = 100, int trees_max = -1, int depth_max = -1,
+    //                 int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0) {
+    //   const Eigen::MatrixXf Q(subset(sample_indices(n_test, seed)));
+    // }
+
 
     /** Create a new index by copying trees from an autotuned index grown
     * without a prespecified recall level. The index is created so that
@@ -1550,6 +1556,27 @@ class Mrpt {
            + get_voting_time(tree, depth, v)
            + get_exact_time(tree, depth, v);
     }
+
+    std::vector<int> sample_indices(int n_test, int seed = 0) const {
+      std::random_device rd;
+      int s = seed ? seed : rd();
+      std::mt19937 gen(s);
+
+      std::vector<int> indices_data(n_samples);
+      std::iota(indices_data.begin(), indices_data.end(), 0);
+      std::shuffle(indices_data.begin(), indices_data.end(), gen);
+      return std::vector<int>(indices_data.begin(), indices_data.begin() + n_test);
+    }
+
+    Eigen::MatrixXf subset(const std::vector<int> &indices) const {
+      int n_test = indices.size();
+      Eigen::MatrixXf Q = Eigen::MatrixXf(dim, n_test);
+      for(int i = 0; i < n_test; ++i)
+        Q.col(i) = X.col(indices[i]);
+
+      return Q;
+    }
+
 
     const Eigen::Map<const Eigen::MatrixXf> X; // the data matrix
     Eigen::MatrixXf split_points; // all split points in all trees
