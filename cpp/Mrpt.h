@@ -211,12 +211,12 @@ class Mrpt {
     */
     void grow(double target_recall, const float *Q, int n_test, int k_, int trees_max = -1,
               int depth_max = -1, int depth_min_ = -1, int votes_max_ = -1,
-              float density = -1.0, int seed = 0) {
+              float density = -1.0, int seed = 0, const std::vector<int> &indices_test = {}) {
       if (target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
         throw std::out_of_range("Target recall must be on the interval [0,1].");
       }
 
-      grow(Q, n_test, k_, trees_max, depth_max, depth_min_, votes_max_, density, seed);
+      grow(Q, n_test, k_, trees_max, depth_max, depth_min_, votes_max_, density, seed, indices_test);
       prune(target_recall);
     }
 
@@ -412,16 +412,6 @@ class Mrpt {
         depth_max, depth_min_, votes_max_, density_, seed);
     }
 
-    void grow_train(int k_, int trees_max = -1, int depth_max = -1, int depth_min_ = -1,
-                    int votes_max_ = -1, float density_ = -1.0, int seed = 0, int n_test = 100) {
-      n_test = n_test > n_samples ? n_samples : n_test;
-      std::vector<int> indices_test(sample_indices(n_test, seed));
-      const Eigen::MatrixXf Q(subset(indices_test));
-
-      grow(Q.data(), Q.cols(), k_, trees_max,
-        depth_max, depth_min_, votes_max_, density_, seed, indices_test);
-    }
-
 
     /** Create a new index by copying trees from an autotuned index grown
     * without a prespecified recall level. The index is created so that
@@ -469,6 +459,27 @@ class Mrpt {
       index2.index_type = autotuned;
       return index2;
     }
+
+    void grow_train(int k_, int trees_max = -1, int depth_max = -1, int depth_min_ = -1,
+                    int votes_max_ = -1, float density_ = -1.0, int seed = 0, int n_test = 100) {
+      n_test = n_test > n_samples ? n_samples : n_test;
+      std::vector<int> indices_test(sample_indices(n_test, seed));
+      const Eigen::MatrixXf Q(subset(indices_test));
+
+      grow(Q.data(), Q.cols(), k_, trees_max,
+        depth_max, depth_min_, votes_max_, density_, seed, indices_test);
+    }
+
+    void grow_train(double target_recall, int k_, int trees_max = -1, int depth_max = -1, int depth_min_ = -1,
+                    int votes_max_ = -1, float density_ = -1.0, int seed = 0, int n_test = 100) {
+      n_test = n_test > n_samples ? n_samples : n_test;
+      std::vector<int> indices_test(sample_indices(n_test, seed));
+      const Eigen::MatrixXf Q(subset(indices_test));
+
+      grow(target_recall, Q.data(), Q.cols(), k_, trees_max,
+        depth_max, depth_min_, votes_max_, density_, seed, indices_test);
+    }
+
 
     /**
     * Return the pareto frontier of optimal parameters for an index which
@@ -1150,7 +1161,8 @@ class Mrpt {
         if(!indices_test.empty()) {
           std::remove(idx.data(), idx.data() + n_samples, indices_test[i]);
         }
-        exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + i * dim, dim), k, idx, n_samples - 1, out_exact.data() + i * k);
+        exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + i * dim, dim), k, idx,
+                  (indices_test.empty() ? n_samples : n_samples - 1), out_exact.data() + i * k);
         std::sort(out_exact.data() + i * k, out_exact.data() + i * k + k);
         if(!indices_test.empty()) {
           idx[n_samples - 1] = indices_test[i];
