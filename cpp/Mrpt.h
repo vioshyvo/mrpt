@@ -462,6 +462,9 @@ class Mrpt {
 
     void grow_train(int k_, int trees_max = -1, int depth_max = -1, int depth_min_ = -1,
                     int votes_max_ = -1, float density_ = -1.0, int seed = 0, int n_test = 100) {
+      if(n_test < 1) {
+        throw std::out_of_range("Test set size must be > 0.");
+      }
       n_test = n_test > n_samples ? n_samples : n_test;
       std::vector<int> indices_test(sample_indices(n_test, seed));
       const Eigen::MatrixXf Q(subset(indices_test));
@@ -472,6 +475,9 @@ class Mrpt {
 
     void grow_train(double target_recall, int k_, int trees_max = -1, int depth_max = -1, int depth_min_ = -1,
                     int votes_max_ = -1, float density_ = -1.0, int seed = 0, int n_test = 100) {
+      if(n_test < 1) {
+        throw std::out_of_range("Test set size must be > 0.");
+      }
       n_test = n_test > n_samples ? n_samples : n_test;
       std::vector<int> indices_test(sample_indices(n_test, seed));
       const Eigen::MatrixXf Q(subset(indices_test));
