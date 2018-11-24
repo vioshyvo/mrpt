@@ -65,9 +65,9 @@ MRPT is a header-only library, so no compilation is required: just include the h
 g++ -std=c++11 -Ofast -march=native -Icpp -Icpp/lib ex1.cpp -o ex1 -fopenmp -lgomp
 ```
 
-Let's first generate a 200-dimensional data set of 10000 points, and 100 test query points (row = dimension, column = data point). Then `Mrpt::exact_knn` can be used to find the indices of the true 10 nearest neighbors of the first test query.
+Let's first generate a 200-dimensional data set of 10000 points, and a query point (row = dimension, column = data point). Then `Mrpt::exact_knn` can be used to find the indices of the true 10 nearest neighbors of the test query.
 
-The `grow` function builds an index for approximate k-nn search; it uses automatic parameter tuning, so only the target recall level (90% in this example), the set of test queries and the number of neighbors searched for have to be specified.
+The `grow_autotune` function builds an index for approximate k-nn search; it uses automatic parameter tuning, so only the target recall level (90% in this example), and the number of neighbors searched for have to be specified. This version automatically samples a test set of 100 query points from the data set to tune the parameters, so no separate test set is required.
 
 ```c++
 #include <iostream>
@@ -75,20 +75,20 @@ The `grow` function builds an index for approximate k-nn search; it uses automat
 #include "Mrpt.h"
 
 int main() {
-  int n = 10000, n_test = 100, d = 200, k = 10;
+  int n = 10000, d = 200, k = 10;
   double target_recall = 0.9;
   Eigen::MatrixXf X = Eigen::MatrixXf::Random(d, n);
-  Eigen::MatrixXf Q = Eigen::MatrixXf::Random(d, n_test);
+  Eigen::MatrixXf q = Eigen::VectorXf::Random(d);
 
   Eigen::VectorXi indices(k), indices_exact(k);
 
-  Mrpt::exact_knn(Q.col(0), X, k, indices_exact.data());
+  Mrpt::exact_knn(q, X, k, indices_exact.data());
   std::cout << indices_exact.transpose() << std::endl;
 
   Mrpt mrpt(X);
-  mrpt.grow(target_recall, Q, k);
+  mrpt.grow_autotune(target_recall, k);
 
-  mrpt.query(Q.col(0), indices.data());
+  mrpt.query(q, indices.data());
   std::cout << indices.transpose() << std::endl;
 }
 ```
@@ -98,7 +98,7 @@ The approximate nearest neighbors are then searched by the function `query`; bec
 Here is a sample output:
 ```
 8108 1465 6963 2165   83 5900  662 8112 3592 5505
-8108 1465 6963 2165   83 5900  662 8112 5505 7992
+8108 1465 6963 2165   83 5900 8112 3592 5505 7992
 ```
 The approximate nearest neighbor search found 9 of 10 true nearest neighbors; so this time the observed recall happened to match the expected recall exactly (results vary between the runs because the algorithm is randomized).
 
