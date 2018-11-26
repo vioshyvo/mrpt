@@ -39,25 +39,25 @@ The `build_autotune` function then builds an index for approximate k-nn search; 
 import mrpt
 import numpy as np
 
-n, n_test, d, k = 10000, 100, 200, 10
+n, d, k = 10000, 200, 10
 target_recall = 0.9
 
 data = np.random.rand(n, d).astype(np.float32)
-test = np.random.rand(n_test, d).astype(np.float32)
+q = np.random.rand(d).astype(np.float32)
 
 index = mrpt.MRPTIndex(data)
-print(index.exact_search(test[0], k))
+print(index.exact_search(q, k, return_distances=False))
 
-index.build_autotune(target_recall, test, k)
-print(index.ann(test[0], return_distances=False))
+index.build_autotune_sample(target_recall, 10)
+print(index.ann(q, return_distances=False))
 ```
 
 The approximate nearest neighbors are then searched by the function `ann`; because the index was autotuned, no other arguments than the query point are required.
 
 Here is a sample output:
 ```
-[7802 9451 3454 4851 8643 3491 1121 1879 6609 4385]
-[7802 9451 3454 4851 8643 3491 1121 6609 8249 6949]
+[9738 5033 6520 2108 9216 9164  112 1442 1871 8020]
+[9738 5033 6520 2108 9216 9164  112 1442 1871 6789]
 ```
 
 ### C++
