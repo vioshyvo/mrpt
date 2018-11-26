@@ -505,10 +505,60 @@ class Mrpt {
     * highest possible recall level.
     *
     * @param target_recall target recall level; on the range [0,1]
-    * @return an autotuned Mrpt index with a recall level at least as
-    * high as target_recall
+    * @return an autotuned Mrpt index with a recall level at least as high as
+    * target_recall
     */
-    Mrpt *subset(double target_recall) const {
+    Mrpt subset(double target_recall) const {
+      if (target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
+        throw std::out_of_range("Target recall must be on the interval [0,1].");
+      }
+
+      Mrpt index2(X);
+      index2.par = parameters(target_recall);
+
+      int depth_max = depth;
+
+      index2.n_trees = index2.par.n_trees;
+      index2.depth = index2.par.depth;
+      index2.votes = index2.par.votes;
+      index2.n_pool = index2.depth * index2.n_trees;
+      index2.n_array = 1 << (index2.depth + 1);
+      index2.tree_leaves.assign(tree_leaves.begin(), tree_leaves.begin() + index2.n_trees);
+      index2.leaf_first_indices_all = leaf_first_indices_all;
+      index2.density = density;
+      index2.k = k;
+
+      index2.split_points = split_points.topLeftCorner(index2.n_array, index2.n_trees);
+      index2.leaf_first_indices = leaf_first_indices_all[index2.depth];
+      if (index2.density < 1) {
+        index2.sparse_random_matrix = Eigen::SparseMatrix<float, Eigen::RowMajor>(index2.n_pool, index2.dim);
+        for (int n_tree = 0; n_tree < index2.n_trees; ++n_tree)
+          index2.sparse_random_matrix.middleRows(n_tree * index2.depth, index2.depth) =
+            sparse_random_matrix.middleRows(n_tree * depth_max, index2.depth);
+      } else {
+        index2.dense_random_matrix = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>(index2.n_pool, index2.dim);
+        for (int n_tree = 0; n_tree < index2.n_trees; ++n_tree)
+          index2.dense_random_matrix.middleRows(n_tree * index2.depth, index2.depth) =
+            dense_random_matrix.middleRows(n_tree * depth_max, index2.depth);
+      }
+      index2.index_type = autotuned;
+
+      return index2;
+    }
+
+
+    /** Create a new index by copying trees from an autotuned index grown
+    * without a prespecified recall level. The index is created so that
+    * it gives a fastest query time at the recall level given as the parameter.
+    * If this recall level is not met, then it creates an index with a
+    * highest possible recall level. This function differs from subset() only
+    * by the return value.
+    *
+    * @param target_recall target recall level; on the range [0,1]
+    * @return pointer to a dynamically allocated autotuned Mrpt index with
+    * a recall level at least as high as target_recall
+    */
+    Mrpt *subset_pointer(double target_recall) const {
       if (target_recall < 0.0 - epsilon || target_recall > 1.0 + epsilon) {
         throw std::out_of_range("Target recall must be on the interval [0,1].");
       }
