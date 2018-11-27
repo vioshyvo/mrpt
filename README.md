@@ -48,7 +48,7 @@ q = np.random.rand(d).astype(np.float32)
 index = mrpt.MRPTIndex(data)
 print(index.exact_search(q, k, return_distances=False))
 
-index.build_autotune_sample(target_recall, 10)
+index.build_autotune_sample(target_recall, k)
 print(index.ann(q, return_distances=False))
 ```
 

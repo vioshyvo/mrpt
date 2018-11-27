@@ -387,6 +387,20 @@ static PyObject *subset(mrptIndex *self, PyObject *args) {
     return reinterpret_cast<PyObject *>(new_idx);
 }
 
+static PyObject *parameters(mrptIndex *self, PyObject *args) {
+    Mrpt_Parameters par = self->index->parameters();
+
+    PyObject *tup = PyTuple_New(6);
+    PyTuple_SetItem(tup, 0, PyLong_FromLong(par.n_trees));
+    PyTuple_SetItem(tup, 1, PyLong_FromLong(par.depth));
+    PyTuple_SetItem(tup, 2, PyLong_FromLong(par.votes));
+    PyTuple_SetItem(tup, 3, PyLong_FromLong(par.k));
+    PyTuple_SetItem(tup, 4, PyFloat_FromDouble(par.estimated_qtime));
+    PyTuple_SetItem(tup, 5, PyFloat_FromDouble(par.estimated_recall));
+
+    return tup;
+}
+
 static PyObject *save(mrptIndex *self, PyObject *args) {
     char *fn;
 
@@ -412,7 +426,16 @@ static PyObject *load(mrptIndex *self, PyObject *args) {
         return NULL;
     }
 
+    self->k = self->index->parameters().k;
+
     Py_RETURN_NONE;
+}
+
+static PyObject *is_autotuned(mrptIndex *self, PyObject *args) {
+  if (self->index->is_autotuned())
+    Py_RETURN_TRUE;
+  else
+    Py_RETURN_FALSE;
 }
 
 static PyMethodDef MrptMethods[] = {
@@ -428,10 +451,14 @@ static PyMethodDef MrptMethods[] = {
             "Build the index using autotuning"},
     {"subset", (PyCFunction) subset, METH_VARARGS,
             "Subset the trees"},
+    {"parameters", (PyCFunction) parameters, METH_VARARGS,
+            "Get the parameters of the index"},
     {"save", (PyCFunction) save, METH_VARARGS,
             "Save the index to a file"},
     {"load", (PyCFunction) load, METH_VARARGS,
             "Load the index from a file"},
+    {"is_autotuned", (PyCFunction) is_autotuned, METH_VARARGS,
+            "Get whether the index has been autotuned"},
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 

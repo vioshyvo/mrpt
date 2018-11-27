@@ -167,6 +167,18 @@ class MRPTIndex(object):
         new_index.autotuned = True
         return new_index
 
+    def parameters(self):
+        """
+        Get the parameters of the index.
+        :return: A dictionary of the hyperparameters of the index.
+        """
+        n_trees, depth, votes, k, qtime, recall = self.index.parameters()
+
+        if self.index.is_autotuned():
+            return {'n_trees': n_trees, 'depth': depth, 'k': k, 'votes': votes,
+                    'estimated_qtime': qtime, 'estimated_recall': recall}
+        return {'n_trees': n_trees, 'depth': depth}
+
     def save(self, path):
         """
         Saves the MRPT index to a file.
@@ -185,6 +197,7 @@ class MRPTIndex(object):
         """
         self.index.load(path)
         self.built = True
+        self.autotuned = self.index.is_autotuned()
 
     def ann(self, q, k=None, votes_required=None, return_distances=False):
         """
