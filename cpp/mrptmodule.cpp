@@ -382,7 +382,7 @@ static PyObject *subset(mrptIndex *self, PyObject *args) {
     mrptIndex *new_idx = reinterpret_cast<mrptIndex *>(type->tp_alloc(type, 0));
     std::memcpy(new_idx, self, sizeof(mrptIndex));
     (*new_idx->subset_refs)++;
-    new_idx->index = self->index->subset(target_recall);
+    new_idx->index = self->index->subset_pointer(target_recall);
 
     return reinterpret_cast<PyObject *>(new_idx);
 }
