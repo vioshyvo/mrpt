@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['save',['save',['../class_mrpt.html#af936713e7629e08e88d11346f2639ba0',1,'Mrpt']]],
-  ['subset',['subset',['../class_mrpt.html#a02a17c26b206605581818e3f44a48669',1,'Mrpt']]]
+  ['query',['query',['../class_mrpt.html#a637e67fe6eba9a6711f5eee65ad4a0da',1,'Mrpt::query(const float *data, int k, int vote_threshold, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const'],['../class_mrpt.html#a35235eb7acf4bff5fbfb12c9cd82f0b8',1,'Mrpt::query(const Eigen::Ref&lt; const Eigen::VectorXf &gt; &amp;q, int k, int vote_threshold, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const'],['../class_mrpt.html#a16fac96c266abcc778694e0b0cdc5f3c',1,'Mrpt::query(const float *q, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const'],['../class_mrpt.html#a9579b70d0553126363f6112a10ffb0eb',1,'Mrpt::query(const Eigen::Ref&lt; const Eigen::VectorXf &gt; &amp;q, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const']]]
 ];
