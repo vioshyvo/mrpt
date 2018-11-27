@@ -999,6 +999,9 @@ class Mrpt {
       }
 
       fclose(fd);
+
+      k = par.k;
+      votes = par.votes;
       return true;
     }
 
