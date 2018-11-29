@@ -42,6 +42,7 @@ static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
     self = reinterpret_cast<mrptIndex *>(type->tp_alloc(type, 0));
 
     if (self != NULL) {
+        self->index = NULL;
         self->data = NULL;
         self->subset_refs = new int(1);
     }
@@ -243,6 +244,11 @@ static void mrpt_dealloc(mrptIndex *self) {
 
         delete self->subset_refs;
     }
+
+    if (self->index) {
+      delete self->index;
+    }
+
     Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
 }
 
