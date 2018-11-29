@@ -1,4 +1,6 @@
 var searchData=
 [
-  ['query',['query',['../class_mrpt.html#addca829856be418a2f5ffd319900cb66',1,'Mrpt::query(const Eigen::Map&lt; const Eigen::VectorXf &gt; &amp;q, int k, int votes_required, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const'],['../class_mrpt.html#a4d1d6550397f391f84ed282627e3eb29',1,'Mrpt::query(const Eigen::VectorXf &amp;q, int k, int votes_required, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const'],['../class_mrpt.html#a2abd3cb56c37250f734e77a5e98d8f61',1,'Mrpt::query(const float *q, int k, int votes_required, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const'],['../class_mrpt.html#a839074e79dc82aa725844421cddde424',1,'Mrpt::query(const Eigen::Map&lt; const Eigen::VectorXf &gt; &amp;q, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const'],['../class_mrpt.html#a554608bbff97c61f81c3c3f15375601b',1,'Mrpt::query(const Eigen::VectorXf &amp;q, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const'],['../class_mrpt.html#a16fac96c266abcc778694e0b0cdc5f3c',1,'Mrpt::query(const float *q, int *out, float *out_distances=nullptr, int *out_n_elected=nullptr) const']]]
+  ['save',['save',['../class_mrpt.html#af936713e7629e08e88d11346f2639ba0',1,'Mrpt']]],
+  ['subset',['subset',['../class_mrpt.html#add8686a73cfae8d8391e85314acbe81a',1,'Mrpt']]],
+  ['subset_5fpointer',['subset_pointer',['../class_mrpt.html#a4dc319eab5e2bc9a5a6d7a6007cef34d',1,'Mrpt']]]
 ];
