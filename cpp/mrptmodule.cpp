@@ -1,6 +1,5 @@
 /*
- * This file wraps the C++11 Mrpt code to an extension module compatible with
- * Python 3.
+ * This file wraps the C++11 Mrpt code to an extension module compatible with Python 3.
  */
 
 #include "Python.h"
@@ -50,17 +49,25 @@ static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 }
 
 float *read_memory(char *file, int n, int dim) {
+    FILE *fd;
+    if ((fd = fopen(file, "rb")) == NULL) {
+        return NULL;
+    }
+
     float *data = new float[n * dim];
 
-    FILE *fd;
-    if ((fd = fopen(file, "rb")) == NULL)
+    if (data == NULL) {
+        fclose(fd);
         return NULL;
+    }
 
     int read = fread(data, sizeof(float), n * dim, fd);
     fclose(fd);
 
-    if (read != n * dim)
+    if (read != n * dim) {
+        delete[] data;
         return NULL;
+    }
 
     return data;
 }
@@ -200,7 +207,7 @@ static PyObject *build_autotune(mrptIndex *self, PyObject *args) {
     }
 
     if (from_mem)
-      delete[] data;
+        delete[] data;
 
     Py_RETURN_NONE;
 }
@@ -243,10 +250,8 @@ static void mrpt_dealloc(mrptIndex *self) {
             self->data = NULL;
         }
 
-        if (self->subset_refs) {
-            delete self->subset_refs;
-            self->subset_refs = NULL;
-        }
+        delete self->subset_refs;
+        self->subset_refs = NULL;
     }
 
     if (self->index) {
@@ -270,8 +275,7 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
     if (k < 0)
         k = self->k;
     if (elect < 0) {
-        struct Mrpt_Parameters par = self->index->parameters();
-        elect = par.votes;
+        elect = self->index->parameters().votes;
     }
 
     if (PyArray_NDIM(v) == 1) {
