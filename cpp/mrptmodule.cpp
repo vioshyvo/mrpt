@@ -38,8 +38,7 @@ typedef struct {
 } mrptIndex;
 
 static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
-    mrptIndex *self;
-    self = reinterpret_cast<mrptIndex *>(type->tp_alloc(type, 0));
+    mrptIndex *self = reinterpret_cast<mrptIndex *>(type->tp_alloc(type, 0));
 
     if (self != NULL) {
         self->index = NULL;
@@ -235,18 +234,24 @@ static void mrpt_dealloc(mrptIndex *self) {
     if (!(*self->subset_refs)) {
         if (self->data) {
 #ifndef _WIN32
-        if (self->mmap)
-            munmap(self->data, self->n * self->dim * sizeof(float));
-        else
+            if (self->mmap)
+                munmap(self->data, self->n * self->dim * sizeof(float));
+            else
 #endif
-            delete[] self->data;
+                delete[] self->data;
+
+            self->data = NULL;
         }
 
-        delete self->subset_refs;
+        if (self->subset_refs) {
+            delete self->subset_refs;
+            self->subset_refs = NULL;
+        }
     }
 
     if (self->index) {
-      delete self->index;
+        delete self->index;
+        self->index = NULL;
     }
 
     Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
@@ -384,12 +389,18 @@ static PyObject *subset(mrptIndex *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "f", &target_recall))
         return NULL;
 
-    PyTypeObject *type = Py_TYPE(self);
-    mrptIndex *new_idx = reinterpret_cast<mrptIndex *>(type->tp_alloc(type, 0));
-    std::memcpy(new_idx, self, sizeof(mrptIndex));
-    (*new_idx->subset_refs)++;
-    new_idx->index = self->index->subset_pointer(target_recall);
+    mrptIndex *new_idx = (mrptIndex *) PyObject_New(mrptIndex, Py_TYPE(self));
+    new_idx = (mrptIndex *) PyObject_Init((PyObject *) new_idx, Py_TYPE(self));
 
+    new_idx->data = self->data;
+    new_idx->subset_refs = self->subset_refs;
+    (*new_idx->subset_refs)++;
+    new_idx->mmap = self->mmap;
+    new_idx->n = self->n;
+    new_idx->dim = self->dim;
+    new_idx->k = self->k;
+
+    new_idx->index = self->index->subset_pointer(target_recall);
     return reinterpret_cast<PyObject *>(new_idx);
 }
 
