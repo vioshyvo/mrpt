@@ -28,6 +28,7 @@ using Eigen::VectorXi;
 typedef struct {
     PyObject_HEAD
     Mrpt *index;
+    PyObject *py_data;
     float *data;
     int *subset_refs;
     bool mmap;
@@ -42,6 +43,7 @@ static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
     if (self != NULL) {
         self->index = NULL;
         self->data = NULL;
+        self->py_data = NULL;
         self->subset_refs = new int(1);
     }
 
@@ -133,6 +135,8 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
         self->data = data;
     } else {
         data = reinterpret_cast<float *>(PyArray_DATA(py_data));
+        self->py_data = py_data;
+        Py_XINCREF(self->py_data);
     }
 
     self->n = n;
@@ -258,6 +262,9 @@ static void mrpt_dealloc(mrptIndex *self) {
         delete self->index;
         self->index = NULL;
     }
+
+    Py_XDECREF(self->py_data);
+    self->py_data = NULL;
 
     Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
 }
@@ -403,6 +410,8 @@ static PyObject *subset(mrptIndex *self, PyObject *args) {
     new_idx->n = self->n;
     new_idx->dim = self->dim;
     new_idx->k = self->k;
+    new_idx->py_data = self->py_data;
+    Py_XINCREF(new_idx->py_data);
 
     new_idx->index = self->index->subset_pointer(target_recall);
     return reinterpret_cast<PyObject *>(new_idx);
