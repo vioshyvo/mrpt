@@ -369,12 +369,16 @@ class Mrpt {
         throw std::out_of_range("The density must be on the interval (0,1].");
       }
 
+      if(n_samples < 101) {
+        throw std::out_of_range("Sample size must be at least 101 to autotune an index.");
+      }
+
       if (trees_max == - 1) {
         trees_max = std::min(std::sqrt(n_samples), 1000.0);
       }
 
       if (depth_min_ == -1) {
-        depth_min = std::min(static_cast<int>(std::log2(n_samples)), 5);
+        depth_min = std::max(static_cast<int>(std::log2(n_samples) - 11), 5);
       } else {
         depth_min = depth_min_;
       }
