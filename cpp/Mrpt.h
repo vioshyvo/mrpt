@@ -1466,7 +1466,7 @@ class Mrpt {
       std::uniform_int_distribution<int> uni2(0, n_samples - 1);
 
       std::vector<double> ex;
-      int n_sim = 100;
+      int n_sim = 20;
       for (int i = 0; i < (int) s_tested.size(); ++i) {
         double mean_exact_time = 0;
         int s_size = s_tested[i];
