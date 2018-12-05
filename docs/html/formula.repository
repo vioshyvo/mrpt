@@ -15,3 +15,7 @@
 \form#14:$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) $
 \form#15:$ \sqrt{d} $
 \form#16:$ \mathrm{min}(\sqrt{n}, 1000)$
+\form#17:$ \lfloor \log_2 (n) \rfloor - 1 $
+\form#18:$ \lfloor \log_2 (n) \rfloor - 11 $
+\form#19:$ \mathrm{max}(\lfloor \log_2 (n) \rfloor - 11, 5)$
+\form#20:$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, \mathrm{min}(10, \mathrm{trees\_max})) $

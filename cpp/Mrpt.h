@@ -164,10 +164,11 @@ class Mrpt {
     * @param depth_min_ minimum depth of trees considered when searching for
     * optimal parameters; in the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
-    * sets this to 5
+    * sets this to \f$ \mathrm{max}(\lfloor \log_2 (n) \rfloor - 11, 5)\f$
     * @param votes_max_ maximum number of votes considered when searching for
     * optimal parameters; a default value -1 sets this to
-    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor,
+    * \mathrm{min}(10, \mathrm{trees\_max})) \f$
     * @param density expected proportion of non-zero components in the random vectors;
     * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
     * the dimension of data
@@ -201,10 +202,11 @@ class Mrpt {
     * @param depth_min_ minimum depth of trees considered when searching for
     * optimal parameters; in the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
-    * sets this to 5
+    * sets this to \f$ \mathrm{max}(\lfloor \log_2 (n) \rfloor - 11, 5)\f$
     * @param votes_max_ maximum number of votes considered when searching for
     * optimal parameters; a default value -1 sets this to
-    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor,
+    * \mathrm{min}(10, \mathrm{trees\_max})) \f$
     * @param density expected proportion of non-zero components in the random vectors;
     * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
     * the dimension of data
@@ -239,10 +241,11 @@ class Mrpt {
     * @param depth_min_ minimum depth of trees considered when searching for
     * optimal parameters; in the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
-    * sets this to 5
+    * sets this to \f$ \mathrm{max}(\lfloor \log_2 (n) \rfloor - 11, 5)\f$
     * @param votes_max_ maximum number of votes considered when searching for
     * optimal parameters; a default value -1 sets this to
-    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor,
+    * \mathrm{min}(10, \mathrm{trees\_max})) \f$
     * @param density_ expected proportion of non-zero components in the random vectors;
     * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
     * the dimension of data
@@ -325,10 +328,11 @@ class Mrpt {
     * @param depth_min_ minimum depth of trees considered when searching for
     * optimal parameters; in the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
-    * sets this to 5
+    * sets this to \f$ \mathrm{max}(\lfloor \log_2 (n) \rfloor - 11, 5)\f$
     * @param votes_max_ maximum number of votes considered when searching for
     * optimal parameters; a default value -1 sets this to
-    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor,
+    * \mathrm{min}(10, \mathrm{trees\_max})) \f$
     * @param density_ expected proportion of non-zero components in the random vectors;
     * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
     * the dimension of data
@@ -341,6 +345,26 @@ class Mrpt {
               int depth_min_ = -1, int votes_max_ = -1, float density_ = -1.0, int seed = 0,
               const std::vector<int> &indices_test = {}) {
 
+      if (trees_max == - 1) {
+        trees_max = std::min(std::sqrt(n_samples), 1000.0);
+      }
+
+      if (depth_min_ == -1) {
+        depth_min_ = std::max(static_cast<int>(std::log2(n_samples) - 11), 5);
+      }
+
+      if (depth_max == -1) {
+        depth_max = std::max(static_cast<int>(std::log2(n_samples) - 4), depth_min_);
+      }
+
+      if (votes_max_ == -1) {
+        votes_max_ = std::max(trees_max / 10, std::min(trees_max, 10));
+      }
+
+      if (density_ > -1.0001 && density_ < -0.9999) {
+        density_ = 1.0 / std::sqrt(dim);
+      }
+
       if (!empty()) {
         throw std::logic_error("The index has already been grown.");
       }
@@ -349,23 +373,23 @@ class Mrpt {
         throw std::out_of_range("k_ must belong to the set {1, ..., n}.");
       }
 
-      if (trees_max < -1 || trees_max == 0) {
+      if (trees_max <= 0) {
         throw std::out_of_range("trees_max must be positive.");
       }
 
-      if (depth_max < -1 || depth_max == 0 || depth_max > std::log2(n_samples)) {
+      if (depth_max <= 0 || depth_max > std::log2(n_samples)) {
         throw std::out_of_range("depth_max must belong to the set {1, ... , log2(n)}.");
       }
 
-      if (depth_min_ < -1 || depth_min_ == 0 || depth_min_ > depth_max) {
+      if (depth_min_ <= 0 || depth_min_ > depth_max) {
         throw std::out_of_range("depth_min_ must belong to the set {1, ... , depth_max}");
       }
 
-      if (votes_max_ < -1 || votes_max_ == 0 || votes_max_ > trees_max) {
+      if (votes_max_ <= 0 || votes_max_ > trees_max) {
         throw std::out_of_range("votes_max_ must belong to the set {1, ... , trees_max}.");
       }
 
-      if (density_ < -1.0001 || density_ > 1.0001 || (density_ > -0.9999 && density_ < -0.0001)) {
+      if (density_ < 0.0 || density_ > 1.0001) {
         throw std::out_of_range("The density must be on the interval (0,1].");
       }
 
@@ -373,36 +397,13 @@ class Mrpt {
         throw std::out_of_range("Sample size must be at least 101 to autotune an index.");
       }
 
-      if (trees_max == - 1) {
-        trees_max = std::min(std::sqrt(n_samples), 1000.0);
-      }
-
-      if (depth_min_ == -1) {
-        depth_min = std::max(static_cast<int>(std::log2(n_samples) - 11), 5);
-      } else {
-        depth_min = depth_min_;
-      }
-
-      if (depth_max == -1) {
-        depth_max = std::max(static_cast<int>(std::log2(n_samples) - 4), depth_min);
-      }
-
-      if (votes_max_ == -1) {
-        votes_max = std::max(trees_max / 10, std::min(trees_max, 10));
-      } else {
-        votes_max = votes_max_;
-      }
-
-      if (density_ < 0) {
-        density = 1.0 / std::sqrt(dim);
-      } else {
-        density = density_;
-      }
-
+      depth_min = depth_min_;
+      votes_max = votes_max_;
       k = k_;
+
       const Eigen::Map<const Eigen::MatrixXf> Q(data, dim, n_test);
 
-      grow(trees_max, depth_max, density, seed);
+      grow(trees_max, depth_max, density_, seed);
       Eigen::MatrixXi exact(k, n_test);
       compute_exact(Q, exact, indices_test);
 
@@ -453,10 +454,11 @@ class Mrpt {
     * @param depth_min_ minimum depth of trees considered when searching for
     * optimal parameters on the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
-    * sets this to 5
+    * sets this to \f$ \mathrm{max}(\lfloor \log_2 (n) \rfloor - 11, 5)\f$
     * @param votes_max_ maximum number of votes considered when searching for
     * optimal parameters; a default value -1 sets this to
-    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor,
+    * \mathrm{min}(10, \mathrm{trees\_max})) \f$
     * @param density_ expected proportion of non-zero components of random vectors;
     * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
     * the dimension of data
@@ -486,10 +488,11 @@ class Mrpt {
     * @param depth_min_ minimum depth of trees considered when searching for
     * optimal parameters on the set
     * \f$\{1,2, \dots ,\lfloor \log_2 (n) \rfloor \}\f$; a default value -1
-    * sets this to 5
+    * sets this to \f$ \mathrm{max}(\lfloor \log_2 (n) \rfloor - 11, 5)\f$
     * @param votes_max_ maximum number of votes considered when searching for
     * optimal parameters; a default value -1 sets this to
-    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor, 10) \f$
+    * \f$ \mathrm{max}(\lfloor \mathrm{trees\_max} / 10 \rfloor,
+    * \mathrm{min}(10, \mathrm{trees\_max})) \f$
     * @param density_ expected proportion of non-zero components of random vectors;
     * default value -1.0 sets this to \f$ 1 / \sqrt{d} \f$, where \f$ d\f$ is
     * the dimension of data
