@@ -4,11 +4,13 @@
 
 [![Documentation](https://img.shields.io/badge/api-reference-blue.svg)](http://vioshyvo.github.io/mrpt/html/index.html)
 
-MRPT is a lightweight and easy-to-use library for approximate nearest neighbor search. It is written in C++11 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level!
+MRPT is a lightweight and easy-to-use library for approximate nearest neighbor search. It is written in C++11 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level! 
 
 According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MRPT is one of the fastest libraries for approximate nearest neighbor search.
 
 In the offline phase of the algorithm MRPT indexes the data with a collection of *random projection trees*. In the online phase the index structure allows us to answer queries in superior time. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found in [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) that was published in IEEE International Conference on Big Data 2016.
+
+The algorithm for automatic hyperparameter tuning is described in detail in our new article that will be presented in Pacific-Asia Conference on Knowledge Discovery and Data Mining 2019 ([arxiv preprint](https://arxiv.org/abs/1812.07484)).
 
 Currently the Euclidean distance is supported as a distance metric.
 
@@ -109,6 +111,19 @@ Here is a sample output:
 The approximate nearest neighbor search found 9 of 10 true nearest neighbors; so this time the observed recall happened to match the expected recall exactly (results vary between the runs because the algorithm is randomized).
 
 ## Citation
+Automatic hyperparameter tuning:
+~~~~
+@inproceedings{Jaasaari2019,
+  title={Efficient Autotuning of Hyperparameters in Approximate Nearest Neighbor Search},
+  author={J{\"a}{\"a}saari, Elias and Hyv{\"o}nen, Ville and Roos, Teemu},
+  booktitle={Pacific-Asia Conference on Knowledge Discovery and Data Mining},
+  pages={In press},
+  year={2019},
+  organization={Springer}
+}
+~~~~
+
+MRPT algorithm:
 ~~~~
 @inproceedings{Hyvonen2016,
   title={Fast nearest neighbor search through sparse random projections and voting},
@@ -119,7 +134,6 @@ The approximate nearest neighbor search found 9 of 10 true nearest neighbors; so
   organization={IEEE}
 }
 ~~~~
-
 
 ## MRPT for other languages
 
