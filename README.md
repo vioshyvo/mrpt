@@ -29,9 +29,12 @@ The tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test)
 
 ## Python installation
 
-Install the module with `pip install git+https://github.com/vioshyvo/mrpt/`
+C++ compiler is needed for building python wrapper.
 
-On MacOS, LLVM is needed for compiling: `brew install llvm libomp`
+On MacOS, LLVM is needed for compiling: `brew install llvm libomp`.
+On Windows, you may use MSVC compiler.
+
+Install the module with `pip install git+https://github.com/vioshyvo/mrpt/`
 
 ## Minimal examples
 
