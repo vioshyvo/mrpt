@@ -1,0 +1,11 @@
+*
+
+!cpp
+!utils
+!*.py
+!README.md
+!LICENSE.txt
+!requirements.txt
+
+**/__pycache__
+**/*.egg-info

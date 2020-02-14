@@ -1,40 +1,84 @@
 #!/usr/bin/python
 
-import setuptools
-import numpy
-from setuptools import Extension
+import sys
 
-# Not all CPUs have march as a tuning parameter
-import platform
-cputune, libraries, fopenmp, llvm = ['-march=native'], [], ['-fopenmp'], ['-lgomp']
-if platform.machine() == 'ppc64le':
-    cputune = ['-mcpu=native']
-if platform.system() == 'Darwin':
-    fopenmp = ['-Xpreprocessor', '-fopenmp']
-    llvm = ['-lomp']
-if platform.system() == 'Windows':
-    libraries = []
-else:
-    libraries = ['stdc++']
+import setuptools
+from setuptools import Extension
+from setuptools.command.build_ext import build_ext
+
+with open('requirements.txt', 'r') as fo:
+    requirements = [line for line in fo]
+
+source_files = ['cpp/mrptmodule.cpp']
+ext_modules = [
+    Extension(
+        'mrptlib',
+        source_files,
+        language='c++14',
+    )
+]
+
+
+class BuildExt(build_ext):
+    """A custom build extension for adding compiler-specific options.
+
+    Assume that C++14 is available.
+    """
+    c_opts = {
+        'msvc': ['/EHsc', '/openmp', '/O2', '/D "NDEBUG"'],
+        'unix': ['-march=native', '-std=c++14', '-Ofast', '-DNDEBUG', '-fopenmp'],
+    }
+    link_opts = {
+        'unix': ['-fopenmp', '-pthread'],
+        'msvc': [],
+    }
+    libraries_opt = {
+        'msvc': [],
+        'unix': ['stdc++'],
+    }
+
+    if sys.platform == 'darwin':
+        c_opts['unix'] += ['-Xpreprocessor', '-stdlib=libc++', '-mmacosx-version-min=10.7']
+        link_opts['unix'] += ['-lomp', '-stdlib=libc++', '-mmacosx-version-min=10.7']
+    else:
+        link_opts['unix'] += ['-lgomp']
+
+    def build_extensions(self):
+        ct = self.compiler.compiler_type
+        opts = self.c_opts.get(ct, [])
+
+        # extend include dirs here (don't assume numpy/pybind11 are installed when first run, since
+        # pip could have installed them as part of executing this script
+        # import pybind11
+        import numpy as np
+        for ext in self.extensions:
+            ext.libraries.extend(self.libraries_opt.get(ct, []))
+            ext.language = 'c++14'
+            ext.extra_compile_args.extend(opts)
+            ext.extra_link_args.extend(self.link_opts.get(ct, []))
+            ext.include_dirs.extend([
+                'cpp/lib',
+
+                # Path to numpy headers
+                np.get_include()
+            ])
+
+        build_ext.build_extensions(self)
+
 
 setuptools.setup(
     name='mrpt',
+    author='Ville Hyvönen',
+    author_email='ville.o.hyvonen@helsinki.fi',
     version='1.0',
+    description='Fast nearest neighbor search with random projection',
     url='http://github.com/vioshyvo/mrpt',
-    install_requires=[],
+    license='MIT',
+    install_requires=requirements,
+    setup_requires=requirements,
     packages={'.': 'mrpt'},
     zip_safe=False,
     test_suite='py.test',
-    entry_points='',
-    ext_modules=[
-        Extension('mrptlib',
-            sources=[
-                'cpp/mrptmodule.cpp',
-            ],
-            extra_compile_args=['-std=c++11', '-Ofast', '-DNDEBUG'] + cputune + fopenmp,
-            libraries=libraries,
-            extra_link_args=llvm,
-            include_dirs=['cpp/lib', numpy.get_include()]
-        )
-    ]
+    ext_modules=ext_modules,
+    cmdclass={'build_ext': BuildExt},
 )

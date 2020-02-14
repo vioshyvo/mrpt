@@ -29,9 +29,22 @@ The tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test)
 
 ## Python installation
 
+C++ compiler is needed for building python wrapper.
+
+On MacOS, LLVM is needed for compiling: `brew install llvm libomp`.
+
+On Windows, you may use MSVC compiler.
+
 Install the module with `pip install git+https://github.com/vioshyvo/mrpt/`
 
-On MacOS, LLVM is needed for compiling: `brew install llvm libomp`
+### Docker
+
+An example docker file is provided, which builds MRPT python wrapper in Linux environment.
+
+```shell script
+docker build -t mrpt .
+docker run --rm -it mrpt
+``` 
 
 ## Minimal examples
 
