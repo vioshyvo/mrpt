@@ -343,6 +343,9 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
       return out_tuple;
     } else {
       Py_BEGIN_ALLOW_THREADS;
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
       for (int i = 0; i < n; ++i) {
         self->index->query(indata + i * dim, k, elect, outdata + i * k);
       }
@@ -413,6 +416,9 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
       return out_tuple;
     } else {
       Py_BEGIN_ALLOW_THREADS;
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
       for (int i = 0; i < n; ++i) {
         self->index->exact_knn(indata + i * dim, k, outdata + i * k);
       }
