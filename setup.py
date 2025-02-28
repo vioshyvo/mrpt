@@ -115,7 +115,7 @@ setuptools.setup(
     name="mrpt",
     author="Ville Hyvönen",
     author_email="ville.o.hyvonen@helsinki.fi",
-    version="2.0",
+    version="2.0.1",
     description="Fast nearest neighbor search with random projection",
     long_description=long_description,
     long_description_content_type="text/markdown",
