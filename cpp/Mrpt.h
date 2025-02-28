@@ -16,6 +16,8 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 
+#include "miniselect/pdqselect.h"
+
 struct Mrpt_Parameters {
   int n_trees = 0; /**< Number of trees in the index. */
   int depth = 0; /**< Depth of the trees in the index. */
@@ -840,7 +842,7 @@ class Mrpt {
 
       Eigen::VectorXi idx(n_samples);
       std::iota(idx.data(), idx.data() + n_samples, 0);
-      std::partial_sort(idx.data(), idx.data() + k, idx.data() + n_samples,
+      miniselect::pdqpartial_sort_branchless(idx.data(), idx.data() + k, idx.data() + n_samples,
                        [&distances](int i1, int i2) { return distances(i1) < distances(i2); });
 
       for (int i = 0; i < k; ++i)
@@ -1056,7 +1058,7 @@ class Mrpt {
 
       if (tree_level == depth) return;
 
-      std::nth_element(begin, begin + n / 2, end,
+      miniselect::pdqselect_branchless(begin, begin + n / 2, end,
           [&tree_projections, tree_level] (int i1, int i2) {
             return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
           });
@@ -1115,7 +1117,7 @@ class Mrpt {
       int n_to_sort = n_elected > k ? k : n_elected;
       Eigen::VectorXi idx(n_elected);
       std::iota(idx.data(), idx.data() + n_elected, 0);
-      std::partial_sort(idx.data(), idx.data() + n_to_sort, idx.data() + n_elected,
+      miniselect::pdqpartial_sort_branchless(idx.data(), idx.data() + n_to_sort, idx.data() + n_elected,
                        [&distances](int i1, int i2) { return distances(i1) < distances(i2); });
 
       for (int i = 0; i < k; ++i)
@@ -1562,14 +1564,14 @@ class Mrpt {
       }
 
       int n_slopes = slopes.size();
-      std::nth_element(slopes.begin(), slopes.begin() + n_slopes / 2, slopes.end());
+      miniselect::pdqselect_branchless(slopes.begin(), slopes.begin() + n_slopes / 2, slopes.end());
       double slope = *(slopes.begin() + n_slopes / 2);
 
       std::vector<double> residuals(n);
       for (int i = 0; i < n; ++i)
         residuals[i] = y[i] - slope * x[i];
 
-      std::nth_element(residuals.begin(), residuals.begin() + n / 2, residuals.end());
+      miniselect::pdqselect_branchless(residuals.begin(), residuals.begin() + n / 2, residuals.end());
       double intercept = *(residuals.begin() + n / 2);
 
       return std::make_pair(intercept, slope);
