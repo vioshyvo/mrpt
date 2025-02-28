@@ -17,6 +17,8 @@ Currently the Euclidean distance is supported as a distance metric.
 The tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test).
 ## New
 
+- Release [MRPT 2.0.0](https://github.com/vioshyvo/mrpt/releases/tag/release-2.0.0) : pip package and bug fixes. (2025/02/28)
+
 - Release [MRPT 1.1.1](https://github.com/vioshyvo/mrpt/releases/tag/release-1.1.1) : faster autotuning and bug fixes. (2018/12/07)
 
 - Release [MRPT 1.1.0](https://github.com/vioshyvo/mrpt/releases/tag/release-1.1.0) : now autotuning works also without a separate set of test queries. (2018/11/24)
@@ -29,22 +31,13 @@ The tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test)
 
 ## Python installation
 
-C++ compiler is needed for building python wrapper.
+Install the module with `pip install mrpt`
 
-On MacOS, LLVM is needed for compiling: `brew install llvm libomp`.
-
-On Windows, you may use MSVC compiler.
-
-Install the module with `pip install git+https://github.com/vioshyvo/mrpt/`
-
-### Docker
-
-An example docker file is provided, which builds MRPT python wrapper in Linux environment.
-
-```shell script
-docker build -t mrpt .
-docker run --rm -it mrpt
-``` 
+On macOS, it is highly recommended to use the Homebrew version of Clang as the compiler:
+```
+brew install llvm libomp
+CC=/opt/homebrew/opt/llvm/bin/clang CXX=/opt/homebrew/opt/llvm/bin/clang++ LDFLAGS=-L/opt/homebrew/opt/llvm/lib pip install lorann
+```
 
 ## Minimal examples
 
@@ -83,7 +76,7 @@ Here is a sample output:
 
 MRPT is a header-only library, so no compilation is required: just include the header `cpp/Mrpt.h`. The only dependency is the Eigen linear algebra library (Eigen 3.3.5 is bundled in `cpp/lib`), so when using g++, the following minimal example can be compiled for example as:
 ```
-g++ -std=c++11 -Ofast -march=native -Icpp -Icpp/lib ex1.cpp -o ex1 -fopenmp -lgomp
+g++ -std=c++14 -Ofast -march=native -Icpp -Icpp/lib ex1.cpp -o ex1 -fopenmp -lgomp
 ```
 
 Let's first generate a 200-dimensional data set of 10000 points, and a query point (row = dimension, column = data point). Then `Mrpt::exact_knn` can be used to find the indices of the true 10 nearest neighbors of the test query.
@@ -147,10 +140,6 @@ MRPT algorithm:
   organization={IEEE}
 }
 ~~~~
-
-## MRPT for other languages
-
-- [Go](https://github.com/rikonor/go-ann)
 
 ## License
 
