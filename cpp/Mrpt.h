@@ -1391,7 +1391,7 @@ class Mrpt {
           build_dense_random_matrix(dense_mat, n_random_vectors, dim);
         }
 
-        double start_proj = omp_get_wtime();
+        const auto start_proj = std::chrono::steady_clock::now();
         Eigen::VectorXf projected_query(n_random_vectors);
 
         if (density < 1) {
@@ -1400,8 +1400,8 @@ class Mrpt {
           projected_query.noalias() = dense_mat * Q.col(0);
         }
 
-        double end_proj = omp_get_wtime();
-        projection_times.push_back(end_proj - start_proj);
+        const auto end_proj = std::chrono::steady_clock::now();
+        projection_times.push_back(std::chrono::duration<double>(end_proj - start_proj).count());
         idx_sum += projected_query.norm();
 
         int votes_index = votes_max < t ? votes_max : t;
@@ -1452,11 +1452,11 @@ class Mrpt {
             projected_query.noalias() = dense_random_matrix * Q.col(ri);
           }
 
-          double start_voting = omp_get_wtime();
+          const auto start_voting = std::chrono::steady_clock::now();
           vote(projected_query, v, elected, n_el, t, d);
-          double end_voting = omp_get_wtime();
+          const auto end_voting = std::chrono::steady_clock::now();
 
-          voting_times.push_back(end_voting - start_voting);
+          voting_times.push_back(std::chrono::duration<double>(end_voting - start_voting).count());
           voting_x.push_back(t);
           for (int i = 0; i < n_el; ++i) idx_sum += elected(i);
         }
@@ -1508,12 +1508,12 @@ class Mrpt {
         Eigen::VectorXi elected(s_size);
         for (int j = 0; j < elected.size(); ++j) elected(j) = uni2(rng);
 
-        double start_exact = omp_get_wtime();
+        const auto start_exact = std::chrono::steady_clock::now();
         std::vector<int> res(k);
         exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + ri * dim, dim), k, elected, s_size,
                   &res[0]);
-        double end_exact = omp_get_wtime();
-        mean_exact_time += (end_exact - start_exact);
+        const auto end_exact = std::chrono::steady_clock::now();
+        mean_exact_time += std::chrono::duration<double>(end_exact - start_exact).count();
 
         for (int l = 0; l < k; ++l) idx_sum += res[l];
       }
