@@ -18,7 +18,6 @@
 
 #include "miniselect/pdqselect.h"
 
-
 struct Mrpt_Parameters {
   int n_trees = 0;               /**< Number of trees in the index. */
   int depth = 0;                 /**< Depth of the trees in the index. */
@@ -126,7 +125,9 @@ class Mrpt {
     count_first_leaf_indices_all(leaf_first_indices_all, n_samples, depth);
     leaf_first_indices = leaf_first_indices_all[depth];
 
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
     for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
       Eigen::MatrixXf tree_projections;
 

@@ -152,7 +152,10 @@ static PyObject *build(mrptIndex *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, "iif", &n_trees, &depth, &density)) return NULL;
 
   try {
+    Py_BEGIN_ALLOW_THREADS;
     self->index->grow(n_trees, depth, density);
+    Py_END_ALLOW_THREADS;
+
   } catch (const std::exception &e) {
     PyErr_SetString(PyExc_RuntimeError, e.what());
   }
@@ -200,11 +203,16 @@ static PyObject *build_autotune(mrptIndex *self, PyObject *args) {
   self->k = k;
 
   try {
-    if (target_recall < 0)
+    if (target_recall < 0) {
+      Py_BEGIN_ALLOW_THREADS;
       self->index->grow(data, n_test, k, trees_max, depth_max, depth_min, votes_max, density);
-    else
+      Py_END_ALLOW_THREADS;
+    } else {
+      Py_BEGIN_ALLOW_THREADS;
       self->index->grow(target_recall, data, n_test, k, trees_max, depth_max, depth_min, votes_max,
                         density);
+      Py_END_ALLOW_THREADS;
+    }
   } catch (const std::exception &e) {
     PyErr_SetString(PyExc_RuntimeError, e.what());
   }
@@ -225,11 +233,16 @@ static PyObject *build_autotune_sample(mrptIndex *self, PyObject *args) {
   self->k = k;
 
   try {
-    if (target_recall < 0)
+    if (target_recall < 0) {
+      Py_BEGIN_ALLOW_THREADS;
       self->index->grow_autotune(k, trees_max, depth_max, depth_min, votes_max, density, 0, n_test);
-    else
+      Py_END_ALLOW_THREADS;
+    } else {
+      Py_BEGIN_ALLOW_THREADS;
       self->index->grow_autotune(target_recall, k, trees_max, depth_max, depth_min, votes_max,
                                  density, 0, n_test);
+      Py_END_ALLOW_THREADS;
+    }
   } catch (const std::exception &e) {
     PyErr_SetString(PyExc_RuntimeError, e.what());
   }
@@ -291,14 +304,18 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
     if (return_distances) {
       PyObject *distances = PyArray_SimpleNew(1, dims, NPY_FLOAT32);
       float *out_distances = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *)distances));
+      Py_BEGIN_ALLOW_THREADS;
       self->index->query(indata, k, elect, outdata, out_distances);
+      Py_END_ALLOW_THREADS;
 
       PyObject *out_tuple = PyTuple_New(2);
       PyTuple_SetItem(out_tuple, 0, nearest);
       PyTuple_SetItem(out_tuple, 1, distances);
       return out_tuple;
     } else {
+      Py_BEGIN_ALLOW_THREADS;
       self->index->query(indata, k, elect, outdata);
+      Py_END_ALLOW_THREADS;
       return nearest;
     }
   } else {
@@ -314,18 +331,25 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
       PyObject *distances = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
       float *distances_out = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *)distances));
 
+      Py_BEGIN_ALLOW_THREADS;
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
       for (int i = 0; i < n; ++i) {
         self->index->query(indata + i * dim, k, elect, outdata + i * k, distances_out + i * k);
       }
+      Py_END_ALLOW_THREADS;
 
       PyObject *out_tuple = PyTuple_New(2);
       PyTuple_SetItem(out_tuple, 0, nearest);
       PyTuple_SetItem(out_tuple, 1, distances);
       return out_tuple;
     } else {
+      Py_BEGIN_ALLOW_THREADS;
       for (int i = 0; i < n; ++i) {
         self->index->query(indata + i * dim, k, elect, outdata + i * k);
       }
+      Py_END_ALLOW_THREADS;
       return nearest;
     }
   }
@@ -350,14 +374,18 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
     if (return_distances) {
       PyObject *distances = PyArray_SimpleNew(1, dims, NPY_FLOAT32);
       float *out_distances = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *)distances));
+      Py_BEGIN_ALLOW_THREADS;
       self->index->exact_knn(indata, k, outdata, out_distances);
+      Py_END_ALLOW_THREADS;
 
       PyObject *out_tuple = PyTuple_New(2);
       PyTuple_SetItem(out_tuple, 0, nearest);
       PyTuple_SetItem(out_tuple, 1, distances);
       return out_tuple;
     } else {
+      Py_BEGIN_ALLOW_THREADS;
       self->index->exact_knn(indata, k, outdata);
+      Py_END_ALLOW_THREADS;
       return nearest;
     }
   } else {
@@ -373,17 +401,25 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
       PyObject *distances = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
       float *distances_out = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *)distances));
 
+      Py_BEGIN_ALLOW_THREADS;
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
       for (int i = 0; i < n; ++i) {
         self->index->exact_knn(indata + i * dim, k, outdata + i * k, distances_out + i * k);
       }
+      Py_END_ALLOW_THREADS;
+
       PyObject *out_tuple = PyTuple_New(2);
       PyTuple_SetItem(out_tuple, 0, nearest);
       PyTuple_SetItem(out_tuple, 1, distances);
       return out_tuple;
     } else {
+      Py_BEGIN_ALLOW_THREADS;
       for (int i = 0; i < n; ++i) {
         self->index->exact_knn(indata + i * dim, k, outdata + i * k);
       }
+      Py_END_ALLOW_THREADS;
       return nearest;
     }
   }
