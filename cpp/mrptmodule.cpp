@@ -270,7 +270,7 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
   PyArrayObject *v;
   int k, elect, dim, n, return_distances;
 
-  if (!PyArg_ParseTuple(args, "Oiii", &PyArray_Type, &v, &k, &elect, &return_distances))
+  if (!PyArg_ParseTuple(args, "O!iii", &PyArray_Type, &v, &k, &elect, &return_distances))
     return NULL;
 
   float *indata = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *)v));
@@ -335,7 +335,7 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
   PyArrayObject *v;
   int k, n, dim, return_distances;
 
-  if (!PyArg_ParseTuple(args, "Oii", &PyArray_Type, &v, &k, &return_distances)) return NULL;
+  if (!PyArg_ParseTuple(args, "O!ii", &PyArray_Type, &v, &k, &return_distances)) return NULL;
 
   float *indata = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *)v));
   PyObject *nearest;
