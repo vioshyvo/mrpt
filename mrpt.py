@@ -8,6 +8,7 @@ class MRPTIndex(object):
     """
     An MRPT index object
     """
+
     def __init__(self, data, shape=None, mmap=False):
         """
         Initializes an MRPT index object.
@@ -21,18 +22,20 @@ class MRPTIndex(object):
                 raise ValueError("The data matrix should be non-empty and two-dimensional")
             if data.dtype != np.float32:
                 raise ValueError("The data matrix should have type float32")
-            if not data.flags['C_CONTIGUOUS'] or not data.flags['ALIGNED']:
+            if not data.flags["C_CONTIGUOUS"] or not data.flags["ALIGNED"]:
                 raise ValueError("The data matrix has to be C_CONTIGUOUS and ALIGNED")
             n_samples, dim = data.shape
         elif isinstance(data, str):
             if not isinstance(shape, tuple) or len(shape) != 2:
-                raise ValueError("You must specify the shape of the data as a tuple (N, dim) "
-                                 "when loading data from a binary file")
+                raise ValueError(
+                    "You must specify the shape of the data as a tuple (N, dim) "
+                    "when loading data from a binary file"
+                )
             n_samples, dim = shape
         elif data is not None:
             raise ValueError("Data must be either an ndarray or a filepath")
 
-        if mmap and os_name == 'nt':
+        if mmap and os_name == "nt":
             raise ValueError("Memory mapping is not available on Windows")
 
         if data is not None:
@@ -43,14 +46,15 @@ class MRPTIndex(object):
         self.autotuned = False
 
     def _compute_sparsity(self, projection_sparsity):
-        if projection_sparsity == 'auto':
-            return 1. / np.sqrt(self.dim)
-        elif projection_sparsity is None:
+        if projection_sparsity == "auto":
+            return 1.0 / np.sqrt(self.dim)
+        if projection_sparsity is None:
             return 1
-        elif not 0 < projection_sparsity <= 1:
+        if not (0 < projection_sparsity <= 1):
             raise ValueError("Sparsity should be in (0, 1]")
+        return projection_sparsity
 
-    def build(self, depth, n_trees, projection_sparsity='auto'):
+    def build(self, depth, n_trees, projection_sparsity="auto"):
         """
         Builds a normal MRPT index.
         :param depth: The depth of the trees; should be in the set {1, 2, ..., floor(log2(n))}.
@@ -65,8 +69,18 @@ class MRPTIndex(object):
         self.index.build(n_trees, depth, projection_sparsity)
         self.built = True
 
-    def build_autotune(self, target_recall, Q, k, trees_max=-1, depth_min=-1, depth_max=-1,
-                       votes_max=-1, projection_sparsity='auto', shape=None):
+    def build_autotune(
+        self,
+        target_recall,
+        Q,
+        k,
+        trees_max=-1,
+        depth_min=-1,
+        depth_max=-1,
+        votes_max=-1,
+        projection_sparsity="auto",
+        shape=None,
+    ):
         """
         Builds an autotuned MRPT index.
         :param target_recall: The target recall level (float) or None if the target recall level
@@ -94,19 +108,23 @@ class MRPTIndex(object):
                 raise ValueError("The test query matrix should be non-empty and two-dimensional")
             if Q.dtype != np.float32:
                 raise ValueError("The test query matrix should have type float32")
-            if not Q.flags['C_CONTIGUOUS'] or not Q.flags['ALIGNED']:
+            if not Q.flags["C_CONTIGUOUS"] or not Q.flags["ALIGNED"]:
                 raise ValueError("The test query matrix has to be C_CONTIGUOUS and ALIGNED")
             n_test, dim = Q.shape
         elif isinstance(Q, str):
             if not isinstance(shape, tuple) or len(shape) != 2:
-                raise ValueError("You must specify the shape of the data as a tuple (n_test, dim) "
-                                 "when loading the test query matrix from a binary file")
+                raise ValueError(
+                    "You must specify the shape of the data as a tuple (n_test, dim) "
+                    "when loading the test query matrix from a binary file"
+                )
             n_test, dim = shape
         else:
             raise ValueError("The test query matrix must be either an ndarray or a filepath")
 
         if dim != self.dim:
-            raise ValueError("The test query matrix should have the same number of columns as the data matrix")
+            raise ValueError(
+                "The test query matrix should have the same number of columns as the data matrix"
+            )
 
         self.built = target_recall is not None
         self.autotuned = True
@@ -116,10 +134,28 @@ class MRPTIndex(object):
 
         projection_sparsity = self._compute_sparsity(projection_sparsity)
         self.index.build_autotune(
-                target_recall, Q, n_test, k, trees_max, depth_min, depth_max, votes_max, projection_sparsity)
+            target_recall,
+            Q,
+            n_test,
+            k,
+            trees_max,
+            depth_min,
+            depth_max,
+            votes_max,
+            projection_sparsity,
+        )
 
-    def build_autotune_sample(self, target_recall, k, n_test=100, trees_max=-1,
-                              depth_min=-1, depth_max=-1, votes_max=-1, projection_sparsity='auto'):
+    def build_autotune_sample(
+        self,
+        target_recall,
+        k,
+        n_test=100,
+        trees_max=-1,
+        depth_min=-1,
+        depth_max=-1,
+        votes_max=-1,
+        projection_sparsity="auto",
+    ):
         """
         Builds an autotuned MRPT index.
         :param target_recall: The target recall level (float) or None if the target recall level
@@ -148,7 +184,15 @@ class MRPTIndex(object):
 
         projection_sparsity = self._compute_sparsity(projection_sparsity)
         self.index.build_autotune_sample(
-                target_recall, n_test, k, trees_max, depth_min, depth_max, votes_max, projection_sparsity)
+            target_recall,
+            n_test,
+            k,
+            trees_max,
+            depth_min,
+            depth_max,
+            votes_max,
+            projection_sparsity,
+        )
 
     def subset(self, target_recall):
         """
@@ -175,9 +219,15 @@ class MRPTIndex(object):
         n_trees, depth, votes, k, qtime, recall = self.index.parameters()
 
         if self.index.is_autotuned():
-            return {'n_trees': n_trees, 'depth': depth, 'k': k, 'votes': votes,
-                    'estimated_qtime': qtime, 'estimated_recall': recall}
-        return {'n_trees': n_trees, 'depth': depth}
+            return {
+                "n_trees": n_trees,
+                "depth": depth,
+                "k": k,
+                "votes": votes,
+                "estimated_qtime": qtime,
+                "estimated_recall": recall,
+            }
+        return {"n_trees": n_trees, "depth": depth}
 
     def save(self, path):
         """

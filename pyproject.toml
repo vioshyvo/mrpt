@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[tool.isort]
+profile = "black"
+src_paths = ["python"]
+
+[tool.black]
+line-length = 100
+target-version = ['py312']
+include = '(\.pyi?$)'
+exclude = '''
+
+(
+  /(
+      \.github
+    | \.vscode
+    | \.venv
+    | docs\/
+    | licenses\/
+    | src\/
+  )/
+)
+'''
+
+[tool.ruff]
+line-length = 100
+indent-width = 4

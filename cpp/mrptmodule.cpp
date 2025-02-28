@@ -1,7 +1,4 @@
-/*
- * This file wraps the C++11 Mrpt code to an extension module compatible with
- * Python 3.
- */
+#define PY_SSIZE_T_CLEAN
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -514,25 +511,25 @@ static PyMethodDef MrptMethods[] = {
 };
 
 static PyTypeObject MrptIndexType = {
-    PyVarObject_HEAD_INIT(NULL, 0) "mrpt.MrptIndex", /*tp_name*/
-    sizeof(mrptIndex),                               /*tp_basicsize*/
-    0,                                               /*tp_itemsize*/
-    (destructor)mrpt_dealloc,                        /*tp_dealloc*/
-    0,                                               /*tp_print*/
-    0,                                               /*tp_getattr*/
-    0,                                               /*tp_setattr*/
-    0,                                               /*tp_compare*/
-    0,                                               /*tp_repr*/
-    0,                                               /*tp_as_number*/
-    0,                                               /*tp_as_sequence*/
-    0,                                               /*tp_as_mapping*/
-    0,                                               /*tp_hash */
-    0,                                               /*tp_call*/
-    0,                                               /*tp_str*/
-    0,                                               /*tp_getattro*/
-    0,                                               /*tp_setattro*/
-    0,                                               /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,                              /*tp_flags*/
+    PyVarObject_HEAD_INIT(NULL, 0) "mrpt.MrptIndex", /* tp_name*/
+    sizeof(mrptIndex),                               /* tp_basicsize*/
+    0,                                               /* tp_itemsize*/
+    (destructor)mrpt_dealloc,                        /* tp_dealloc*/
+    0,                                               /* tp_print*/
+    0,                                               /* tp_getattr*/
+    0,                                               /* tp_setattr*/
+    0,                                               /* tp_compare*/
+    0,                                               /* tp_repr*/
+    0,                                               /* tp_as_number*/
+    0,                                               /* tp_as_sequence*/
+    0,                                               /* tp_as_mapping*/
+    0,                                               /* tp_hash */
+    0,                                               /* tp_call*/
+    0,                                               /* tp_str*/
+    0,                                               /* tp_getattro*/
+    0,                                               /* tp_setattro*/
+    0,                                               /* tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /* tp_flags */
     "Mrpt index object",                             /* tp_doc */
     0,                                               /* tp_traverse */
     0,                                               /* tp_clear */
