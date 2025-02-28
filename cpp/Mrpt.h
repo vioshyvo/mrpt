@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <functional>
 #include <map>
@@ -16,6 +17,7 @@
 #include <vector>
 
 #include "miniselect/pdqselect.h"
+
 
 struct Mrpt_Parameters {
   int n_trees = 0;               /**< Number of trees in the index. */
