@@ -134,7 +134,7 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
         self->mmap = mmap;
         self->data = data;
     } else {
-        data = reinterpret_cast<float *>(PyArray_DATA(py_data));
+        data = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *) py_data));
         self->py_data = py_data;
         Py_XINCREF(self->py_data);
     }
@@ -196,7 +196,7 @@ static PyObject *build_autotune(mrptIndex *self, PyObject *args) {
 
         from_mem = true;
     } else {
-        data = reinterpret_cast<float *>(PyArray_DATA(py_data));
+        data = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *) py_data));
     }
 
     self->k = k;
@@ -270,13 +270,13 @@ static void mrpt_dealloc(mrptIndex *self) {
 }
 
 static PyObject *ann(mrptIndex *self, PyObject *args) {
-    PyObject *v;
+    PyArrayObject *v;
     int k, elect, dim, n, return_distances;
 
-    if (!PyArg_ParseTuple(args, "Oiii", &v, &k, &elect, &return_distances))
+    if (!PyArg_ParseTuple(args, "Oiii", &PyArray_Type, &v, &k, &elect, &return_distances))
         return NULL;
 
-    float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
+    float *indata = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *) v));
     PyObject *nearest;
 
     if (k < 0)
@@ -290,11 +290,11 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
 
         npy_intp dims[1] = {k};
         nearest = PyArray_SimpleNew(1, dims, NPY_INT);
-        int *outdata = reinterpret_cast<int *>(PyArray_DATA(nearest));
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA((PyArrayObject *) nearest));
 
         if (return_distances) {
             PyObject *distances = PyArray_SimpleNew(1, dims, NPY_FLOAT32);
-            float *out_distances = reinterpret_cast<float *>(PyArray_DATA(distances));
+            float *out_distances = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *) distances));
             self->index->query(indata, k, elect, outdata, out_distances);
 
             PyObject *out_tuple = PyTuple_New(2);
@@ -311,12 +311,12 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
 
         npy_intp dims[2] = {n, k};
         nearest = PyArray_SimpleNew(2, dims, NPY_INT);
-        int *outdata = reinterpret_cast<int *>(PyArray_DATA(nearest));
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA((PyArrayObject *) nearest));
 
         if (return_distances) {
             npy_intp dims[2] = {n, k};
             PyObject *distances = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
-            float *distances_out = reinterpret_cast<float *>(PyArray_DATA(distances));
+            float *distances_out = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *) distances));
 
             for (int i = 0; i < n; ++i) {
                 self->index->query(indata + i * dim, k, elect, outdata + i * k, distances_out + i * k);
@@ -336,13 +336,13 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
 }
 
 static PyObject *exact_search(mrptIndex *self, PyObject *args) {
-    PyObject *v;
+    PyArrayObject *v;
     int k, n, dim, return_distances;
 
-    if (!PyArg_ParseTuple(args, "Oii", &v, &k, &return_distances))
+    if (!PyArg_ParseTuple(args, "Oii", &PyArray_Type, &v, &k, &return_distances))
         return NULL;
 
-    float *indata = reinterpret_cast<float *>(PyArray_DATA(v));
+    float *indata = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *) v));
     PyObject *nearest;
 
     if (PyArray_NDIM(v) == 1) {
@@ -350,11 +350,11 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
 
         npy_intp dims[1] = {k};
         nearest = PyArray_SimpleNew(1, dims, NPY_INT);
-        int *outdata = reinterpret_cast<int *>(PyArray_DATA(nearest));
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA((PyArrayObject *) nearest));
 
         if (return_distances) {
             PyObject *distances = PyArray_SimpleNew(1, dims, NPY_FLOAT32);
-            float *out_distances = reinterpret_cast<float *>(PyArray_DATA(distances));
+            float *out_distances = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *) distances));
             self->index->exact_knn(indata, k, outdata, out_distances);
 
             PyObject *out_tuple = PyTuple_New(2);
@@ -371,12 +371,12 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
 
         npy_intp dims[2] = {n, k};
         nearest = PyArray_SimpleNew(2, dims, NPY_INT);
-        int *outdata = reinterpret_cast<int *>(PyArray_DATA(nearest));
+        int *outdata = reinterpret_cast<int *>(PyArray_DATA((PyArrayObject *) nearest));
 
         if (return_distances) {
             npy_intp dims[2] = {n, k};
             PyObject *distances = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
-            float *distances_out = reinterpret_cast<float *>(PyArray_DATA(distances));
+            float *distances_out = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *) distances));
 
             for (int i = 0; i < n; ++i) {
                 self->index->exact_knn(indata + i * dim, k, outdata + i * k, distances_out + i * k);
