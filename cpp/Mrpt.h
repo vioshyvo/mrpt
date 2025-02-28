@@ -17,7 +17,6 @@
 
 #include "miniselect/pdqselect.h"
 
-
 struct Mrpt_Parameters {
   int n_trees = 0;               /**< Number of trees in the index. */
   int depth = 0;                 /**< Depth of the trees in the index. */
@@ -706,11 +705,10 @@ class Mrpt {
 
     std::vector<int> found_leaves(n_trees);
 
-/*
- * The following loops over all trees, and routes the query to exactly one
- * leaf in each.
- */
-#pragma omp parallel for
+    /*
+     * The following loops over all trees, and routes the query to exactly one
+     * leaf in each.
+     */
     for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
       int idx_tree = 0;
       for (int d = 0; d < depth; ++d) {
@@ -856,7 +854,6 @@ class Mrpt {
 
     Eigen::VectorXf distances(n_samples);
 
-#pragma omp parallel for
     for (int i = 0; i < n_samples; ++i) distances(i) = (X.col(i) - q).squaredNorm();
 
     if (k == 1) {
@@ -1123,7 +1120,6 @@ class Mrpt {
 
     Eigen::VectorXf distances(n_elected);
 
-#pragma omp parallel for
     for (int i = 0; i < n_elected; ++i) distances(i) = (X.col(indices(i)) - q).squaredNorm();
 
     if (k == 1) {
@@ -1203,7 +1199,6 @@ class Mrpt {
     int depth_min = depth - recalls.size() + 1;
     std::vector<std::vector<int>> start_indices(n_trees);
 
-#pragma omp parallel for
     for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
       start_indices[n_tree] = std::vector<int>(depth - depth_min + 1);
       int idx_tree = 0;
@@ -1322,7 +1317,7 @@ class Mrpt {
 
     for (int i = 0; i < n_test; ++i) {
       if (!indices_test.empty()) {
-        std::remove(idx.data(), idx.data() + n_samples, indices_test[i]);
+        (void)std::remove(idx.data(), idx.data() + n_samples, indices_test[i]);
       }
       exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + i * dim, dim), k, idx,
                 (indices_test.empty() ? n_samples : n_samples - 1), out_exact.data() + i * k);
@@ -1342,7 +1337,6 @@ class Mrpt {
     std::vector<int> found_leaves(n_trees);
     const std::vector<int> &leaf_first_indices = leaf_first_indices_all[depth_crnt];
 
-#pragma omp parallel for
     for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
       int idx_tree = 0;
       for (int d = 0; d < depth_crnt; ++d) {
