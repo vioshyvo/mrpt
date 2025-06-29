@@ -36,7 +36,7 @@ Install the module with `pip install mrpt`
 On macOS, it is highly recommended to use the Homebrew version of Clang as the compiler:
 ```
 brew install llvm libomp
-CC=/opt/homebrew/opt/llvm/bin/clang CXX=/opt/homebrew/opt/llvm/bin/clang++ LDFLAGS=-L/opt/homebrew/opt/llvm/lib pip install lorann
+CC=/opt/homebrew/opt/llvm/bin/clang CXX=/opt/homebrew/opt/llvm/bin/clang++ LDFLAGS=-L/opt/homebrew/opt/llvm/lib pip install mrpt
 ```
 
 ## Minimal examples
