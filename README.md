@@ -2,7 +2,10 @@
 
 ![Fifty shades of green](docs/img/voting-candidates2.png)
 
-[![Documentation](https://img.shields.io/badge/api-reference-blue.svg)](http://vioshyvo.github.io/mrpt/html/index.html)
+[![Documentation](https://img.shields.io/badge/api-reference-green.svg)](http://vioshyvo.github.io/mrpt/html/index.html)
+[![Paper](https://img.shields.io/badge/Paper-Big_Data%3A_MRPT-blue)](https://eliasjaasaari.com/pdf/bigdata2016.pdf)
+[![PyPI](https://img.shields.io/pypi/v/mrpt?color=salmon)](https://pypi.org/project/mrpt)
+[![GitHub stars](https://img.shields.io/github/stars/vioshyvo/mrpt)](https://github.com/vioshyvo/mrpt/stargazers)
 
 MRPT is a lightweight and easy-to-use library for approximate nearest neighbor search. It is written in C++14 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level! 
 
