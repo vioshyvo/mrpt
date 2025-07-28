@@ -4,39 +4,24 @@
 
 [![Documentation](https://img.shields.io/badge/api-reference-blue.svg)](http://vioshyvo.github.io/mrpt/html/index.html)
 
-MRPT is a lightweight and easy-to-use library for approximate nearest neighbor search. It is written in C++11 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level! 
+MRPT is a lightweight and easy-to-use library for approximate nearest neighbor search. It is written in C++14 and has Python bindings. The index building has an integrated hyperparameter tuning algorithm, so the only hyperparameter required to construct the index is the target recall level! 
 
 According to [our experiments](https://github.com/ejaasaari/mrpt-comparison/) MRPT is one of the fastest libraries for approximate nearest neighbor search.
 
-In the offline phase of the algorithm MRPT indexes the data with a collection of *random projection trees*. In the online phase the index structure allows us to answer queries in superior time. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found in [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) that was published in IEEE International Conference on Big Data 2016.
+In the offline phase of the algorithm, MRPT indexes the data with a collection of *random projection trees*. In the online phase, the index structure allows us to answer queries rapidly. A detailed description of the algorithm with the time and space complexities, and the aforementioned comparisons can be found in [our article](https://www.cs.helsinki.fi/u/ttonteri/pub/bigdata2016.pdf) published at the IEEE International Conference on Big Data 2016.
 
-The algorithm for automatic hyperparameter tuning is described in detail in our new article that will be presented in Pacific-Asia Conference on Knowledge Discovery and Data Mining 2019 ([arxiv preprint](https://arxiv.org/abs/1812.07484)).
+The algorithm for automatic hyperparameter tuning is described in detail in our [article](https://arxiv.org/abs/1812.07484) presented at PAKDD 2019.
 
 Currently the Euclidean distance is supported as a distance metric.
-
-The tests for MRPT are in a separate [repo](https://github.com/vioshyvo/RP-test).
-## New
-
-- Release [MRPT 2.0.0](https://github.com/vioshyvo/mrpt/releases/tag/release-2.0.0) : pip package and bug fixes. (2025/02/28)
-
-- Release [MRPT 1.1.1](https://github.com/vioshyvo/mrpt/releases/tag/release-1.1.1) : faster autotuning and bug fixes. (2018/12/07)
-
-- Release [MRPT 1.1.0](https://github.com/vioshyvo/mrpt/releases/tag/release-1.1.0) : now autotuning works also without a separate set of test queries. (2018/11/24)
-
-- Release [MRPT 1.0.0](https://github.com/vioshyvo/mrpt/releases) (2018/11/22)
-
-- Add [documentation](http://vioshyvo.github.io/mrpt/html/index.html) for C++ API (2018/11/22)
-
-- Add index building with autotuning: no more manual hyperparameter tuning! (2018/11/21)
 
 ## Python installation
 
 Install the module with `pip install mrpt`
 
-On macOS, it is highly recommended to use the Homebrew version of Clang as the compiler:
+On macOS, it is recommended to use the Homebrew version of Clang as the compiler:
 ```
 brew install llvm libomp
-CC=/opt/homebrew/opt/llvm/bin/clang CXX=/opt/homebrew/opt/llvm/bin/clang++ LDFLAGS=-L/opt/homebrew/opt/llvm/lib pip install mrpt
+CC=/opt/homebrew/opt/llvm/bin/clang CXX=/opt/homebrew/opt/llvm/bin/clang++ pip install mrpt
 ```
 
 ## Minimal examples
