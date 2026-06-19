@@ -110,7 +110,7 @@ class Mrpt {
     n_trees = n_trees_;
     depth = depth_;
     n_pool = n_trees_ * depth_;
-    n_array = 1 << (depth_ + 1);
+    n_array = count_internal_nodes(depth_);
 
     if (density_ < 0) {
       density = 1.0 / std::sqrt(dim);
@@ -569,7 +569,7 @@ class Mrpt {
     index2.depth = index2.par.depth;
     index2.votes = index2.par.votes;
     index2.n_pool = index2.depth * index2.n_trees;
-    index2.n_array = 1 << (index2.depth + 1);
+    index2.n_array = count_internal_nodes(index2.depth);
     index2.tree_leaves.assign(tree_leaves.begin(), tree_leaves.begin() + index2.n_trees);
     index2.leaf_first_indices_all = leaf_first_indices_all;
     index2.density = density;
@@ -621,7 +621,7 @@ class Mrpt {
     index2->depth = index2->par.depth;
     index2->votes = index2->par.votes;
     index2->n_pool = index2->depth * index2->n_trees;
-    index2->n_array = 1 << (index2->depth + 1);
+    index2->n_array = count_internal_nodes(index2->depth);
     index2->tree_leaves.assign(tree_leaves.begin(), tree_leaves.begin() + index2->n_trees);
     index2->leaf_first_indices_all = leaf_first_indices_all;
     index2->density = density;
@@ -1024,7 +1024,7 @@ class Mrpt {
     fread(&density, sizeof(float), 1, fd);
 
     n_pool = n_trees * depth;
-    n_array = 1 << (depth + 1);
+    n_array = count_internal_nodes(depth);
 
     count_first_leaf_indices_all(leaf_first_indices_all, n_samples, depth);
     leaf_first_indices = leaf_first_indices_all[depth];
@@ -1093,6 +1093,8 @@ class Mrpt {
   /**@}*/
 
  private:
+  static int count_internal_nodes(int tree_depth) { return (1 << tree_depth) - 1; }
+
   struct ProjectionIndex {
     float projection;
     int index;
@@ -1328,7 +1330,7 @@ class Mrpt {
     depth = par.depth;
     votes = par.votes;
     n_pool = depth * n_trees;
-    n_array = 1 << (depth + 1);
+    n_array = count_internal_nodes(depth);
 
     tree_leaves.resize(n_trees);
     tree_leaves.shrink_to_fit();
@@ -1948,7 +1950,7 @@ class Mrpt {
   int depth = 0;         // depth of an RP-tree with median split
   float density = -1.0;  // expected ratio of non-zero components in a projection matrix
   int n_pool = 0;        // amount of random vectors needed for all the RP-trees
-  int n_array = 0;       // length of the one RP-tree as array
+  int n_array = 0;       // number of internal nodes in one RP-tree
   int votes = 0;         // optimal number of votes to use
   int k = 0;
   enum itype { normal, autotuned, autotuned_unpruned };
