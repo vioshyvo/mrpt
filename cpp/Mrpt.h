@@ -6,7 +6,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <functional>
+#include <iterator>
 #include <map>
 #include <numeric>
 #include <random>
@@ -129,18 +131,33 @@ class Mrpt {
 #pragma omp parallel for
 #endif
     for (int n_tree = 0; n_tree < n_trees; ++n_tree) {
-      Eigen::MatrixXf tree_projections;
+      Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> tree_projections;
 
-      if (density < 1)
-        tree_projections.noalias() = sparse_random_matrix.middleRows(n_tree * depth, depth) * X;
-      else
+      if (density < 1) {
+        tree_projections.resize(depth, n_samples);
+        const int *outer = sparse_random_matrix.outerIndexPtr();
+        const int *inner = sparse_random_matrix.innerIndexPtr();
+        const float *values = sparse_random_matrix.valuePtr();
+        const int first_row = n_tree * depth;
+
+        for (int sample = 0; sample < n_samples; ++sample) {
+          for (int d = 0; d < depth; ++d) {
+            float projection = 0.0f;
+            const int row = first_row + d;
+            for (int p = outer[row]; p < outer[row + 1]; ++p)
+              projection += values[p] * X(inner[p], sample);
+            tree_projections(d, sample) = projection;
+          }
+        }
+      } else {
         tree_projections.noalias() = dense_random_matrix.middleRows(n_tree * depth, depth) * X;
+      }
 
       tree_leaves[n_tree] = std::vector<int>(n_samples);
       std::vector<int> &indices = tree_leaves[n_tree];
       std::iota(indices.begin(), indices.end(), 0);
 
-      grow_subtree(indices.begin(), indices.end(), 0, 0, n_tree, tree_projections);
+      grow_tree(indices, n_tree, tree_projections);
     }
   }
 
@@ -1076,37 +1093,179 @@ class Mrpt {
   /**@}*/
 
  private:
-  /**
-   * Builds a single random projection tree. The tree is constructed by
-   * recursively projecting the data on a random vector and splitting into two
-   * by the median.
-   */
-  void grow_subtree(std::vector<int>::iterator begin, std::vector<int>::iterator end,
-                    int tree_level, int i, int n_tree, const Eigen::MatrixXf &tree_projections) {
-    int n = end - begin;
-    int idx_left = 2 * i + 1;
-    int idx_right = idx_left + 1;
+  struct ProjectionIndex {
+    float projection;
+    int index;
+  };
 
-    if (tree_level == depth) return;
+  struct ProjectionIndexReference {
+    float *projection;
+    int *index;
 
-    miniselect::pdqselect_branchless(
-        begin, begin + n / 2, end, [&tree_projections, tree_level](int i1, int i2) {
-          return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
-        });
-    auto mid = end - n / 2;
+    operator ProjectionIndex() const { return {*projection, *index}; }
 
-    if (n % 2) {
-      split_points(i, n_tree) = tree_projections(tree_level, *(mid - 1));
-    } else {
-      auto left_it = std::max_element(begin, mid, [&tree_projections, tree_level](int i1, int i2) {
-        return tree_projections(tree_level, i1) < tree_projections(tree_level, i2);
-      });
-      split_points(i, n_tree) =
-          (tree_projections(tree_level, *mid) + tree_projections(tree_level, *left_it)) / 2.0;
+    ProjectionIndexReference &operator=(ProjectionIndex value) {
+      *projection = value.projection;
+      *index = value.index;
+      return *this;
     }
 
-    grow_subtree(begin, mid, tree_level + 1, idx_left, n_tree, tree_projections);
-    grow_subtree(mid, end, tree_level + 1, idx_right, n_tree, tree_projections);
+    ProjectionIndexReference &operator=(const ProjectionIndexReference &other) {
+      return *this = static_cast<ProjectionIndex>(other);
+    }
+
+    friend void swap(ProjectionIndexReference left, ProjectionIndexReference right) {
+      std::swap(*left.projection, *right.projection);
+      std::swap(*left.index, *right.index);
+    }
+  };
+
+  class ProjectionIndexIterator {
+   public:
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = ProjectionIndex;
+    using difference_type = std::ptrdiff_t;
+    using pointer = void;
+    using reference = ProjectionIndexReference;
+
+    ProjectionIndexIterator(float *projection, int *index)
+        : projection_(projection), index_(index) {}
+
+    reference operator*() const { return {projection_, index_}; }
+    reference operator[](difference_type offset) const {
+      return {projection_ + offset, index_ + offset};
+    }
+
+    ProjectionIndexIterator &operator++() {
+      ++projection_;
+      ++index_;
+      return *this;
+    }
+
+    ProjectionIndexIterator operator++(int) {
+      ProjectionIndexIterator copy = *this;
+      ++*this;
+      return copy;
+    }
+
+    ProjectionIndexIterator &operator--() {
+      --projection_;
+      --index_;
+      return *this;
+    }
+
+    ProjectionIndexIterator operator--(int) {
+      ProjectionIndexIterator copy = *this;
+      --*this;
+      return copy;
+    }
+
+    ProjectionIndexIterator &operator+=(difference_type offset) {
+      projection_ += offset;
+      index_ += offset;
+      return *this;
+    }
+
+    ProjectionIndexIterator &operator-=(difference_type offset) { return *this += -offset; }
+
+    friend ProjectionIndexIterator operator+(ProjectionIndexIterator iterator,
+                                             difference_type offset) {
+      iterator += offset;
+      return iterator;
+    }
+
+    friend ProjectionIndexIterator operator+(difference_type offset,
+                                             ProjectionIndexIterator iterator) {
+      return iterator + offset;
+    }
+
+    friend ProjectionIndexIterator operator-(ProjectionIndexIterator iterator,
+                                             difference_type offset) {
+      iterator -= offset;
+      return iterator;
+    }
+
+    friend difference_type operator-(ProjectionIndexIterator left, ProjectionIndexIterator right) {
+      return left.projection_ - right.projection_;
+    }
+
+    friend bool operator==(ProjectionIndexIterator left, ProjectionIndexIterator right) {
+      return left.projection_ == right.projection_;
+    }
+
+    friend bool operator!=(ProjectionIndexIterator left, ProjectionIndexIterator right) {
+      return !(left == right);
+    }
+
+    friend bool operator<(ProjectionIndexIterator left, ProjectionIndexIterator right) {
+      return left.projection_ < right.projection_;
+    }
+
+    friend bool operator>(ProjectionIndexIterator left, ProjectionIndexIterator right) {
+      return right < left;
+    }
+
+    friend bool operator<=(ProjectionIndexIterator left, ProjectionIndexIterator right) {
+      return !(right < left);
+    }
+
+    friend bool operator>=(ProjectionIndexIterator left, ProjectionIndexIterator right) {
+      return !(left < right);
+    }
+
+   private:
+    float *projection_;
+    int *index_;
+  };
+
+  struct ProjectionIndexLess {
+    bool operator()(ProjectionIndex left, ProjectionIndex right) const {
+      return left.projection < right.projection;
+    }
+  };
+
+  /**
+   * Builds a random projection tree breadth-first. At each level the previous
+   * projection row is reused as scratch space for projections ordered like the
+   * current index vector.
+   */
+  void grow_tree(
+      std::vector<int> &indices, int n_tree,
+      Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> &tree_projections) {
+    int *index_data = indices.data();
+
+    for (int tree_level = 0; tree_level < depth; ++tree_level) {
+      float *projections;
+      if (tree_level == 0) {
+        projections = tree_projections.data();
+      } else {
+        projections = tree_projections.data() + (tree_level - 1) * n_samples;
+        const float *source = tree_projections.data() + tree_level * n_samples;
+        for (int sample = 0; sample < n_samples; ++sample)
+          projections[sample] = source[index_data[sample]];
+      }
+
+      const std::vector<int> &first_indices = leaf_first_indices_all[tree_level];
+      const int first_node = (1 << tree_level) - 1;
+      const int n_nodes = 1 << tree_level;
+
+      for (int node = 0; node < n_nodes; ++node) {
+        const int begin = first_indices[node];
+        const int end = first_indices[node + 1];
+        const int n = end - begin;
+        const int mid = end - n / 2;
+
+        ProjectionIndexIterator first(projections + begin, index_data + begin);
+        miniselect::pdqselect_branchless(first, first + n / 2, first + n, ProjectionIndexLess());
+
+        if (n % 2) {
+          split_points(first_node + node, n_tree) = projections[mid - 1];
+        } else {
+          const float left = *std::max_element(projections + begin, projections + mid);
+          split_points(first_node + node, n_tree) = (projections[mid] + left) / 2.0f;
+        }
+      }
+    }
   }
 
   /**
@@ -1253,7 +1412,7 @@ class Mrpt {
           int v = ++votes(idx);
           if (v <= votes_max) {
             candidate_set_size(v - 1, n_tree)++;
-            if (std::find(exact_begin, exact_end, idx) != exact_end) recall(v - 1, n_tree)++;
+            if (std::binary_search(exact_begin, exact_end, idx)) recall(v - 1, n_tree)++;
           }
         }
       }
