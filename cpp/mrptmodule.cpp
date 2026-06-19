@@ -3,9 +3,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <memory>
+#include <new>
 #include <numeric>
 #include <string>
 #include <vector>
@@ -34,7 +37,26 @@ typedef struct {
   int n;
   int dim;
   int k;
+  size_t data_bytes;
 } mrptIndex;
+
+static bool matrix_size(int n, int dim, size_t *elements, size_t *bytes) {
+  if (n <= 0 || dim <= 0) return false;
+
+  const size_t n_size = static_cast<size_t>(n);
+  const size_t dim_size = static_cast<size_t>(dim);
+  if (n_size > std::numeric_limits<size_t>::max() / dim_size) return false;
+
+  *elements = n_size * dim_size;
+  if (*elements > std::numeric_limits<size_t>::max() / sizeof(float)) return false;
+
+  *bytes = *elements * sizeof(float);
+  return true;
+}
+
+static bool file_size_matches(const struct stat &sb, size_t expected_bytes) {
+  return sb.st_size >= 0 && static_cast<uintmax_t>(sb.st_size) == expected_bytes;
+}
 
 static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
   mrptIndex *self = reinterpret_cast<mrptIndex *>(type->tp_alloc(type, 0));
@@ -44,28 +66,29 @@ static PyObject *Mrpt_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
     self->data = NULL;
     self->py_data = NULL;
     self->subset_refs = new int(1);
+    self->data_bytes = 0;
   }
 
   return reinterpret_cast<PyObject *>(self);
 }
 
-float *read_memory(char *file, int n, int dim) {
+float *read_memory(const char *file, size_t elements) {
   FILE *fd;
   if ((fd = fopen(file, "rb")) == NULL) {
     return NULL;
   }
 
-  float *data = new float[n * dim];
+  float *data = new (std::nothrow) float[elements];
 
   if (data == NULL) {
     fclose(fd);
     return NULL;
   }
 
-  int read = fread(data, sizeof(float), n * dim, fd);
+  const size_t read = fread(data, sizeof(float), elements, fd);
   fclose(fd);
 
-  if (read != n * dim) {
+  if (read != elements) {
     delete[] data;
     return NULL;
   }
@@ -74,7 +97,7 @@ float *read_memory(char *file, int n, int dim) {
 }
 
 #ifndef _WIN32
-float *read_mmap(char *file, int n, int dim) {
+float *read_mmap(const char *file, size_t bytes) {
   FILE *fd;
   if ((fd = fopen(file, "rb")) == NULL) return NULL;
 
@@ -82,11 +105,11 @@ float *read_mmap(char *file, int n, int dim) {
 
   if ((data = reinterpret_cast<float *>(
 #ifdef MAP_POPULATE
-           mmap(0, n * dim * sizeof(float), PROT_READ, MAP_SHARED | MAP_POPULATE, fileno(fd),
-                0))) == MAP_FAILED) {
+           mmap(0, bytes, PROT_READ, MAP_SHARED | MAP_POPULATE, fileno(fd), 0))) == MAP_FAILED) {
 #else
-           mmap(0, n * dim * sizeof(float), PROT_READ, MAP_SHARED, fileno(fd), 0))) == MAP_FAILED) {
+           mmap(0, bytes, PROT_READ, MAP_SHARED, fileno(fd), 0))) == MAP_FAILED) {
 #endif
+    fclose(fd);
     return NULL;
   }
 
@@ -101,9 +124,16 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
 
   if (!PyArg_ParseTuple(args, "Oiii", &py_data, &n, &dim, &mmap)) return -1;
 
+  size_t elements, bytes;
+  if (!matrix_size(n, dim, &elements, &bytes)) {
+    PyErr_SetString(PyExc_OverflowError, "Data shape is invalid or too large");
+    return -1;
+  }
+
   float *data;
   if (PyUnicode_Check(py_data)) {
-    char *file = PyBytes_AsString(py_data);
+    const char *file = PyUnicode_AsUTF8(py_data);
+    if (file == NULL) return -1;
 
     struct stat sb;
     if (stat(file, &sb) != 0) {
@@ -111,15 +141,15 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
       return -1;
     }
 
-    if (sb.st_size != static_cast<unsigned>(sizeof(float) * dim * n)) {
+    if (!file_size_matches(sb, bytes)) {
       PyErr_SetString(PyExc_ValueError, "Size of the input is not N x dim");
       return -1;
     }
 
 #ifndef _WIN32
-    data = mmap ? read_mmap(file, n, dim) : read_memory(file, n, dim);
+    data = mmap ? read_mmap(file, bytes) : read_memory(file, elements);
 #else
-    data = read_memory(file, n, dim);
+    data = read_memory(file, elements);
 #endif
 
     if (data == NULL) {
@@ -129,7 +159,13 @@ static int Mrpt_init(mrptIndex *self, PyObject *args) {
 
     self->mmap = mmap;
     self->data = data;
+    self->data_bytes = bytes;
   } else {
+    if (!PyArray_Check(py_data) ||
+        static_cast<size_t>(PyArray_SIZE(reinterpret_cast<PyArrayObject *>(py_data))) != elements) {
+      PyErr_SetString(PyExc_ValueError, "Size of the input is not N x dim");
+      return -1;
+    }
     data = reinterpret_cast<float *>(PyArray_DATA((PyArrayObject *)py_data));
     self->py_data = py_data;
     Py_XINCREF(self->py_data);
@@ -173,7 +209,14 @@ static PyObject *build_autotune(mrptIndex *self, PyObject *args) {
 
   float *data;
   if (PyUnicode_Check(py_data)) {
-    char *file = PyBytes_AsString(py_data);
+    const char *file = PyUnicode_AsUTF8(py_data);
+    if (file == NULL) return NULL;
+
+    size_t elements, bytes;
+    if (!matrix_size(n_test, self->dim, &elements, &bytes)) {
+      PyErr_SetString(PyExc_OverflowError, "Test query shape is invalid or too large");
+      return NULL;
+    }
 
     struct stat sb;
     if (stat(file, &sb) != 0) {
@@ -181,12 +224,12 @@ static PyObject *build_autotune(mrptIndex *self, PyObject *args) {
       return NULL;
     }
 
-    if (sb.st_size != static_cast<unsigned>(sizeof(float) * self->dim * n_test)) {
+    if (!file_size_matches(sb, bytes)) {
       PyErr_SetString(PyExc_ValueError, "Size of the input is not n_test x dim");
       return NULL;
     }
 
-    data = read_memory(file, n_test, self->dim);
+    data = read_memory(file, elements);
     if (data == NULL) {
       PyErr_SetString(PyExc_IOError, "Unable to read data from file or allocate memory for it");
       return NULL;
@@ -253,7 +296,7 @@ static void mrpt_dealloc(mrptIndex *self) {
     if (self->data) {
 #ifndef _WIN32
       if (self->mmap)
-        munmap(self->data, self->n * self->dim * sizeof(float));
+        munmap(self->data, self->data_bytes);
       else
 #endif
         delete[] self->data;
@@ -278,7 +321,8 @@ static void mrpt_dealloc(mrptIndex *self) {
 
 static PyObject *ann(mrptIndex *self, PyObject *args) {
   PyArrayObject *v;
-  int k, elect, dim, n, return_distances;
+  int k, elect, return_distances;
+  npy_intp dim, n;
 
   if (!PyArg_ParseTuple(args, "O!iii", &PyArray_Type, &v, &k, &elect, &return_distances))
     return NULL;
@@ -293,6 +337,10 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
 
   if (PyArray_NDIM(v) == 1) {
     dim = PyArray_DIM(v, 0);
+    if (dim != self->dim) {
+      PyErr_SetString(PyExc_ValueError, "Query dimension does not match the index");
+      return NULL;
+    }
 
     npy_intp dims[1] = {k};
     nearest = PyArray_SimpleNew(1, dims, NPY_INT);
@@ -315,9 +363,13 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
       Py_END_ALLOW_THREADS;
       return nearest;
     }
-  } else {
+  } else if (PyArray_NDIM(v) == 2) {
     n = PyArray_DIM(v, 0);
     dim = PyArray_DIM(v, 1);
+    if (dim != self->dim) {
+      PyErr_SetString(PyExc_ValueError, "Query dimension does not match the index");
+      return NULL;
+    }
 
     npy_intp dims[2] = {n, k};
     nearest = PyArray_SimpleNew(2, dims, NPY_INT);
@@ -332,8 +384,11 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-      for (int i = 0; i < n; ++i) {
-        self->index->query(indata + i * dim, k, elect, outdata + i * k, distances_out + i * k);
+      for (npy_intp i = 0; i < n; ++i) {
+        const npy_intp query_offset = i * dim;
+        const npy_intp output_offset = i * static_cast<npy_intp>(k);
+        self->index->query(indata + query_offset, k, elect, outdata + output_offset,
+                           distances_out + output_offset);
       }
       Py_END_ALLOW_THREADS;
 
@@ -346,18 +401,24 @@ static PyObject *ann(mrptIndex *self, PyObject *args) {
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-      for (int i = 0; i < n; ++i) {
-        self->index->query(indata + i * dim, k, elect, outdata + i * k);
+      for (npy_intp i = 0; i < n; ++i) {
+        const npy_intp query_offset = i * dim;
+        const npy_intp output_offset = i * static_cast<npy_intp>(k);
+        self->index->query(indata + query_offset, k, elect, outdata + output_offset);
       }
       Py_END_ALLOW_THREADS;
       return nearest;
     }
   }
+
+  PyErr_SetString(PyExc_ValueError, "Query input must be one- or two-dimensional");
+  return NULL;
 }
 
 static PyObject *exact_search(mrptIndex *self, PyObject *args) {
   PyArrayObject *v;
-  int k, n, dim, return_distances;
+  int k, return_distances;
+  npy_intp n, dim;
 
   if (!PyArg_ParseTuple(args, "O!ii", &PyArray_Type, &v, &k, &return_distances)) return NULL;
 
@@ -366,6 +427,10 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
 
   if (PyArray_NDIM(v) == 1) {
     dim = PyArray_DIM(v, 0);
+    if (dim != self->dim) {
+      PyErr_SetString(PyExc_ValueError, "Query dimension does not match the index");
+      return NULL;
+    }
 
     npy_intp dims[1] = {k};
     nearest = PyArray_SimpleNew(1, dims, NPY_INT);
@@ -388,9 +453,13 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
       Py_END_ALLOW_THREADS;
       return nearest;
     }
-  } else {
+  } else if (PyArray_NDIM(v) == 2) {
     n = PyArray_DIM(v, 0);
     dim = PyArray_DIM(v, 1);
+    if (dim != self->dim) {
+      PyErr_SetString(PyExc_ValueError, "Query dimension does not match the index");
+      return NULL;
+    }
 
     npy_intp dims[2] = {n, k};
     nearest = PyArray_SimpleNew(2, dims, NPY_INT);
@@ -405,8 +474,11 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-      for (int i = 0; i < n; ++i) {
-        self->index->exact_knn(indata + i * dim, k, outdata + i * k, distances_out + i * k);
+      for (npy_intp i = 0; i < n; ++i) {
+        const npy_intp query_offset = i * dim;
+        const npy_intp output_offset = i * static_cast<npy_intp>(k);
+        self->index->exact_knn(indata + query_offset, k, outdata + output_offset,
+                               distances_out + output_offset);
       }
       Py_END_ALLOW_THREADS;
 
@@ -419,13 +491,18 @@ static PyObject *exact_search(mrptIndex *self, PyObject *args) {
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-      for (int i = 0; i < n; ++i) {
-        self->index->exact_knn(indata + i * dim, k, outdata + i * k);
+      for (npy_intp i = 0; i < n; ++i) {
+        const npy_intp query_offset = i * dim;
+        const npy_intp output_offset = i * static_cast<npy_intp>(k);
+        self->index->exact_knn(indata + query_offset, k, outdata + output_offset);
       }
       Py_END_ALLOW_THREADS;
       return nearest;
     }
   }
+
+  PyErr_SetString(PyExc_ValueError, "Query input must be one- or two-dimensional");
+  return NULL;
 }
 
 static PyObject *subset(mrptIndex *self, PyObject *args) {
@@ -443,6 +520,7 @@ static PyObject *subset(mrptIndex *self, PyObject *args) {
   new_idx->n = self->n;
   new_idx->dim = self->dim;
   new_idx->k = self->k;
+  new_idx->data_bytes = self->data_bytes;
   new_idx->py_data = self->py_data;
   Py_XINCREF(new_idx->py_data);
 

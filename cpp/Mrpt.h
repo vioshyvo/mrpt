@@ -430,8 +430,9 @@ class Mrpt {
       std::vector<Eigen::MatrixXd> recall_tmp(depth_max - depth_min + 1);
       std::vector<Eigen::MatrixXd> cs_size_tmp(depth_max - depth_min + 1);
 
-      count_elected(Q.col(i), Eigen::Map<Eigen::VectorXi>(exact.data() + i * k, k), votes_max,
-                    recall_tmp, cs_size_tmp);
+      const Eigen::Index exact_offset = static_cast<Eigen::Index>(i) * static_cast<Eigen::Index>(k);
+      count_elected(Q.col(i), Eigen::Map<Eigen::VectorXi>(exact.data() + exact_offset, k),
+                    votes_max, recall_tmp, cs_size_tmp);
 
       for (int d = depth_min; d <= depth_max; ++d) {
         recalls[d - depth_min] += recall_tmp[d - depth_min];
@@ -440,7 +441,7 @@ class Mrpt {
     }
 
     for (int d = depth_min; d <= depth_max; ++d) {
-      recalls[d - depth_min] /= (k * n_test);
+      recalls[d - depth_min] /= static_cast<double>(k) * static_cast<double>(n_test);
       cs_sizes[d - depth_min] /= n_test;
     }
 
@@ -951,7 +952,7 @@ class Mrpt {
     fwrite(&depth, sizeof(int), 1, fd);
     fwrite(&density, sizeof(float), 1, fd);
 
-    fwrite(split_points.data(), sizeof(float), n_array * n_trees, fd);
+    fwrite(split_points.data(), sizeof(float), static_cast<size_t>(split_points.size()), fd);
 
     // save tree leaves
     for (int i = 0; i < n_trees; ++i) {
@@ -975,7 +976,8 @@ class Mrpt {
         }
       }
     } else {
-      fwrite(dense_random_matrix.data(), sizeof(float), n_pool * dim, fd);
+      fwrite(dense_random_matrix.data(), sizeof(float),
+             static_cast<size_t>(dense_random_matrix.size()), fd);
     }
 
     fclose(fd);
@@ -1011,7 +1013,7 @@ class Mrpt {
     leaf_first_indices = leaf_first_indices_all[depth];
 
     split_points = Eigen::MatrixXf(n_array, n_trees);
-    fread(split_points.data(), sizeof(float), n_array * n_trees, fd);
+    fread(split_points.data(), sizeof(float), static_cast<size_t>(split_points.size()), fd);
 
     // load tree leaves
     tree_leaves = std::vector<std::vector<int>>(n_trees);
@@ -1044,7 +1046,8 @@ class Mrpt {
     } else {
       dense_random_matrix =
           Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>(n_pool, dim);
-      fread(dense_random_matrix.data(), sizeof(float), n_pool * dim, fd);
+      fread(dense_random_matrix.data(), sizeof(float),
+            static_cast<size_t>(dense_random_matrix.size()), fd);
     }
 
     fclose(fd);
@@ -1307,7 +1310,8 @@ class Mrpt {
     std::mt19937 gen(s);
     std::normal_distribution<float> normal_dist(0, 1);
 
-    std::generate(dense_random_matrix.data(), dense_random_matrix.data() + n_row * n_col,
+    std::generate(dense_random_matrix.data(),
+                  dense_random_matrix.data() + dense_random_matrix.size(),
                   [&normal_dist, &gen] { return normal_dist(gen); });
   }
 
@@ -1319,12 +1323,17 @@ class Mrpt {
     std::iota(idx.data(), idx.data() + n_samples, 0);
 
     for (int i = 0; i < n_test; ++i) {
+      const Eigen::Index query_offset =
+          static_cast<Eigen::Index>(i) * static_cast<Eigen::Index>(dim);
+      const Eigen::Index output_offset =
+          static_cast<Eigen::Index>(i) * static_cast<Eigen::Index>(k);
       if (!indices_test.empty()) {
         (void)std::remove(idx.data(), idx.data() + n_samples, indices_test[i]);
       }
-      exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + i * dim, dim), k, idx,
-                (indices_test.empty() ? n_samples : n_samples - 1), out_exact.data() + i * k);
-      std::sort(out_exact.data() + i * k, out_exact.data() + i * k + k);
+      exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + query_offset, dim), k, idx,
+                (indices_test.empty() ? n_samples : n_samples - 1),
+                out_exact.data() + output_offset);
+      std::sort(out_exact.data() + output_offset, out_exact.data() + output_offset + k);
       if (!indices_test.empty()) {
         idx[n_samples - 1] = indices_test[i];
       }
@@ -1513,8 +1522,10 @@ class Mrpt {
 
         const auto start_exact = std::chrono::steady_clock::now();
         std::vector<int> res(k);
-        exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + ri * dim, dim), k, elected, s_size,
-                  &res[0]);
+        const Eigen::Index query_offset =
+            static_cast<Eigen::Index>(ri) * static_cast<Eigen::Index>(dim);
+        exact_knn(Eigen::Map<const Eigen::VectorXf>(Q.data() + query_offset, dim), k, elected,
+                  s_size, &res[0]);
         const auto end_exact = std::chrono::steady_clock::now();
         mean_exact_time += std::chrono::duration<double>(end_exact - start_exact).count();
 
